@@ -7,7 +7,7 @@ const STATS = [
 
 export default function Hero() {
   return (
-    <section className="relative min-h-screen bg-[#0d0d0d] flex items-center justify-center overflow-hidden pt-16">
+    <section className="relative min-h-screen bg-[#0B1220] flex items-center justify-center overflow-hidden pt-16">
       <div className="absolute inset-0 opacity-100"
         style={{
           backgroundImage: "linear-gradient(rgba(208,27,27,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(208,27,27,0.05) 1px, transparent 1px)",
@@ -34,7 +34,7 @@ export default function Hero() {
           BUILD.
         </h1>
 
-        <p className="text-gray-500 leading-relaxed max-w-lg mx-auto mb-10 text-base md:text-lg"
+        <p className="text-slate-400 leading-relaxed max-w-lg mx-auto mb-10 text-base md:text-lg"
           style={{ fontFamily: "'DM Sans', sans-serif" }}>
           Greenland Mini 4WD Club is a passionate Tamiya racing community for Filipinos and locals in Nuuk — built for speed, craft, and real connection.
         </p>

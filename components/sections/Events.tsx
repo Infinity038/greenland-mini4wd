@@ -14,13 +14,13 @@ const TYPE_STYLES: Record<Event["type"], string> = {
 
 export default function Events() {
   return (
-    <section id="events" className="bg-[#0d0d0d] px-5 py-20">
+    <section id="events" className="bg-[#0B1220] px-5 py-20">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
           <div>
             <p className="text-xs font-semibold text-[#D01B1B] tracking-[0.3em] mb-2"
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>UPCOMING</p>
-            <h2 className="font-black text-[#F4F4F0] leading-none"
+            <h2 className="font-black text-[#F8FAFC] leading-none"
               style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(38px, 6vw, 58px)" }}>
               EVENTS &<br />RACES
             </h2>
@@ -32,11 +32,11 @@ export default function Events() {
         <div className="flex flex-col gap-4">
           {EVENTS.map((ev) => (
             <div key={ev.id}
-              className="bg-[#0F1923] border border-white/[0.07] hover:border-red-700/50 rounded-lg p-5 md:p-6 grid grid-cols-[72px_1fr] md:grid-cols-[80px_1fr_auto] gap-4 md:gap-6 items-center transition-all duration-200 hover:-translate-y-0.5 cursor-pointer">
+              className="bg-[#1E293B] border border-white/[0.07] hover:border-red-700/50 rounded-lg p-5 md:p-6 grid grid-cols-[72px_1fr] md:grid-cols-[80px_1fr_auto] gap-4 md:gap-6 items-center transition-all duration-200 hover:-translate-y-0.5 cursor-pointer">
               <div className="text-center bg-red-900/10 border border-red-900/20 rounded-md py-3 px-2">
                 <div className="font-black text-xl text-[#D01B1B] leading-none"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.date}</div>
-                <div className="text-[10px] text-gray-400 tracking-widest mt-0.5"
+                <div className="text-[10px] text-slate-300 tracking-widest mt-0.5"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.month}</div>
               </div>
               <div className="min-w-0">
@@ -44,17 +44,17 @@ export default function Events() {
                   <span className={`text-[10px] font-bold tracking-widest px-2.5 py-0.5 rounded-full ${TYPE_STYLES[ev.type]}`}
                     style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.type.toUpperCase()}</span>
                 </div>
-                <div className="font-bold text-xl md:text-2xl text-[#F4F4F0] leading-tight mb-1"
+                <div className="font-bold text-xl md:text-2xl text-[#F8FAFC] leading-tight mb-1"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.title}</div>
-                <div className="text-sm text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>📍 {ev.location}</div>
+                <div className="text-sm text-slate-300" style={{ fontFamily: "'DM Sans', sans-serif" }}>📍 {ev.location}</div>
               </div>
               <div className="hidden md:block text-right flex-shrink-0">
-                {ev.spots && <p className="text-xs text-gray-400 mb-2">{ev.spots} spots left</p>}
+                {ev.spots && <p className="text-xs text-slate-300 mb-2">{ev.spots} spots left</p>}
                 <button className="bg-[#D01B1B] hover:bg-red-700 text-white px-5 py-2.5 rounded font-bold text-sm tracking-widest border-none cursor-pointer"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>RSVP</button>
               </div>
               <div className="col-span-2 flex items-center justify-between md:hidden pt-2 border-t border-white/5">
-                <span className="text-xs text-gray-400">{ev.spots ? `${ev.spots} spots left` : "Open to all"}</span>
+                <span className="text-xs text-slate-300">{ev.spots ? `${ev.spots} spots left` : "Open to all"}</span>
                 <button className="bg-[#D01B1B] text-white px-5 py-2 rounded font-bold text-sm tracking-widest border-none cursor-pointer"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>RSVP</button>
               </div>

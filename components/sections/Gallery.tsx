@@ -23,7 +23,7 @@ export default function Gallery() {
   const [hovered, setHovered] = useState<number | null>(null);
 
   return (
-    <section id="gallery" className="bg-[#0F1923] px-5 py-20">
+    <section id="gallery" className="bg-[#111827] px-5 py-20">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
           <p className="text-xs font-semibold text-[#D01B1B] tracking-[0.3em] mb-2"
@@ -43,7 +43,7 @@ export default function Gallery() {
               onMouseLeave={() => setHovered(null)}>
               <div className={`w-full h-full bg-gradient-to-br ${BG[i]} flex flex-col items-center justify-center gap-2`}>
                 <span style={{ fontSize: i === 0 ? 40 : 20 }}>{item.emoji}</span>
-                <span className={`text-white/70 tracking-widest font-semibold ${i === 0 ? "text-sm" : "text-[9px]"}`}
+                <span className={`text-white/90 tracking-widest font-semibold ${i === 0 ? "text-sm" : "text-[9px]"}`}
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
                   {item.label.toUpperCase()}
                 </span>
