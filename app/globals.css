@@ -31,7 +31,5 @@ input, select, textarea {
 input::placeholder, textarea::placeholder {
   color: #9CA3AF !important;
 }
-.bg-\[#1a1a1a\] {
-  background: #F9FAFB !important;
-}
+
 
