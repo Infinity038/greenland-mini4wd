@@ -31,7 +31,7 @@ export default function AdminPage() {
     if (!auth) return;
     setLoading(true);
     supabase.from("members").select("*").order("created_at", { ascending: false })
-      .then(({ data }) => { setMembers(data || []); setLoading(false); });
+      .then(({ data }: { data: Member[] | null }) => { setMembers(data || []); setLoading(false); });
   }, [auth]);
 
   if (!auth) return (
