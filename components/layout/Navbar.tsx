@@ -1,7 +1,13 @@
 "use client";
 import { useState } from "react";
 
-const NAV_LINKS = ["Events", "Gallery", "Blog", "Shop", "About"];
+const NAV_LINKS = [
+  { label: "Events", href: "/events" },
+  { label: "Gallery", href: "/gallery" },
+  { label: "Blog", href: "/blog" },
+  { label: "Shop", href: "/shop" },
+  { label: "About", href: "/about" },
+];
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -24,11 +30,11 @@ export default function Navbar() {
 
         <div className="hidden md:flex items-center gap-8">
           {NAV_LINKS.map((link) => (
-            <a key={link} href={`#${link.toLowerCase()}`}
+            <a key={link.label} href={link.href}
               className="font-semibold text-sm text-gray-400 tracking-widest no-underline hover:text-[#D01B1B] transition-colors duration-200"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{link}</a>
+              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{link.label}</a>
           ))}
-          <a href="#register"
+          <a href="/register"
             className="bg-[#D01B1B] hover:bg-red-700 text-white px-5 py-2 rounded font-bold text-sm tracking-widest no-underline transition-colors duration-200"
             style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>JOIN CLUB</a>
         </div>
@@ -44,11 +50,11 @@ export default function Navbar() {
       {open && (
         <div className="md:hidden bg-[#0d0d0d] border-t border-white/5 px-5 pb-6">
           {NAV_LINKS.map((link) => (
-            <a key={link} href={`#${link.toLowerCase()}`} onClick={() => setOpen(false)}
+            <a key={link.label} href={link.href} onClick={() => setOpen(false)}
               className="block py-3 border-b border-white/5 font-bold text-xl text-white no-underline tracking-widest"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{link}</a>
+              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{link.label}</a>
           ))}
-          <a href="#register" onClick={() => setOpen(false)}
+          <a href="/register" onClick={() => setOpen(false)}
             className="block mt-4 bg-[#D01B1B] text-white text-center py-3.5 rounded font-bold text-lg tracking-widest no-underline"
             style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>JOIN THE CLUB</a>
         </div>
