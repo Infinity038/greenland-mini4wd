@@ -1,6 +1,16 @@
-const FOOTER_LINKS = {
-  Club: ["About", "Events", "Gallery", "Blog"],
-  Join: ["Register", "Membership", "Shop", "Contact"],
+const LINKS = {
+  Club: [
+    { label: "About", href: "/about" },
+    { label: "Events", href: "/events" },
+    { label: "Gallery", href: "/gallery" },
+    { label: "Blog", href: "/blog" },
+  ],
+  Join: [
+    { label: "Register", href: "/register" },
+    { label: "Membership", href: "/register" },
+    { label: "Shop", href: "/shop" },
+    { label: "Contact", href: "#" },
+  ],
 };
 
 const SOCIAL = [
@@ -12,51 +22,37 @@ const SOCIAL = [
 
 export default function Footer() {
   return (
-    <footer className="bg-[#111827] border-t border-white/5 px-5 pt-12 pb-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
-          <div className="col-span-2 md:col-span-1">
-            <div className="font-black text-white text-xl tracking-wide leading-none"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>GREENLAND</div>
-            <div className="text-xs font-semibold text-[#D01B1B] tracking-[0.3em] mt-0.5 mb-4"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>MINI 4WD CLUB</div>
-            <p className="text-sm text-[#B8C1CC] leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-              Greenland's premier Tamiya racing community. Race. Connect. Build.
-            </p>
+    <footer style={{ background: "#071426", borderTop: "1px solid rgba(255,255,255,0.08)", padding: "48px 20px 28px" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 32, marginBottom: 40 }}>
+          <div style={{ gridColumn: "span 1" }}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, color: "#F5F5F5", fontSize: 18, letterSpacing: 2 }}>GREENLAND</div>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: "#DC2626", fontSize: 10, letterSpacing: 4, marginTop: 2, marginBottom: 12 }}>MINI 4WD CLUB</div>
+            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", lineHeight: 1.6 }}>Greenland's premier Tamiya racing community. Race. Connect. Build.</p>
           </div>
 
-          {Object.entries(FOOTER_LINKS).map(([col, links]) => (
+          {Object.entries(LINKS).map(([col, links]) => (
             <div key={col}>
-              <div className="text-xs font-bold text-[#B8C1CC] tracking-[0.2em] mb-4"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{col.toUpperCase()}</div>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700, color: "#B8C1CC", letterSpacing: 3, marginBottom: 14 }}>{col.toUpperCase()}</div>
               {links.map((link) => (
-                <a key={link} href="#"
-                  className="block text-sm text-[#B8C1CC] hover:text-white no-underline mb-2.5 transition-colors duration-200"
-                  style={{ fontFamily: "'DM Sans', sans-serif" }}>{link}</a>
+                <a key={link.label} href={link.href} style={{ display: "block", fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", marginBottom: 10 }}>{link.label}</a>
               ))}
             </div>
           ))}
 
           <div>
-            <div className="text-xs font-bold text-[#B8C1CC] tracking-[0.2em] mb-4"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>FOLLOW US</div>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700, color: "#B8C1CC", letterSpacing: 3, marginBottom: 14 }}>FOLLOW US</div>
             {SOCIAL.map((s) => (
-              <a key={s.name} href={s.href}
-                className="flex items-center gap-2.5 text-sm text-[#B8C1CC] hover:text-white no-underline mb-2.5 transition-colors duration-200"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}>
+              <a key={s.name} href={s.href} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", marginBottom: 10 }}>
                 <span>{s.icon}</span>{s.name}
               </a>
             ))}
           </div>
         </div>
 
-        <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row justify-between gap-3">
-          <p className="text-xs text-[#B8C1CC]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-            © 2026 Greenland Mini 4WD Club. All rights reserved.
-          </p>
-          <p className="text-xs text-[#B8C1CC]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-            Made with ❤️ for the community in Nuuk, Greenland
-          </p>
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 20, display: "flex", flexDirection: "column", gap: 6 }}>
+          <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#B8C1CC" }}>© 2026 Greenland Mini 4WD Club. All rights reserved.</p>
+          <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#B8C1CC" }}>Made with ❤️ for the community in Nuuk, Greenland</p>
         </div>
       </div>
     </footer>

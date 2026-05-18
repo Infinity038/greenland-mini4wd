@@ -7,40 +7,31 @@ const VALUES = [
 
 export default function About() {
   return (
-    <section id="about" className="bg-white px-5 py-20">
-      <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+    <section id="about" style={{ background: "#071426", padding: "80px 20px" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 48, alignItems: "center" }}>
         <div>
-          <p className="text-xs font-semibold text-[#D01B1B] tracking-[0.3em] mb-4"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>OUR STORY</p>
-          <h2 className="font-black text-[#111827] leading-none mb-6"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(38px, 6vw, 62px)" }}>
-            MORE THAN<br /><span className="text-[#D01B1B]">JUST RACING</span>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 12, fontWeight: 600 }}>OUR STORY</div>
+          <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(36px, 6vw, 58px)", lineHeight: 0.95, color: "#F5F5F5", marginBottom: 20 }}>
+            MORE THAN<br /><span style={{ color: "#DC2626" }}>JUST RACING</span>
           </h2>
-          <p className="text-[#4B5563] leading-relaxed mb-5 text-base"
-            style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          <p style={{ color: "#B8C1CC", lineHeight: 1.7, marginBottom: 16, fontSize: 15, fontFamily: "'DM Sans', sans-serif" }}>
             Far from home, we found something unexpected: community. Greenland Mini 4WD Club started as a small gathering of Filipinos in Nuuk who wanted a clean, fun hobby outside of work — and it grew into something much bigger.
           </p>
-          <p className="text-[#4B5563] leading-relaxed mb-8 text-base"
-            style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          <p style={{ color: "#B8C1CC", lineHeight: 1.7, marginBottom: 28, fontSize: 15, fontFamily: "'DM Sans', sans-serif" }}>
             We welcome everyone — OFWs, Greenlandic locals, beginners, and seasoned racers alike. If you love Tamiya cars or just want to try something new, you belong here.
           </p>
-          <a href="/register"
-            className="inline-block border-2 border-[#DC2626] text-white hover:bg-[#DC2626] px-7 py-3 rounded font-bold text-sm tracking-widest no-underline transition-all duration-200"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+          <a href="/register" style={{ display: "inline-block", background: "#DC2626", color: "#fff", padding: "12px 28px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: 3 }}>
             BECOME A MEMBER
           </a>
         </div>
 
-        <div className="grid gap-4">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {VALUES.map((v) => (
-            <div key={v.title}
-              className="flex gap-4 items-start bg-white border border-[#E5E7EB] hover:border-[#DC2626] rounded-lg px-6 py-5 transition-colors duration-200">
-              <span className="text-3xl leading-none flex-shrink-0">{v.icon}</span>
+            <div key={v.title} style={{ display: "flex", gap: 16, alignItems: "flex-start", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "16px 20px" }}>
+              <span style={{ fontSize: 28, lineHeight: 1, flexShrink: 0 }}>{v.icon}</span>
               <div>
-                <div className="font-bold text-lg text-[#111827] mb-1"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{v.title}</div>
-                <div className="text-sm text-[#4B5563] leading-relaxed"
-                  style={{ fontFamily: "'DM Sans', sans-serif" }}>{v.desc}</div>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 18, color: "#F5F5F5", marginBottom: 4 }}>{v.title}</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", lineHeight: 1.6 }}>{v.desc}</div>
               </div>
             </div>
           ))}
