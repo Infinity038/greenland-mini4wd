@@ -7,20 +7,20 @@ const VALUES = [
 
 export default function About() {
   return (
-    <section id="about" className="bg-[#111827] px-5 py-20">
+    <section id="about" className="bg-white px-5 py-20">
       <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
         <div>
           <p className="text-xs font-semibold text-[#D01B1B] tracking-[0.3em] mb-4"
             style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>OUR STORY</p>
-          <h2 className="font-black text-[#F8FAFC] leading-none mb-6"
+          <h2 className="font-black text-[#111827] leading-none mb-6"
             style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(38px, 6vw, 62px)" }}>
             MORE THAN<br /><span className="text-[#D01B1B]">JUST RACING</span>
           </h2>
-          <p className="text-slate-300 leading-relaxed mb-5 text-base"
+          <p className="text-[#4B5563] leading-relaxed mb-5 text-base"
             style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Far from home, we found something unexpected: community. Greenland Mini 4WD Club started as a small gathering of Filipinos in Nuuk who wanted a clean, fun hobby outside of work — and it grew into something much bigger.
           </p>
-          <p className="text-slate-300 leading-relaxed mb-8 text-base"
+          <p className="text-[#4B5563] leading-relaxed mb-8 text-base"
             style={{ fontFamily: "'DM Sans', sans-serif" }}>
             We welcome everyone — OFWs, Greenlandic locals, beginners, and seasoned racers alike. If you love Tamiya cars or just want to try something new, you belong here.
           </p>
@@ -34,12 +34,12 @@ export default function About() {
         <div className="grid gap-4">
           {VALUES.map((v) => (
             <div key={v.title}
-              className="flex gap-4 items-start bg-white/[0.02] border border-white/[0.07] hover:border-red-700/40 rounded-lg px-6 py-5 transition-colors duration-200">
+              className="flex gap-4 items-start bg-white border border-[#E5E7EB] hover:border-[#DC2626] rounded-lg px-6 py-5 transition-colors duration-200">
               <span className="text-3xl leading-none flex-shrink-0">{v.icon}</span>
               <div>
-                <div className="font-bold text-lg text-[#F8FAFC] mb-1"
+                <div className="font-bold text-lg text-[#111827] mb-1"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{v.title}</div>
-                <div className="text-sm text-slate-300 leading-relaxed"
+                <div className="text-sm text-[#4B5563] leading-relaxed"
                   style={{ fontFamily: "'DM Sans', sans-serif" }}>{v.desc}</div>
               </div>
             </div>

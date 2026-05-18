@@ -23,12 +23,12 @@ export default function Gallery() {
   const [hovered, setHovered] = useState<number | null>(null);
 
   return (
-    <section id="gallery" className="bg-[#111827] px-5 py-20">
+    <section id="gallery" className="bg-[#F3F4F6] px-5 py-20">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
           <p className="text-xs font-semibold text-[#D01B1B] tracking-[0.3em] mb-2"
             style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>COMMUNITY</p>
-          <h2 className="font-black text-[#F4F4F0] leading-none"
+          <h2 className="font-black text-[#111827] leading-none"
             style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(38px, 6vw, 58px)" }}>
             PHOTO GALLERY
           </h2>

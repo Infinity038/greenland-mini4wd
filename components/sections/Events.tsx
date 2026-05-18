@@ -14,13 +14,13 @@ const TYPE_STYLES: Record<Event["type"], string> = {
 
 export default function Events() {
   return (
-    <section id="events" className="bg-[#0B1220] px-5 py-20">
+    <section id="events" className="bg-[#F3F4F6] px-5 py-20">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
           <div>
             <p className="text-xs font-semibold text-[#D01B1B] tracking-[0.3em] mb-2"
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>UPCOMING</p>
-            <h2 className="font-black text-[#F8FAFC] leading-none"
+            <h2 className="font-black text-[#111827] leading-none"
               style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(38px, 6vw, 58px)" }}>
               EVENTS &<br />RACES
             </h2>
@@ -32,7 +32,7 @@ export default function Events() {
         <div className="flex flex-col gap-4">
           {EVENTS.map((ev) => (
             <div key={ev.id}
-              className="bg-[#1E293B] border border-white/[0.07] hover:border-red-700/50 rounded-lg p-5 md:p-6 grid grid-cols-[72px_1fr] md:grid-cols-[80px_1fr_auto] gap-4 md:gap-6 items-center transition-all duration-200 hover:-translate-y-0.5 cursor-pointer">
+              className="bg-white border border-[#E5E7EB] hover:border-[#DC2626] rounded-lg p-5 md:p-6 grid grid-cols-[72px_1fr] md:grid-cols-[80px_1fr_auto] gap-4 md:gap-6 items-center transition-all duration-200 hover:-translate-y-0.5 cursor-pointer">
               <div className="text-center bg-red-900/10 border border-red-900/20 rounded-md py-3 px-2">
                 <div className="font-black text-xl text-[#D01B1B] leading-none"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.date}</div>
@@ -44,7 +44,7 @@ export default function Events() {
                   <span className={`text-[10px] font-bold tracking-widest px-2.5 py-0.5 rounded-full ${TYPE_STYLES[ev.type]}`}
                     style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.type.toUpperCase()}</span>
                 </div>
-                <div className="font-bold text-xl md:text-2xl text-[#F8FAFC] leading-tight mb-1"
+                <div className="font-bold text-xl md:text-2xl text-[#111827] leading-tight mb-1"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.title}</div>
                 <div className="text-sm text-slate-300" style={{ fontFamily: "'DM Sans', sans-serif" }}>📍 {ev.location}</div>
               </div>

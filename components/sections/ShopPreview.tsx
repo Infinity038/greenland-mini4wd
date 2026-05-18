@@ -7,7 +7,7 @@ const ITEMS = [
 
 export default function ShopPreview() {
   return (
-    <section id="shop" className="relative bg-[#111827] px-5 py-20 overflow-hidden">
+    <section id="shop" className="relative bg-[#F3F4F6] px-5 py-20 overflow-hidden">
       <div className="absolute top-0 right-0 w-1/2 h-full pointer-events-none"
         style={{ background: "linear-gradient(135deg, transparent 0%, rgba(208,27,27,0.04) 100%)" }} />
 
@@ -15,7 +15,7 @@ export default function ShopPreview() {
         <div className="text-center mb-4">
           <p className="text-xs font-semibold text-[#D01B1B] tracking-[0.3em] mb-2"
             style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>COMING SOON</p>
-          <h2 className="font-black text-[#F8FAFC] leading-none mb-4"
+          <h2 className="font-black text-[#111827] leading-none mb-4"
             style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(38px, 6vw, 58px)" }}>
             CLUB SHOP
           </h2>
@@ -27,7 +27,7 @@ export default function ShopPreview() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
           {ITEMS.map((item) => (
-            <div key={item.id} className="relative bg-[#1E293B] border border-white/[0.07] rounded-lg overflow-hidden">
+            <div key={item.id} className="relative bg-white border border-white/[0.07] rounded-lg overflow-hidden">
               <div className="absolute top-3 right-3 text-[10px] font-bold tracking-widest text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 rounded-full px-2.5 py-0.5"
                 style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>SOON</div>
               <div className="h-36 bg-gradient-to-br from-[#111] to-[#1a1a1a] flex items-center justify-center text-4xl">
@@ -36,7 +36,7 @@ export default function ShopPreview() {
               <div className="p-4">
                 <p className="text-[10px] text-gray-400 tracking-widest mb-1 uppercase"
                   style={{ fontFamily: "'DM Sans', sans-serif" }}>{item.category}</p>
-                <p className="font-bold text-lg text-[#F8FAFC] leading-tight mb-2"
+                <p className="font-bold text-lg text-[#111827] leading-tight mb-2"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{item.name}</p>
                 <p className="font-black text-xl text-[#D01B1B]"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{item.price}</p>
