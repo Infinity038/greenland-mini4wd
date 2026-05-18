@@ -20,29 +20,29 @@ export default function Footer() {
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>GREENLAND</div>
             <div className="text-xs font-semibold text-[#D01B1B] tracking-[0.3em] mt-0.5 mb-4"
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>MINI 4WD CLUB</div>
-            <p className="text-sm text-gray-300 leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            <p className="text-sm text-[#B8C1CC] leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               Greenland's premier Tamiya racing community. Race. Connect. Build.
             </p>
           </div>
 
           {Object.entries(FOOTER_LINKS).map(([col, links]) => (
             <div key={col}>
-              <div className="text-xs font-bold text-gray-300 tracking-[0.2em] mb-4"
+              <div className="text-xs font-bold text-[#B8C1CC] tracking-[0.2em] mb-4"
                 style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{col.toUpperCase()}</div>
               {links.map((link) => (
                 <a key={link} href="#"
-                  className="block text-sm text-gray-300 hover:text-white no-underline mb-2.5 transition-colors duration-200"
+                  className="block text-sm text-[#B8C1CC] hover:text-white no-underline mb-2.5 transition-colors duration-200"
                   style={{ fontFamily: "'DM Sans', sans-serif" }}>{link}</a>
               ))}
             </div>
           ))}
 
           <div>
-            <div className="text-xs font-bold text-gray-300 tracking-[0.2em] mb-4"
+            <div className="text-xs font-bold text-[#B8C1CC] tracking-[0.2em] mb-4"
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>FOLLOW US</div>
             {SOCIAL.map((s) => (
               <a key={s.name} href={s.href}
-                className="flex items-center gap-2.5 text-sm text-gray-300 hover:text-white no-underline mb-2.5 transition-colors duration-200"
+                className="flex items-center gap-2.5 text-sm text-[#B8C1CC] hover:text-white no-underline mb-2.5 transition-colors duration-200"
                 style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 <span>{s.icon}</span>{s.name}
               </a>
@@ -51,10 +51,10 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row justify-between gap-3">
-          <p className="text-xs text-gray-300" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          <p className="text-xs text-[#B8C1CC]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             © 2026 Greenland Mini 4WD Club. All rights reserved.
           </p>
-          <p className="text-xs text-gray-300" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          <p className="text-xs text-[#B8C1CC]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Made with ❤️ for the community in Nuuk, Greenland
           </p>
         </div>

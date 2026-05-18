@@ -25,7 +25,7 @@ export default function About() {
             We welcome everyone — OFWs, Greenlandic locals, beginners, and seasoned racers alike. If you love Tamiya cars or just want to try something new, you belong here.
           </p>
           <a href="/register"
-            className="inline-block border-2 border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-[#0d0d0d] px-7 py-3 rounded font-bold text-sm tracking-widest no-underline transition-all duration-200"
+            className="inline-block border-2 border-[#DC2626] text-white hover:bg-[#DC2626] px-7 py-3 rounded font-bold text-sm tracking-widest no-underline transition-all duration-200"
             style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
             BECOME A MEMBER
           </a>

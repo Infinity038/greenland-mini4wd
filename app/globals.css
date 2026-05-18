@@ -2,28 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg: #050505;
+  --dark-section: #071426;
+  --light-section: #F3F4F6;
+  --text-primary: #F5F5F5;
+  --text-secondary: #B8C1CC;
+  --text-dark: #111827;
+  --red: #DC2626;
+  --border-dark: rgba(255,255,255,0.08);
+  --border-light: #E5E7EB;
+}
+
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0d0d0d; }
-::-webkit-scrollbar-thumb { background: #D01B1B; border-radius: 3px; }
+::-webkit-scrollbar-track { background: #050505; }
+::-webkit-scrollbar-thumb { background: #DC2626; border-radius: 3px; }
 
 * { box-sizing: border-box; }
-a { text-decoration: none; }
+a { text-decoration: none !important; }
 
 body {
-  background: #0d0d0d !important;
-  color: #F4F4F0 !important;
+  background: #050505 !important;
+  color: #F5F5F5 !important;
+  font-family: 'DM Sans', sans-serif;
 }
 
-p { color: #9CA3AF; }
-label { color: #F4F4F0 !important; }
+/* Global text overrides */
+p { color: #B8C1CC; }
+h1, h2, h3, h4, h5, h6 { color: #F5F5F5; }
 
+/* Remove ALL blue/purple link colors */
+a { color: inherit !important; }
+a:hover { color: #DC2626 !important; }
+a.text-blue-300,
+a.text-blue-400,
+.text-blue-300,
+.text-blue-400 { color: #B8C1CC !important; }
+
+/* Remove all dark gray text on dark backgrounds */
+.text-gray-400,
+.text-gray-500,
+.text-gray-600,
+.text-gray-700,
+.text-slate-400,
+.text-slate-500 { color: #B8C1CC !important; }
+
+/* Section backgrounds */
+.bg-\[#0d0d0d\],
+.bg-\[#050505\],
+.bg-\[#0B1220\] { background: #050505 !important; }
+
+.bg-\[#0F1923\],
+.bg-\[#071426\],
+.bg-\[#111827\],
+.bg-\[#1F2937\] { background: #071426 !important; }
+
+/* Cards */
+.border-white\/\[0\.07\],
+.border-white\/5 { border-color: rgba(255,255,255,0.08) !important; }
+
+/* Inputs */
 input, select, textarea {
-  color: #F4F4F0 !important;
-  background: #1a1a1a !important;
+  background: #0d1f35 !important;
+  color: #F5F5F5 !important;
+  border-color: rgba(255,255,255,0.15) !important;
 }
-input::placeholder, textarea::placeholder {
-  color: #6B7280 !important;
+input::placeholder,
+textarea::placeholder { color: #6B7280 !important; }
+
+/* Light section overrides */
+.light-section {
+  background: #F3F4F6 !important;
+  color: #111827 !important;
 }
+.light-section p { color: #4B5563 !important; }
+.light-section h1,
+.light-section h2,
+.light-section h3 { color: #111827 !important; }
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(20px); }
