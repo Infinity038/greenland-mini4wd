@@ -22,13 +22,13 @@ export default function RegisterPage() {
 
   const field = (label: string, name: string, type = "text", placeholder = "") => (
     <div style={{ marginBottom: 20 }}>
-      <label style={{ display: "block", fontSize: 13, letterSpacing: 2, color: "#aaa", marginBottom: 8, fontFamily: "'Barlow Condensed', sans-serif" }}>
+      <label style={{ display: "block", fontSize: 13, letterSpacing: 2, color: "#4B5563", marginBottom: 8, fontFamily: "'Barlow Condensed', sans-serif" }}>
         {label.toUpperCase()}
       </label>
       <input
         type={type} name={name} placeholder={placeholder}
         value={(form as any)[name]} onChange={handle}
-        style={{ width: "100%", background: "#1a1a1a", border: "1px solid #333", borderRadius: 8, padding: "14px 16px", color: "#fff", fontSize: 16, outline: "none" }}
+        style={{ width: "100%", background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 8, padding: "14px 16px", color: "#111827", fontSize: 16, outline: "none" }}
       />
     </div>
   );
@@ -39,10 +39,10 @@ export default function RegisterPage() {
       <main style={{ background: "#0D0D0D", minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24 }}>
         <div>
           <div style={{ fontSize: 64, marginBottom: 24 }}>🏁</div>
-          <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 56, fontWeight: 900, color: "#fff", marginBottom: 16 }}>
+          <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 56, fontWeight: 900, color: "#111827", marginBottom: 16 }}>
             YOU'RE <span style={{ color: "#D01B1B" }}>IN!</span>
           </h1>
-          <p style={{ color: "#aaa", fontSize: 18 }}>Welcome to Greenland Mini 4WD Club. We'll be in touch soon.</p>
+          <p style={{ color: "#4B5563", fontSize: 18 }}>Welcome to Greenland Mini 4WD Club. We'll be in touch soon.</p>
         </div>
       </main>
       <Footer />
@@ -52,7 +52,7 @@ export default function RegisterPage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "#0D0D0D", color: "#fff", padding: "80px 24px" }}>
+      <main style={{ background: "#0D0D0D", color: "#111827", padding: "80px 24px" }}>
         <div style={{ maxWidth: 560, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 48 }}>
             <div style={{ fontSize: 13, letterSpacing: 4, color: "#D01B1B", marginBottom: 12, fontFamily: "'Barlow Condensed', sans-serif" }}>
@@ -71,12 +71,12 @@ export default function RegisterPage() {
           {field("City", "city", "text", "Nuuk")}
 
           <div style={{ marginBottom: 32 }}>
-            <label style={{ display: "block", fontSize: 13, letterSpacing: 2, color: "#aaa", marginBottom: 8, fontFamily: "'Barlow Condensed', sans-serif" }}>
+            <label style={{ display: "block", fontSize: 13, letterSpacing: 2, color: "#4B5563", marginBottom: 8, fontFamily: "'Barlow Condensed', sans-serif" }}>
               EXPERIENCE LEVEL
             </label>
             <select
               name="experience" value={form.experience} onChange={handle}
-              style={{ width: "100%", background: "#1a1a1a", border: "1px solid #333", borderRadius: 8, padding: "14px 16px", color: "#fff", fontSize: 16 }}
+              style={{ width: "100%", background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 8, padding: "14px 16px", color: "#111827", fontSize: 16 }}
             >
               <option value="">Select your level</option>
               <option value="beginner">Beginner — Never built one</option>
@@ -91,7 +91,7 @@ export default function RegisterPage() {
 
           <button
             onClick={submit} disabled={status === "loading"}
-            style={{ width: "100%", background: "#D01B1B", color: "#fff", border: "none", borderRadius: 8, padding: "18px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, cursor: "pointer" }}
+            style={{ width: "100%", background: "#D01B1B", color: "#111827", border: "none", borderRadius: 8, padding: "18px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, cursor: "pointer" }}
           >
             {status === "loading" ? "SUBMITTING..." : "JOIN NOW →"}
           </button>

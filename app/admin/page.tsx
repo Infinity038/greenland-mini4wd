@@ -44,7 +44,7 @@ export default function AdminPage() {
           type="password" placeholder="Enter password"
           value={pw} onChange={(e) => setPw(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && login()}
-          style={{ width: "100%", background: "#1a1a1a", border: "1px solid #333", borderRadius: 8, padding: "14px 16px", color: "#fff", fontSize: 16, outline: "none", marginBottom: 16 }}
+          style={{ width: "100%", background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 8, padding: "14px 16px", color: "#fff", fontSize: 16, outline: "none", marginBottom: 16 }}
         />
         <button onClick={login}
           style={{ width: "100%", background: "#D01B1B", color: "#fff", border: "none", borderRadius: 8, padding: 16, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, letterSpacing: 2, cursor: "pointer" }}>
@@ -67,7 +67,7 @@ export default function AdminPage() {
             <div style={{ color: "#555", fontSize: 14 }}>Greenland Mini 4WD Club</div>
           </div>
           <button onClick={() => setAuth(false)}
-            style={{ background: "#1a1a1a", color: "#aaa", border: "1px solid #333", borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontSize: 14 }}>
+            style={{ background: "#F9FAFB", color: "#aaa", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontSize: 14 }}>
             Logout
           </button>
         </div>
