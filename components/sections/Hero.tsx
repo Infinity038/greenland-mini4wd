@@ -40,7 +40,7 @@ export default function Hero() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <a href="#register"
+          <a href="/register"
             className="bg-[#D01B1B] hover:bg-red-700 text-white px-9 py-4 rounded font-bold text-base tracking-widest no-underline transition-colors duration-200"
             style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
             JOIN THE CLUB
