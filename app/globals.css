@@ -2,34 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg: #F3F4F6;
-  --card: #FFFFFF;
-  --dark: #111827;
-  --text: #111827;
-  --muted: #4B5563;
-  --red: #DC2626;
-  --border: #E5E7EB;
-}
-
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #F3F4F6; }
-::-webkit-scrollbar-thumb { background: #DC2626; border-radius: 3px; }
+::-webkit-scrollbar-track { background: #0d0d0d; }
+::-webkit-scrollbar-thumb { background: #D01B1B; border-radius: 3px; }
 
 * { box-sizing: border-box; }
 a { text-decoration: none; }
 
 body {
-  background: #F3F4F6 !important;
-  color: #111827 !important;
+  background: #0d0d0d !important;
+  color: #F4F4F0 !important;
 }
+
+p { color: #9CA3AF; }
+label { color: #F4F4F0 !important; }
 
 input, select, textarea {
-  color: #111827 !important;
-  background: #ffffff !important;
+  color: #F4F4F0 !important;
+  background: #1a1a1a !important;
 }
 input::placeholder, textarea::placeholder {
-  color: #9CA3AF !important;
+  color: #6B7280 !important;
 }
 
-
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fadeUp 0.6s ease forwards; }
