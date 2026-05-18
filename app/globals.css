@@ -2,95 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg: #111827;
+  --card: #1F2937;
+  --text: #F9FAFB;
+  --muted: #D1D5DB;
+  --red: #DC2626;
+}
+
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0B1220; }
-::-webkit-scrollbar-thumb { background: #D01B1B; border-radius: 3px; }
+::-webkit-scrollbar-track { background: #111827; }
+::-webkit-scrollbar-thumb { background: #DC2626; border-radius: 3px; }
 
 * { box-sizing: border-box; }
 a { text-decoration: none; }
+
+body {
+  background: #111827 !important;
+  color: #F9FAFB !important;
+}
+
+p, li, span, div {
+  color: inherit;
+}
+
+.text-gray-500, .text-gray-600, .text-gray-700 {
+  color: #D1D5DB !important;
+}
+
+.text-gray-400, .text-slate-400, .text-slate-300 {
+  color: #D1D5DB !important;
+}
+
+a.text-gray-600, a.text-gray-400, a.text-slate-400 {
+  color: #D1D5DB !important;
+}
+
+a.text-blue-300 {
+  color: #F9FAFB !important;
+}
+
+.bg-\[#0d0d0d\], .bg-\[#0B1220\], .bg-\[#080808\] {
+  background: #111827 !important;
+}
+
+.bg-\[#0F1923\], .bg-\[#111827\] {
+  background: #1F2937 !important;
+}
+
+.border-white\/\[0\.07\], .border-white\/5 {
+  border-color: rgba(255,255,255,0.08) !important;
+}
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-up { animation: fadeUp 0.6s ease forwards; }
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
-
-body { color: #F8FAFC; }
-p { color: #CBD5E1; }
-label { color: #F8FAFC !important; }
-
