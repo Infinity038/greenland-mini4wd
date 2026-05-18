@@ -36,7 +36,7 @@ export default function Events() {
               <div className="text-center bg-red-900/10 border border-red-900/20 rounded-md py-3 px-2">
                 <div className="font-black text-xl text-[#D01B1B] leading-none"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.date}</div>
-                <div className="text-[10px] text-gray-600 tracking-widest mt-0.5"
+                <div className="text-[10px] text-gray-400 tracking-widest mt-0.5"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.month}</div>
               </div>
               <div className="min-w-0">
@@ -46,15 +46,15 @@ export default function Events() {
                 </div>
                 <div className="font-bold text-xl md:text-2xl text-[#F4F4F0] leading-tight mb-1"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.title}</div>
-                <div className="text-sm text-gray-600" style={{ fontFamily: "'DM Sans', sans-serif" }}>📍 {ev.location}</div>
+                <div className="text-sm text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>📍 {ev.location}</div>
               </div>
               <div className="hidden md:block text-right flex-shrink-0">
-                {ev.spots && <p className="text-xs text-gray-600 mb-2">{ev.spots} spots left</p>}
+                {ev.spots && <p className="text-xs text-gray-400 mb-2">{ev.spots} spots left</p>}
                 <button className="bg-[#D01B1B] hover:bg-red-700 text-white px-5 py-2.5 rounded font-bold text-sm tracking-widest border-none cursor-pointer"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>RSVP</button>
               </div>
               <div className="col-span-2 flex items-center justify-between md:hidden pt-2 border-t border-white/5">
-                <span className="text-xs text-gray-600">{ev.spots ? `${ev.spots} spots left` : "Open to all"}</span>
+                <span className="text-xs text-gray-400">{ev.spots ? `${ev.spots} spots left` : "Open to all"}</span>
                 <button className="bg-[#D01B1B] text-white px-5 py-2 rounded font-bold text-sm tracking-widest border-none cursor-pointer"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>RSVP</button>
               </div>

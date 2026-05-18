@@ -43,7 +43,7 @@ export default function Gallery() {
               onMouseLeave={() => setHovered(null)}>
               <div className={`w-full h-full bg-gradient-to-br ${BG[i]} flex flex-col items-center justify-center gap-2`}>
                 <span style={{ fontSize: i === 0 ? 40 : 20 }}>{item.emoji}</span>
-                <span className={`text-white/30 tracking-widest font-semibold ${i === 0 ? "text-sm" : "text-[9px]"}`}
+                <span className={`text-white/70 tracking-widest font-semibold ${i === 0 ? "text-sm" : "text-[9px]"}`}
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
                   {item.label.toUpperCase()}
                 </span>

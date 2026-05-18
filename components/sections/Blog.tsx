@@ -41,11 +41,11 @@ export default function Blog() {
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-[10px] font-bold tracking-widest text-yellow-400 bg-yellow-400/10 px-2.5 py-0.5 rounded-full"
                     style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{post.tag}</span>
-                  <span className="text-xs text-gray-600" style={{ fontFamily: "'DM Sans', sans-serif" }}>{post.date}</span>
+                  <span className="text-xs text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>{post.date}</span>
                 </div>
                 <h3 className="font-bold text-xl md:text-2xl text-[#F4F4F0] leading-tight mb-3"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{post.title}</h3>
-                <p className="text-sm text-gray-600 leading-relaxed mb-4"
+                <p className="text-sm text-gray-400 leading-relaxed mb-4"
                   style={{ fontFamily: "'DM Sans', sans-serif" }}>{post.excerpt}</p>
                 <a href="#" className="text-xs font-bold text-[#D01B1B] tracking-widest no-underline hover:text-red-400"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>READ MORE →</a>

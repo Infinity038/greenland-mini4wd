@@ -16,15 +16,15 @@ export default function About() {
             style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(38px, 6vw, 62px)" }}>
             MORE THAN<br /><span className="text-[#D01B1B]">JUST RACING</span>
           </h2>
-          <p className="text-gray-500 leading-relaxed mb-5 text-base"
+          <p className="text-gray-400 leading-relaxed mb-5 text-base"
             style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Far from home, we found something unexpected: community. Greenland Mini 4WD Club started as a small gathering of Filipinos in Nuuk who wanted a clean, fun hobby outside of work — and it grew into something much bigger.
           </p>
-          <p className="text-gray-500 leading-relaxed mb-8 text-base"
+          <p className="text-gray-400 leading-relaxed mb-8 text-base"
             style={{ fontFamily: "'DM Sans', sans-serif" }}>
             We welcome everyone — OFWs, Greenlandic locals, beginners, and seasoned racers alike. If you love Tamiya cars or just want to try something new, you belong here.
           </p>
-          <a href="#register"
+          <a href="/register"
             className="inline-block border-2 border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-[#0d0d0d] px-7 py-3 rounded font-bold text-sm tracking-widest no-underline transition-all duration-200"
             style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
             BECOME A MEMBER
@@ -39,7 +39,7 @@ export default function About() {
               <div>
                 <div className="font-bold text-lg text-[#F4F4F0] mb-1"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{v.title}</div>
-                <div className="text-sm text-gray-600 leading-relaxed"
+                <div className="text-sm text-gray-400 leading-relaxed"
                   style={{ fontFamily: "'DM Sans', sans-serif" }}>{v.desc}</div>
               </div>
             </div>

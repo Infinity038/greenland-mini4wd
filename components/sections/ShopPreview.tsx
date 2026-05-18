@@ -19,7 +19,7 @@ export default function ShopPreview() {
             style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(38px, 6vw, 58px)" }}>
             CLUB SHOP
           </h2>
-          <p className="text-gray-600 max-w-md mx-auto mb-12 text-base"
+          <p className="text-gray-400 max-w-md mx-auto mb-12 text-base"
             style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Cars, parts, apparel, and accessories — delivered to Nuuk and across Greenland.
           </p>
@@ -34,7 +34,7 @@ export default function ShopPreview() {
                 {item.emoji}
               </div>
               <div className="p-4">
-                <p className="text-[10px] text-gray-600 tracking-widest mb-1 uppercase"
+                <p className="text-[10px] text-gray-400 tracking-widest mb-1 uppercase"
                   style={{ fontFamily: "'DM Sans', sans-serif" }}>{item.category}</p>
                 <p className="font-bold text-lg text-[#F4F4F0] leading-tight mb-2"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{item.name}</p>
