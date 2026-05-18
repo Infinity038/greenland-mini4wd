@@ -30,7 +30,7 @@ export default function JoinCTA() {
           style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(42px, 9vw, 76px)" }}>
           START YOUR<br />RACING JOURNEY
         </h2>
-        <p className="text-white/80 leading-relaxed mb-10 text-base md:text-lg max-w-md mx-auto"
+        <p className="text-[#CBD5E1] leading-relaxed mb-10 text-base md:text-lg max-w-md mx-auto"
           style={{ fontFamily: "'DM Sans', sans-serif" }}>
           Join the Greenland Mini 4WD Club today. Get event updates, connect with members, and be part of something fast, fun, and real.
         </p>
