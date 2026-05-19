@@ -1,10 +1,9 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow these paths through
   if (
     pathname.startsWith("/register") ||
     pathname.startsWith("/admin") ||
@@ -15,7 +14,6 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check cookie
   const registered = request.cookies.get("gm4wd_registered");
   if (!registered) {
     return NextResponse.redirect(new URL("/register", request.url));
