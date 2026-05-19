@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { saveMemberData } from "@/lib/member";
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
@@ -20,7 +21,6 @@ export default function RegisterPage() {
     }
     setStatus("loading");
     setErrorMsg("");
-
     try {
       const { error } = await supabase.from("members").insert([{
         first_name: form.first_name,
@@ -31,21 +31,15 @@ export default function RegisterPage() {
         city: form.city || null,
         experience: form.experience || null,
       }]);
-
-      if (error) {
-        if (error.code === "23505") {
-          // Duplicate email — already registered, just let them in
-          document.cookie = "gm4wd_registered=1; path=/; max-age=31536000; SameSite=Lax";
-          setStatus("success");
-        } else {
-          setStatus("error");
-          setErrorMsg(`Error: ${error.message}`);
-        }
-      } else {
-        document.cookie = "gm4wd_registered=1; path=/; max-age=31536000; SameSite=Lax";
-        setStatus("success");
+      if (error && error.code !== "23505") {
+        setStatus("error");
+        setErrorMsg(`Error: ${error.message}`);
+        return;
       }
-    } catch (err: any) {
+      document.cookie = "gm4wd_registered=1; path=/; max-age=31536000; SameSite=Lax";
+      saveMemberData({ ...form, registered_at: new Date().toISOString() });
+      setStatus("success");
+    } catch {
       setStatus("error");
       setErrorMsg("Unexpected error. Please try again.");
     }
@@ -56,11 +50,9 @@ export default function RegisterPage() {
       <label style={{ display: "block", fontSize: 13, letterSpacing: 2, color: "#B8C1CC", marginBottom: 8, fontFamily: "'Barlow Condensed', sans-serif" }}>
         {label.toUpperCase()}
       </label>
-      <input
-        type={type} name={name} placeholder={placeholder}
+      <input type={type} name={name} placeholder={placeholder}
         value={(form as any)[name]} onChange={handle}
-        style={{ width: "100%", background: "#0D1B2A", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "14px 16px", color: "#F5F5F5", fontSize: 16, outline: "none", boxSizing: "border-box" as const }}
-      />
+        style={{ width: "100%", background: "#0D1B2A", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "14px 16px", color: "#F5F5F5", fontSize: 16, outline: "none", boxSizing: "border-box" as const }} />
     </div>
   );
 
@@ -92,12 +84,8 @@ export default function RegisterPage() {
 
   return (
     <div style={{ background: "#050505", minHeight: "100vh", color: "#F5F5F5" }}>
-
-      {/* Header */}
       <div style={{ background: "#071426", borderBottom: "1px solid rgba(220,38,38,0.2)", padding: "48px 24px 40px", textAlign: "center" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
-
-          {/* Logo */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 32 }}>
             <div style={{ width: 40, height: 40, background: "#DC2626", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, color: "#fff", fontSize: 16 }}>4W</div>
             <div>
@@ -105,7 +93,6 @@ export default function RegisterPage() {
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: "#FACC15", fontSize: 10, letterSpacing: 4, lineHeight: 1, marginTop: 2 }}>MINI 4WD CLUB</div>
             </div>
           </div>
-
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, letterSpacing: 5, color: "#DC2626", marginBottom: 12 }}>FREE · REQUIRED · ONE-TIME</div>
           <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(36px, 8vw, 68px)", fontWeight: 900, color: "#F5F5F5", lineHeight: 1, marginBottom: 16 }}>
             REGISTER TO<br /><span style={{ color: "#DC2626" }}>ACCESS THE SITE</span>
@@ -113,7 +100,6 @@ export default function RegisterPage() {
           <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "#B8C1CC", lineHeight: 1.7, maxWidth: 480, margin: "0 auto" }}>
             Greenland's premier Tamiya Mini 4WD racing community. Free registration required before accessing the site.
           </p>
-
           <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: 20 }}>
             {["✅ Free forever", "🏁 Track access", "🎟️ Race tournaments", "🏆 Win prize pools"].map(b => (
               <span key={b} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "5px 14px", fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#B8C1CC" }}>{b}</span>
@@ -122,10 +108,8 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      {/* Form */}
       <div style={{ padding: "48px 24px 80px" }}>
         <div style={{ maxWidth: 520, margin: "0 auto" }}>
-
           {field("First Name *", "first_name", "text", "Juan")}
           {field("Last Name *", "last_name", "text", "dela Cruz")}
           {field("Email *", "email", "email", "juan@email.com")}
@@ -170,7 +154,6 @@ export default function RegisterPage() {
               Click here to enter
             </button>
           </p>
-
         </div>
       </div>
     </div>

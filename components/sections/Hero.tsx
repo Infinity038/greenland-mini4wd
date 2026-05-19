@@ -1,3 +1,7 @@
+"use client";
+import { useEffect, useState } from "react";
+import { isRegistered } from "@/lib/member";
+
 const STATS = [
   { value: "42+", label: "Members", red: true },
   { value: "8", label: "Races Run", red: false },
@@ -6,6 +10,12 @@ const STATS = [
 ];
 
 export default function Hero() {
+  const [registered, setRegistered] = useState(false);
+
+  useEffect(() => {
+    setRegistered(isRegistered());
+  }, []);
+
   return (
     <section style={{ minHeight: "100vh", background: "#050505", display: "flex", alignItems: "center", justifyContent: "center", paddingTop: 60, overflow: "hidden", position: "relative" }}>
       <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(220,38,38,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(220,38,38,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
@@ -18,18 +28,26 @@ export default function Hero() {
         </div>
 
         <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(64px, 14vw, 120px)", lineHeight: 0.9, color: "#F5F5F5", marginBottom: 20 }}>
-          RACE.<br />
-          <span style={{ color: "#DC2626" }}>CONNECT.</span><br />
-          BUILD.
+          RACE.<br /><span style={{ color: "#DC2626" }}>CONNECT.</span><br />BUILD.
         </h1>
 
         <p style={{ color: "#B8C1CC", fontSize: 16, lineHeight: 1.7, maxWidth: 480, margin: "0 auto 28px", fontFamily: "'DM Sans', sans-serif" }}>
-          Greenland Mini 4WD Club is a passionate Tamiya racing community for Filipinos and locals in Nuuk — built for speed, craft, and real connection.
+          Greenland Mini 4WD Club — a passionate Tamiya racing community for Filipinos and locals in Nuuk, built for speed, craft, and real connection.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 360, margin: "0 auto 40px" }}>
-          <a href="/register" style={{ display: "block", background: "#DC2626", color: "#fff", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center" }}>JOIN THE CLUB</a>
-          <a href="#events" style={{ display: "block", border: "1px solid rgba(255,255,255,0.2)", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center" }}>SEE EVENTS →</a>
+          {registered ? (
+            <>
+              <a href="/shop" style={{ display: "block", background: "#DC2626", color: "#fff", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>GO TO SHOP →</a>
+              <a href="/tournaments" style={{ display: "block", border: "1px solid rgba(220,38,38,0.4)", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>VIEW TOURNAMENTS →</a>
+              <a href="/profile" style={{ display: "block", border: "1px solid rgba(255,255,255,0.15)", color: "#B8C1CC", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>MY PROFILE →</a>
+            </>
+          ) : (
+            <>
+              <a href="/register" style={{ display: "block", background: "#DC2626", color: "#fff", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>JOIN THE CLUB FREE →</a>
+              <a href="#events" style={{ display: "block", border: "1px solid rgba(255,255,255,0.2)", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>SEE EVENTS →</a>
+            </>
+          )}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
