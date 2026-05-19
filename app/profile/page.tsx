@@ -79,7 +79,7 @@ export default function ProfilePage() {
           {/* Quick links */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 40 }}>
             <a href="/orders" style={{ background: "#DC2626", color: "#fff", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 2, textDecoration: "none", textAlign: "center" }}>MY ORDERS →</a>
-            <a href="/tournaments" style={{ background: "#071426", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 2, textDecoration: "none", textAlign: "center", border: "1px solid rgba(255,255,255,0.1)" }}>TOURNAMENTS →</a>
+            <a href="/tournament" style={{ background: "#071426", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 2, textDecoration: "none", textAlign: "center", border: "1px solid rgba(255,255,255,0.1)" }}>TOURNAMENTS →</a>
             <a href="/shop" style={{ background: "#071426", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 2, textDecoration: "none", textAlign: "center", border: "1px solid rgba(255,255,255,0.1)" }}>SHOP →</a>
           </div>
 

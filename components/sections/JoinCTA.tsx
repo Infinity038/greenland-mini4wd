@@ -18,7 +18,7 @@ export default function JoinCTA() {
         </h2>
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
           <a href="/shop" style={{ background: "#DC2626", color: "#fff", padding: "14px 28px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 2, textDecoration: "none" }}>SHOP NOW</a>
-          <a href="/tournaments" style={{ background: "transparent", color: "#F5F5F5", padding: "14px 28px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 2, textDecoration: "none", border: "1px solid rgba(255,255,255,0.15)" }}>TOURNAMENTS</a>
+          <a href="/tournament" style={{ background: "transparent", color: "#F5F5F5", padding: "14px 28px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 2, textDecoration: "none", border: "1px solid rgba(255,255,255,0.15)" }}>TOURNAMENTS</a>
           <a href="/profile" style={{ background: "transparent", color: "#FACC15", padding: "14px 28px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 2, textDecoration: "none", border: "1px solid rgba(250,204,21,0.3)" }}>MY PROFILE</a>
         </div>
       </div>

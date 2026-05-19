@@ -191,7 +191,7 @@ export default function TournamentsPage() {
               {[
                 { badge: "FULL ACCESS", badgeColor: "#DC2626", title: "Registered Members", desc: "Full access to community track sessions. Enter tournaments by buying race tickets." },
                 { badge: "REGISTER FIRST", badgeColor: "#FACC15", title: "First-Time Visitors", desc: "Must register (free) before any track or race participation." },
-                { badge: "DEMO ONLY", badgeColor: "#B8C1CC", title: "House Cars & Batteries", desc: "Demo cars available for first-try sessions. Batteries for testing only — must be returned." },
+                { badge: "RENTAL AVAILABLE", badgeColor: "#B8C1CC", title: "House Cars & Batteries", desc: "House car rental: 25 kr/hour (batteries included). Battery rental only: 15 kr. Batteries are for use during the session and must be returned." },
               ].map(t => (
                 <div key={t.title} style={{ background: "#050505", borderRadius: 10, padding: "22px 20px" }}>
                   <div style={{ display: "inline-block", border: `1px solid ${t.badgeColor}40`, borderRadius: 4, padding: "3px 10px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: t.badgeColor, marginBottom: 12 }}>{t.badge}</div>

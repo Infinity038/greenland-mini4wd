@@ -39,7 +39,7 @@ export default function Hero() {
           {registered ? (
             <>
               <a href="/shop" style={{ display: "block", background: "#DC2626", color: "#fff", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>GO TO SHOP →</a>
-              <a href="/tournaments" style={{ display: "block", border: "1px solid rgba(220,38,38,0.4)", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>VIEW TOURNAMENTS →</a>
+              <a href="/tournament" style={{ display: "block", border: "1px solid rgba(220,38,38,0.4)", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>VIEW TOURNAMENTS →</a>
               <a href="/profile" style={{ display: "block", border: "1px solid rgba(255,255,255,0.15)", color: "#B8C1CC", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>MY PROFILE →</a>
             </>
           ) : (
