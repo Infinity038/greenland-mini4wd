@@ -4,7 +4,7 @@ import { isRegistered, getMemberData, logout } from "@/lib/member";
 
 const NAV_LINKS = [
   { label: "Cars", href: "/cars" },
-  { label: "Tournaments", href: "/tournaments" },
+  { label: "Tournament", href: "/tournament" },
   { label: "Events", href: "/events" },
   { label: "Gallery", href: "/gallery" },
   { label: "Shop", href: "/shop" },
@@ -62,7 +62,7 @@ export default function Navbar() {
                   {[
                     { label: "👤 Profile", href: "/profile" },
                     { label: "📦 My Orders", href: "/orders" },
-                    { label: "🎟️ Race Tickets", href: "/tournaments" },
+                    { label: "🎟️ Race Tickets", href: "/tournament" },
                   ].map(item => (
                     <a key={item.label} href={item.href}
                       style={{ display: "block", padding: "12px 18px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: 14, color: "#F5F5F5", textDecoration: "none", borderBottom: "1px solid rgba(255,255,255,0.05)", letterSpacing: 1 }}>
@@ -107,7 +107,7 @@ export default function Navbar() {
               {[
                 { label: "👤 Profile", href: "/profile" },
                 { label: "📦 My Orders", href: "/orders" },
-                { label: "🎟️ Race Tickets", href: "/tournaments" },
+                { label: "🎟️ Race Tickets", href: "/tournament" },
               ].map(item => (
                 <a key={item.label} href={item.href} onClick={() => setOpen(false)}
                   style={{ display: "block", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 20, color: "#FACC15", letterSpacing: 3, textDecoration: "none" }}>
