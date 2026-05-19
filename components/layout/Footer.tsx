@@ -14,10 +14,10 @@ const LINKS = {
 };
 
 const SOCIAL = [
-  { name: "Facebook", icon: "📘", href: "#" },
-  { name: "Instagram", icon: "📷", href: "#" },
-  { name: "TikTok", icon: "🎵", href: "#" },
-  { name: "YouTube", icon: "▶️", href: "#" },
+  { name: "Facebook", icon: "📘", href: "https://www.facebook.com/share/188c7YeqHT/?mibextid=wwXIfr" },
+  { name: "Instagram", icon: "📷", href: "https://www.instagram.com/thearctichustle" },
+  { name: "TikTok", icon: "🎵", href: "https://www.tiktok.com/@the.arctic.hustle" },
+  { name: "YouTube", icon: "▶️", href: "https://youtube.com/@thearctichustle-038" },
 ];
 
 export default function Footer() {
@@ -43,7 +43,7 @@ export default function Footer() {
           <div>
             <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700, color: "#B8C1CC", letterSpacing: 3, marginBottom: 14 }}>FOLLOW US</div>
             {SOCIAL.map((s) => (
-              <a key={s.name} href={s.href} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", marginBottom: 10 }}>
+              <a key={s.name} href={s.href} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", marginBottom: 10 }}>
                 <span>{s.icon}</span>{s.name}
               </a>
             ))}
