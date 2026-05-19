@@ -1,6 +1,7 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import Hero from "@/components/sections/Hero";
+import RegisterFirst from "@/components/sections/RegisterFirst";
 import About from "@/components/sections/About";
 import Events from "@/components/sections/Events";
 import Gallery from "@/components/sections/Gallery";
@@ -14,6 +15,7 @@ export default function HomePage() {
       <Navbar />
       <main>
         <Hero />
+        <RegisterFirst />
         <About />
         <Events />
         <Gallery />

@@ -2,10 +2,11 @@
 import { useState } from "react";
 
 const NAV_LINKS = [
+  { label: "Cars", href: "/cars" },
+  { label: "Tournaments", href: "/tournaments" },
   { label: "Events", href: "/events" },
   { label: "Gallery", href: "/gallery" },
   { label: "Blog", href: "/blog" },
-  { label: "Shop", href: "/shop" },
   { label: "About", href: "/about" },
 ];
 
@@ -23,11 +24,11 @@ export default function Navbar() {
           </div>
         </a>
 
-        <div className="hidden md:flex" style={{ alignItems: "center", gap: 28 }}>
+        <div className="hidden md:flex" style={{ alignItems: "center", gap: 24 }}>
           {NAV_LINKS.map((link) => (
             <a key={link.label} href={link.href} style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: 13, color: "#B8C1CC", letterSpacing: 3 }}>{link.label}</a>
           ))}
-          <a href="/register" style={{ background: "#DC2626", color: "#fff", padding: "8px 18px", borderRadius: 6, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 13, letterSpacing: 2 }}>JOIN CLUB</a>
+          <a href="/register" style={{ background: "#DC2626", color: "#fff", padding: "8px 18px", borderRadius: 6, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 13, letterSpacing: 2 }}>JOIN FREE</a>
         </div>
 
         <button onClick={() => setOpen(!open)} className="md:hidden" style={{ display: "flex", flexDirection: "column", gap: 5, padding: 8, background: "transparent", border: "none", cursor: "pointer" }}>
@@ -47,7 +48,7 @@ export default function Navbar() {
           ))}
           <a href="/register" onClick={() => setOpen(false)}
             style={{ display: "block", marginTop: 16, background: "#DC2626", color: "#fff", textAlign: "center", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 18, letterSpacing: 3 }}>
-            JOIN THE CLUB
+            JOIN FREE — REGISTER NOW
           </a>
         </div>
       )}
