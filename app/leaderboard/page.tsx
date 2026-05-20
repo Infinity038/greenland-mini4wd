@@ -1,184 +1,160 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState } from 'react';
 import { RANK_COLORS } from '@/lib/member';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 
-type LeaderCategory = 'points' | 'wins' | 'fastest' | 'active' | 'referrals' | 'rookie';
+const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
+const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
-const DEMO_PLAYERS = [
-  { name: 'Jovannie M.', rank: 'Legend', points: 520, wins: 12, fastest_ms: 4820, races: 28, referrals: 5, is_rookie: false },
-  { name: 'Carlo R.', rank: 'Champion', points: 310, wins: 7, fastest_ms: 4950, races: 21, referrals: 3, is_rookie: false },
-  { name: 'Mark A.', rank: 'Contender', points: 185, wins: 4, fastest_ms: 5100, races: 16, referrals: 2, is_rookie: false },
-  { name: 'Renz D.', rank: 'Tuner', points: 90, wins: 2, fastest_ms: 5250, races: 11, referrals: 1, is_rookie: false },
-  { name: 'Jake P.', rank: 'Racer', points: 55, wins: 1, fastest_ms: 5380, races: 8, referrals: 0, is_rookie: false },
-  { name: 'Luis G.', rank: 'Builder', points: 22, wins: 0, fastest_ms: 5600, races: 4, referrals: 2, is_rookie: false },
-  { name: 'Erik N.', rank: 'Rookie', points: 8, wins: 0, fastest_ms: 5900, races: 2, referrals: 1, is_rookie: true },
-  { name: 'Nico B.', rank: 'Rookie', points: 5, wins: 0, fastest_ms: 6100, races: 1, referrals: 0, is_rookie: true },
+type Cat = 'points' | 'wins' | 'fastest' | 'active' | 'referrals' | 'rookie';
+
+const PLAYERS = [
+  { name: 'Jovannie M.', rank: 'Legend',     points: 520, wins: 12, fastest_ms: 4820, races: 28, referrals: 5, rookie: false },
+  { name: 'Carlo R.',    rank: 'Champion',   points: 310, wins: 7,  fastest_ms: 4950, races: 21, referrals: 3, rookie: false },
+  { name: 'Mark A.',     rank: 'Contender',  points: 185, wins: 4,  fastest_ms: 5100, races: 16, referrals: 2, rookie: false },
+  { name: 'Renz D.',     rank: 'Tuner',      points: 90,  wins: 2,  fastest_ms: 5250, races: 11, referrals: 1, rookie: false },
+  { name: 'Jake P.',     rank: 'Racer',      points: 55,  wins: 1,  fastest_ms: 5380, races: 8,  referrals: 0, rookie: false },
+  { name: 'Luis G.',     rank: 'Builder',    points: 22,  wins: 0,  fastest_ms: 5600, races: 4,  referrals: 2, rookie: false },
+  { name: 'Erik N.',     rank: 'Rookie',     points: 8,   wins: 0,  fastest_ms: 5900, races: 2,  referrals: 1, rookie: true  },
+  { name: 'Nico B.',     rank: 'Rookie',     points: 5,   wins: 0,  fastest_ms: 6100, races: 1,  referrals: 0, rookie: true  },
 ];
 
-const CATEGORIES: { key: LeaderCategory; label: string; icon: string }[] = [
-  { key: 'points', label: 'Overall Points', icon: '🏆' },
-  { key: 'wins', label: 'Most Wins', icon: '🥇' },
-  { key: 'fastest', label: 'Fastest Lap', icon: '⚡' },
-  { key: 'active', label: 'Most Active', icon: '🔥' },
-  { key: 'referrals', label: 'Referral Champs', icon: '📣' },
-  { key: 'rookie', label: 'Rookie Standings', icon: '🌟' },
+const CATS: { key: Cat; label: string; icon: string }[] = [
+  { key: 'points',   label: 'Overall Points',  icon: '🏆' },
+  { key: 'wins',     label: 'Most Wins',        icon: '🥇' },
+  { key: 'fastest',  label: 'Fastest Lap',      icon: '⚡' },
+  { key: 'active',   label: 'Most Active',      icon: '🔥' },
+  { key: 'referrals',label: 'Referral Champs',  icon: '📣' },
+  { key: 'rookie',   label: 'Rookie Standings', icon: '🌟' },
 ];
 
-function formatLap(ms: number) {
-  const s = (ms / 1000).toFixed(3);
-  return `${s}s`;
+function getSorted(cat: Cat) {
+  const base = cat === 'rookie' ? PLAYERS.filter(p => p.rookie) : PLAYERS;
+  if (cat === 'wins')      return [...base].sort((a, b) => b.wins - a.wins);
+  if (cat === 'fastest')   return [...base].sort((a, b) => a.fastest_ms - b.fastest_ms);
+  if (cat === 'active')    return [...base].sort((a, b) => b.races - a.races);
+  if (cat === 'referrals') return [...base].sort((a, b) => b.referrals - a.referrals);
+  return [...base].sort((a, b) => b.points - a.points);
 }
 
-function getSorted(players: typeof DEMO_PLAYERS, cat: LeaderCategory) {
-  const base = cat === 'rookie' ? players.filter(p => p.is_rookie) : players;
-  switch (cat) {
-    case 'points': return [...base].sort((a, b) => b.points - a.points);
-    case 'wins': return [...base].sort((a, b) => b.wins - a.wins);
-    case 'fastest': return [...base].sort((a, b) => a.fastest_ms - b.fastest_ms);
-    case 'active': return [...base].sort((a, b) => b.races - a.races);
-    case 'referrals': return [...base].sort((a, b) => b.referrals - a.referrals);
-    case 'rookie': return [...base].sort((a, b) => b.points - a.points);
-    default: return base;
-  }
-}
-
-function getStatDisplay(p: typeof DEMO_PLAYERS[0], cat: LeaderCategory) {
-  switch (cat) {
-    case 'points': return { value: p.points, unit: 'pts' };
-    case 'wins': return { value: p.wins, unit: 'wins' };
-    case 'fastest': return { value: formatLap(p.fastest_ms), unit: 'best lap' };
-    case 'active': return { value: p.races, unit: 'races' };
-    case 'referrals': return { value: p.referrals, unit: 'referrals' };
-    case 'rookie': return { value: p.points, unit: 'pts' };
-  }
+function getStat(p: typeof PLAYERS[0], cat: Cat): string {
+  if (cat === 'wins')      return `${p.wins} wins`;
+  if (cat === 'fastest')   return `${(p.fastest_ms / 1000).toFixed(3)}s`;
+  if (cat === 'active')    return `${p.races} races`;
+  if (cat === 'referrals') return `${p.referrals} refs`;
+  return `${p.points} pts`;
 }
 
 export default function LeaderboardPage() {
-  const [cat, setCat] = useState<LeaderCategory>('points');
-  const sorted = getSorted(DEMO_PLAYERS, cat);
+  const [cat, setCat] = useState<Cat>('points');
+  const sorted = getSorted(cat);
   const top3 = sorted.slice(0, 3);
   const rest = sorted.slice(3);
 
-  const podiumOrder = [top3[1], top3[0], top3[2]].filter(Boolean);
-  const podiumHeights = ['h-24', 'h-32', 'h-20'];
-  const podiumPositions = [2, 1, 3];
+  // Podium order: 2nd, 1st, 3rd
+  const podium = [top3[1], top3[0], top3[2]].filter(Boolean);
+  const podiumPos = [2, 1, 3];
+  const podiumH = [88, 120, 72];
 
   return (
-    <div className="min-h-screen bg-[#050505]">
+    <>
       <Navbar />
+      <main style={{ background: '#050505', color: '#F5F5F5', minHeight: '100vh', paddingTop: 60 }}>
 
-      <div className="pt-24 pb-16 px-4 max-w-4xl mx-auto">
-        <div className="mb-8">
-          <div className="text-[#DC2626] font-barlaw font-black text-sm uppercase tracking-widest mb-2">Rankings</div>
-          <h1 className="text-4xl font-barlaw font-black text-white uppercase">Leaderboard</h1>
-          <p className="text-[#B8C1CC] mt-1 text-sm">Demo data — live rankings unlock after first official race event.</p>
-        </div>
+        {/* Header */}
+        <section style={{ background: '#071426', borderBottom: '1px solid rgba(220,38,38,0.2)', padding: '48px 24px 32px' }}>
+          <div style={{ maxWidth: 800, margin: '0 auto' }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>RANKINGS</div>
+            <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(40px, 10vw, 80px)', color: '#F5F5F5', margin: '0 0 8px', lineHeight: 0.95 }}>LEADERBOARD</h1>
+            <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', margin: 0 }}>Demo data — live rankings unlock after first official race event.</p>
+          </div>
+        </section>
 
-        {/* Category tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-8">
-          {CATEGORIES.map(c => (
-            <button
-              key={c.key}
-              onClick={() => setCat(c.key)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-barlaw font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${
-                cat === c.key
-                  ? 'bg-[#DC2626] text-white'
-                  : 'bg-[#071426] text-[#B8C1CC] border border-white/10 hover:text-white'
-              }`}
-            >
-              <span>{c.icon}</span> {c.label}
-            </button>
-          ))}
-        </div>
+        <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 24px' }}>
 
-        {/* Podium */}
-        {sorted.length >= 3 && (
-          <div className="flex items-end justify-center gap-2 mb-10">
-            {podiumOrder.map((player, i) => {
-              const pos = podiumPositions[i];
-              const rankColor = RANK_COLORS[player.rank as keyof typeof RANK_COLORS] || '#6B7280';
-              const stat = getStatDisplay(player, cat);
+          {/* Category tabs — scrollable */}
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 32, WebkitOverflowScrolling: 'touch' as any }}>
+            {CATS.map(c => (
+              <button
+                key={c.key}
+                onClick={() => setCat(c.key)}
+                style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, padding: '10px 16px', border: cat === c.key ? 'none' : '1px solid rgba(255,255,255,0.1)', borderRadius: 10, background: cat === c.key ? '#DC2626' : '#071426', color: cat === c.key ? '#fff' : '#B8C1CC', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+              >
+                {c.icon} {c.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Podium */}
+          {sorted.length >= 2 && (
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 12, marginBottom: 40 }}>
+              {podium.map((player, i) => {
+                const pos = podiumPos[i];
+                const rc = RANK_COLORS[player.rank as keyof typeof RANK_COLORS] || '#6B7280';
+                return (
+                  <div key={player.name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, maxWidth: 160 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: rc + '22', border: `2px solid ${rc}`, display: 'flex', alignItems: 'center', justifyContent: 'center', ...F, fontWeight: 900, fontSize: 20, color: rc, marginBottom: 8 }}>
+                      {player.name[0]}
+                    </div>
+                    <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#F5F5F5', textAlign: 'center', marginBottom: 2 }}>{player.name}</div>
+                    <div style={{ ...F, fontSize: 12, color: rc, marginBottom: 4 }}>{player.rank}</div>
+                    <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#FACC15', marginBottom: 8 }}>{getStat(player, cat)}</div>
+                    <div style={{ width: '100%', height: podiumH[i], borderRadius: '8px 8px 0 0', background: pos === 1 ? 'rgba(250,204,21,0.15)' : '#071426', border: `1px solid ${pos === 1 ? '#FACC15' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
+                      {pos === 1 ? '🥇' : pos === 2 ? '🥈' : '🥉'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Full rankings */}
+          <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: 32 }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 3, color: '#F5F5F5' }}>FULL RANKINGS</span>
+              <span style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>{sorted.length} racers</span>
+            </div>
+            {sorted.map((player, idx) => {
+              const rc = RANK_COLORS[player.rank as keyof typeof RANK_COLORS] || '#6B7280';
               return (
-                <div key={player.name} className="flex flex-col items-center flex-1 max-w-[140px]">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-barlaw font-black mb-2"
-                    style={{ backgroundColor: rankColor + '22', color: rankColor, border: `2px solid ${rankColor}` }}>
+                <div key={player.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderBottom: idx < sorted.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                  <div style={{ ...F, fontWeight: 900, fontSize: 18, color: idx < 3 ? '#FACC15' : '#B8C1CC', width: 28, textAlign: 'center' }}>{idx + 1}</div>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: rc + '22', border: `1px solid ${rc}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', ...F, fontWeight: 900, fontSize: 16, color: rc, flexShrink: 0 }}>
                     {player.name[0]}
                   </div>
-                  <div className="text-white font-barlaw font-black text-sm text-center leading-tight">{player.name}</div>
-                  <div className="text-xs text-center mt-0.5" style={{ color: rankColor }}>{player.rank}</div>
-                  <div className="text-[#FACC15] font-barlaw font-black text-lg">{stat.value}</div>
-                  <div
-                    className={`w-full ${podiumHeights[i]} rounded-t-xl mt-2 flex items-center justify-center text-2xl font-barlaw font-black`}
-                    style={{
-                      backgroundColor: pos === 1 ? '#FACC1522' : '#071426',
-                      border: `1px solid ${pos === 1 ? '#FACC15' : 'rgba(255,255,255,0.1)'}`,
-                      color: pos === 1 ? '#FACC15' : pos === 2 ? '#D1D5DB' : '#C2773B'
-                    }}
-                  >
-                    {pos === 1 ? '🥇' : pos === 2 ? '🥈' : '🥉'}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ ...F, fontWeight: 700, fontSize: 17, color: '#F5F5F5' }}>{player.name}</div>
+                    <div style={{ ...F, fontSize: 12, color: rc }}>{player.rank}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5' }}>{getStat(player, cat)}</div>
                   </div>
                 </div>
               );
             })}
           </div>
-        )}
 
-        {/* Full rankings */}
-        <div className="bg-[#071426] rounded-2xl border border-white/10 overflow-hidden">
-          <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
-            <span className="font-barlaw font-black text-white uppercase tracking-wider text-sm">Full Rankings</span>
-            <span className="text-xs text-[#B8C1CC]">{sorted.length} racers</span>
+          {/* Rank legend */}
+          <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 24 }}>
+            <div style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 3, color: '#B8C1CC', marginBottom: 16 }}>MEMBER RANK SYSTEM</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
+              {Object.entries(RANK_COLORS).map(([rank, color]) => (
+                <div key={rank} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                  <span style={{ ...F, fontWeight: 700, fontSize: 15, color }}>{rank}</span>
+                </div>
+              ))}
+            </div>
+            <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', margin: 0 }}>
+              Ranks earned through race participation, wins, fastest laps, attendance, referrals, and improvement over time.
+            </p>
           </div>
-          {sorted.map((player, idx) => {
-            const rankColor = RANK_COLORS[player.rank as keyof typeof RANK_COLORS] || '#6B7280';
-            const stat = getStatDisplay(player, cat);
-            return (
-              <div
-                key={player.name}
-                className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors"
-              >
-                <div className={`w-8 text-center font-barlaw font-black text-lg ${idx < 3 ? 'text-[#FACC15]' : 'text-[#B8C1CC]'}`}>
-                  {idx + 1}
-                </div>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-barlaw font-black flex-shrink-0"
-                  style={{ backgroundColor: rankColor + '22', color: rankColor }}>
-                  {player.name[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-barlaw font-bold text-white truncate">{player.name}</div>
-                  <div className="text-xs" style={{ color: rankColor }}>{player.rank}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-barlaw font-black text-white">{stat.value}</div>
-                  <div className="text-xs text-[#B8C1CC]">{stat.unit}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
 
-        {/* Rank legend */}
-        <div className="mt-8 bg-[#071426] rounded-2xl border border-white/10 p-5">
-          <h3 className="font-barlaw font-black text-white uppercase tracking-wider mb-4 text-sm">Member Rank System</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {Object.entries(RANK_COLORS).map(([rank, color]) => (
-              <div key={rank} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                <span className="text-sm font-bold" style={{ color }}>{rank}</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-[#B8C1CC] mt-3">
-            Ranks are earned through race participation, wins, fastest laps, attendance, referrals, and improvement over time.
-          </p>
         </div>
-      </div>
-
+      </main>
       <Footer />
-    </div>
+    </>
   );
 }

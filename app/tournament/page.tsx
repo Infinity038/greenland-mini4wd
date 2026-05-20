@@ -206,8 +206,8 @@ export default function TournamentsPage() {
           <div style={{ textAlign: "center", padding: "20px 0 20px" }}>
             <h3 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 40, color: "#F5F5F5", marginBottom: 8 }}>READY TO RACE?</h3>
             <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "#B8C1CC", marginBottom: 28 }}>Register free first. Race tickets sold separately per tournament.</p>
-            <a href="/register" style={{ display: "inline-block", background: "#DC2626", color: "#fff", padding: "16px 48px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 20, letterSpacing: 3, textDecoration: "none" }}>
-              REGISTER FREE →
+            <a href={typeof window !== 'undefined' && document.cookie.includes('gm4wd_registered=1') ? '/shop' : '/register'} style={{ background: "#DC2626", color: "#fff", padding: "14px 32px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 17, letterSpacing: 2, textDecoration: "none" }}>
+              {typeof window !== 'undefined' && document.cookie.includes('gm4wd_registered=1') ? 'BUY RACE TICKETS →' : 'REGISTER FREE FIRST →'}
             </a>
           </div>
         </div>
