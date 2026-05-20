@@ -194,7 +194,7 @@ export default function RegisterPage() {
         <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.1)", marginBottom: 32 }}>
           {(["register", "login"] as const).map(t => (
             <button key={t} onClick={() => { setTab(t); setError(""); }}
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", padding: "12px 24px", cursor: "pointer", color: tab === t ? "#fff" : "rgba(255,255,255,0.45)", borderBottom: `2px solid ${tab === t ? "#E8192C" : "transparent"}`, marginBottom: -1, background: "none", border: "none", borderBottom: `2px solid ${tab === t ? "#E8192C" : "transparent"}` as any }}>
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", padding: "12px 24px", cursor: "pointer", color: tab === t ? "#fff" : "rgba(255,255,255,0.45)", borderBottom: `2px solid ${tab === t ? "#E8192C" : "transparent"}`, marginBottom: -1, background: "none", borderTop: "none", borderLeft: "none", borderRight: "none" }}>
               {t === "register" ? "Register" : "Member Login"}
             </button>
           ))}
