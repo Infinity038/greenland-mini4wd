@@ -54,7 +54,6 @@ export default function ProfilePage() {
 
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 40, paddingBottom: 32, borderBottom: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
-            {/* Avatar */}
             <div style={{ width: 80, height: 80, background: "#DC2626", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 32, color: "#fff", flexShrink: 0, border: "3px solid rgba(220,38,38,0.3)" }}>
               {loading ? "..." : initial}
             </div>
@@ -67,7 +66,6 @@ export default function ProfilePage() {
                 Member since {registeredDate} · {member?.city || "Nuuk, Greenland"}
               </div>
             </div>
-            {/* Active badge */}
             <div style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 6, padding: "6px 14px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 3, color: "#22C55E" }}>
               ✓ ACTIVE MEMBER
             </div>
