@@ -49,7 +49,7 @@ export default function AdminOrdersPage() {
 
     // Index proofs by order_id
     const proofMap: Record<string, any> = {};
-    (proofData || []).forEach(p => { proofMap[p.order_id] = p; });
+    (proofData || []).forEach((p: any) => { proofMap[p.order_id] = p; });
     setProofs(proofMap);
 
     // Init notes
