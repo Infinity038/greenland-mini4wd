@@ -26,7 +26,7 @@ export interface TicketWallet {
   paid_used: number;
   paid_available: number;
   bonus_available: number;
-  loyalty_progress: number; // X out of 10 toward next bonus
+  loyalty_progress: number;
   loyalty_needed: number;
 }
 
@@ -94,16 +94,15 @@ export async function getTicketWallet(email: string): Promise<TicketWallet> {
     .select('*')
     .eq('member_email', email);
 
-  const all = tickets || [];
-  const paid = all.filter(t => t.ticket_type === 'paid' && t.status !== 'cancelled');
-  const paidUsed = paid.filter(t => t.status === 'used').length;
-  const paidAvailable = paid.filter(t => t.status === 'available').length;
-  const paidTotal = paid.length;
-  const bonusAvailable = all.filter(t => t.ticket_type !== 'paid' && t.status === 'available').length;
+  const all: any[] = tickets || [];
+  const paid: any[] = all.filter((t: any) => t.ticket_type === 'paid' && t.status !== 'cancelled');
+  const paidUsed: number = paid.filter((t: any) => t.status === 'used').length;
+  const paidAvailable: number = paid.filter((t: any) => t.status === 'available').length;
+  const paidTotal: number = paid.length;
+  const bonusAvailable: number = all.filter((t: any) => t.ticket_type !== 'paid' && t.status === 'available').length;
 
-  // Count confirmed paid tickets for loyalty (exclude cancelled)
-  const confirmedPaid = paid.filter(t => t.status !== 'cancelled').length;
-  const loyaltyProgress = confirmedPaid % 10;
+  const confirmedPaid: number = paid.filter((t: any) => t.status !== 'cancelled').length;
+  const loyaltyProgress: number = confirmedPaid % 10;
 
   return {
     paid_total: paidTotal,
@@ -127,10 +126,10 @@ export async function getReferralStats(member: Member): Promise<ReferralStats> {
     .select('*')
     .eq('referrer_email', member.email);
 
-  const all = referrals || [];
-  const confirmed = all.filter(r => r.status === 'rewarded' || r.status === 'qualified').length;
-  const pending = all.filter(r => r.status === 'pending').length;
-  const bonusEarned = all.filter(r => r.reward_given).length;
+  const all: any[] = referrals || [];
+  const confirmed: number = all.filter((r: any) => r.status === 'rewarded' || r.status === 'qualified').length;
+  const pending: number = all.filter((r: any) => r.status === 'pending').length;
+  const bonusEarned: number = all.filter((r: any) => r.reward_given).length;
 
   return {
     referral_code: code,
