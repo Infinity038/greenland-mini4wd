@@ -18,7 +18,24 @@ export default function Hero() {
 
   return (
     <section style={{ minHeight: "100vh", background: "#050505", display: "flex", alignItems: "center", justifyContent: "center", paddingTop: 60, overflow: "hidden", position: "relative" }}>
+
+      {/* Real background image */}
+      <div style={{
+        position: "absolute", inset: 0,
+        backgroundImage: "url('/IMG_5374.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        opacity: 0.18,
+      }} />
+
+      {/* Dark overlay */}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,5,5,0.6) 0%, rgba(5,5,5,0.4) 50%, rgba(5,5,5,0.95) 100%)" }} />
+
+      {/* Grid pattern */}
       <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(220,38,38,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(220,38,38,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+
+      {/* Red glow */}
       <div style={{ position: "absolute", top: "40%", left: "50%", transform: "translate(-50%,-50%)", width: 500, height: 500, background: "radial-gradient(circle, rgba(220,38,38,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
 
       <div style={{ position: "relative", zIndex: 1, textAlign: "center", padding: "0 20px", maxWidth: 700, width: "100%" }}>
