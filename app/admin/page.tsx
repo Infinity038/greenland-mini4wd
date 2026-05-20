@@ -1,136 +1,222 @@
 "use client";
-export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 const PASSWORD = "mini4wd2026";
 
-type Member = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string;
-  nationality: string;
-  city: string;
-  experience: string;
-  created_at: string;
-};
+const STATUS_OPTIONS = [
+  { value: "pending", label: "Pending Confirmation", color: "#FACC15" },
+  { value: "reserved", label: "Reserved", color: "#60A5FA" },
+  { value: "awaiting_stock", label: "Awaiting Stock", color: "#F97316" },
+  { value: "in_transit", label: "In Transit", color: "#A78BFA" },
+  { value: "ready_for_pickup", label: "Ready for Pickup", color: "#34D399" },
+  { value: "completed", label: "Completed", color: "#B8C1CC" },
+  { value: "cancelled", label: "Cancelled", color: "#DC2626" },
+];
 
-export default function AdminPage() {
-  const [auth, setAuth] = useState(false);
+function statusColor(s: string) {
+  return STATUS_OPTIONS.find(o => o.value === s)?.color || "#B8C1CC";
+}
+function statusLabel(s: string) {
+  return STATUS_OPTIONS.find(o => o.value === s)?.label || s;
+}
+
+export default function AdminOrdersPage() {
+  const [authed, setAuthed] = useState(false);
   const [pw, setPw] = useState("");
-  const [members, setMembers] = useState<Member[]>([]);
+  const [pwError, setPwError] = useState("");
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [updating, setUpdating] = useState<string | null>(null);
+  const [filter, setFilter] = useState("all");
+  const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
 
-  const login = () => {
-    if (pw === PASSWORD) setAuth(true);
+  const fetchOrders = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+    setOrders(data || []);
+    setLoading(false);
   };
 
   useEffect(() => {
-    if (!auth) return;
-    setLoading(true);
-    supabase.from("members").select("*").order("created_at", { ascending: false })
-      .then(({ data }: { data: Member[] | null }) => { setMembers(data || []); setLoading(false); });
-  }, [auth]);
+    if (authed) fetchOrders();
+  }, [authed]);
 
-  if (!auth) return (
-    <main style={{ background: "#0D0D0D", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <div style={{ background: "#111", border: "1px solid #222", borderRadius: 12, padding: 48, width: "100%", maxWidth: 400, textAlign: "center" }}>
-        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 32, fontWeight: 900, color: "#fff", marginBottom: 8 }}>
-          ADMIN <span style={{ color: "#D01B1B" }}>ACCESS</span>
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pw === PASSWORD) { setAuthed(true); setPwError(""); }
+    else setPwError("Incorrect password.");
+  };
+
+  const updateStatus = async (id: string, status: string) => {
+    setUpdating(id);
+    await supabase.from("orders").update({ status }).eq("id", id);
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+    setUpdating(null);
+  };
+
+  const saveNote = async (id: string) => {
+    setUpdating(id);
+    await supabase.from("orders").update({ notes: adminNotes[id] }).eq("id", id);
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, notes: adminNotes[id] } : o));
+    setUpdating(null);
+  };
+
+  const filtered = filter === "all" ? orders : orders.filter(o => o.status === filter);
+
+  const counts: Record<string, number> = {};
+  orders.forEach(o => { counts[o.status] = (counts[o.status] || 0) + 1; });
+
+  const s: React.CSSProperties = {
+    background: "#050505", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6,
+    color: "#F5F5F5", fontFamily: "'DM Sans', sans-serif", fontSize: 13,
+    padding: "8px 12px", outline: "none", width: "100%",
+  };
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#050505", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ width: "100%", maxWidth: 380 }}>
+          <div style={{ textAlign: "center", marginBottom: 32 }}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 8 }}>ADMIN PANEL</div>
+            <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 36, color: "#F5F5F5", margin: 0 }}>ORDER MANAGEMENT</h1>
+          </div>
+          <form onSubmit={handleLogin} style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "32px 28px" }}>
+            <label style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 4, color: "#B8C1CC", display: "block", marginBottom: 8 }}>ADMIN PASSWORD</label>
+            <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Enter password" style={{ ...s, marginBottom: 8 }} />
+            {pwError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 8 }}>{pwError}</p>}
+            <button type="submit" style={{ width: "100%", background: "#DC2626", color: "#fff", border: "none", borderRadius: 6, padding: "12px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: 2, cursor: "pointer", marginTop: 8 }}>
+              LOGIN →
+            </button>
+          </form>
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            <a href="/admin" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: "#B8C1CC", textDecoration: "none", letterSpacing: 2 }}>← BACK TO ADMIN</a>
+          </div>
         </div>
-        <p style={{ color: "#555", marginBottom: 32, fontSize: 14 }}>Greenland Mini 4WD Club</p>
-        <input
-          type="password" placeholder="Enter password"
-          value={pw} onChange={(e) => setPw(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && login()}
-          style={{ width: "100%", background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 8, padding: "14px 16px", color: "#fff", fontSize: 16, outline: "none", marginBottom: 16 }}
-        />
-        <button onClick={login}
-          style={{ width: "100%", background: "#D01B1B", color: "#fff", border: "none", borderRadius: 8, padding: 16, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, letterSpacing: 2, cursor: "pointer" }}>
-          LOGIN
-        </button>
       </div>
-    </main>
-  );
+    );
+  }
 
   return (
-    <main style={{ background: "#0D0D0D", minHeight: "100vh", padding: "40px 24px", color: "#fff" }}>
+    <div style={{ minHeight: "100vh", background: "#050505", color: "#F5F5F5", padding: "32px 24px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
 
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 40 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, flexWrap: "wrap", gap: 12 }}>
           <div>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 40, fontWeight: 900 }}>
-              ADMIN <span style={{ color: "#D01B1B" }}>DASHBOARD</span>
-            </div>
-            <div style={{ color: "#555", fontSize: 14 }}>Greenland Mini 4WD Club</div>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 4 }}>ADMIN PANEL</div>
+            <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 36, color: "#F5F5F5", margin: 0 }}>PREORDER MANAGEMENT</h1>
           </div>
-          <button onClick={() => setAuth(false)}
-            style={{ background: "#F9FAFB", color: "#aaa", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontSize: 14 }}>
-            Logout
-          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={fetchOrders} style={{ background: "#071426", color: "#F5F5F5", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "10px 18px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: 2, cursor: "pointer" }}>
+              REFRESH
+            </button>
+            <a href="/admin" style={{ background: "transparent", color: "#B8C1CC", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "10px 18px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: 2, textDecoration: "none" }}>
+              ← ADMIN HOME
+            </a>
+          </div>
         </div>
 
         {/* Stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 40 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 32 }}>
           {[
-            { label: "Total Members", value: members.length },
-            { label: "Beginners", value: members.filter(m => m.experience === "beginner").length },
-            { label: "Intermediate", value: members.filter(m => m.experience === "intermediate").length },
-            { label: "Advanced", value: members.filter(m => m.experience === "advanced").length },
-          ].map((s) => (
-            <div key={s.label} style={{ background: "#111", border: "1px solid #222", borderRadius: 12, padding: 24 }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 40, fontWeight: 900, color: "#D01B1B" }}>{s.value}</div>
-              <div style={{ color: "#555", fontSize: 13, marginTop: 4 }}>{s.label}</div>
+            { label: "Total", value: orders.length, color: "#F5F5F5" },
+            { label: "Pending", value: counts["pending"] || 0, color: "#FACC15" },
+            { label: "Reserved", value: counts["reserved"] || 0, color: "#60A5FA" },
+            { label: "Pickup Ready", value: counts["ready_for_pickup"] || 0, color: "#34D399" },
+            { label: "Completed", value: counts["completed"] || 0, color: "#B8C1CC" },
+            { label: "Cancelled", value: counts["cancelled"] || 0, color: "#DC2626" },
+          ].map(stat => (
+            <div key={stat.label} style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "16px", textAlign: "center" }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 32, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginTop: 4 }}>{stat.label.toUpperCase()}</div>
             </div>
           ))}
         </div>
 
-        {/* Table */}
-        <div style={{ background: "#111", border: "1px solid #222", borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ padding: "20px 24px", borderBottom: "1px solid #222", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 700 }}>
-            MEMBERS ({members.length})
-          </div>
-          {loading ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#555" }}>Loading...</div>
-          ) : members.length === 0 ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#555" }}>No members yet.</div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                <thead>
-                  <tr style={{ background: "#0D0D0D" }}>
-                    {["Name", "Email", "Phone", "Nationality", "City", "Experience", "Joined"].map((h) => (
-                      <th key={h} style={{ padding: "12px 16px", textAlign: "left", color: "#555", fontSize: 11, letterSpacing: 2, fontWeight: 600, whiteSpace: "nowrap" }}>{h.toUpperCase()}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((m, i) => (
-                    <tr key={m.id} style={{ borderTop: "1px solid #1a1a1a", background: i % 2 === 0 ? "#111" : "#0f0f0f" }}>
-                      <td style={{ padding: "14px 16px", whiteSpace: "nowrap", fontWeight: 600 }}>{m.first_name} {m.last_name}</td>
-                      <td style={{ padding: "14px 16px", color: "#aaa" }}>{m.email}</td>
-                      <td style={{ padding: "14px 16px", color: "#aaa" }}>{m.phone}</td>
-                      <td style={{ padding: "14px 16px", color: "#aaa" }}>{m.nationality}</td>
-                      <td style={{ padding: "14px 16px", color: "#aaa" }}>{m.city}</td>
-                      <td style={{ padding: "14px 16px" }}>
-                        <span style={{ background: m.experience === "advanced" ? "#D01B1B" : m.experience === "intermediate" ? "#b8860b" : "#1a3a1a", color: "#fff", padding: "4px 10px", borderRadius: 4, fontSize: 11, letterSpacing: 1 }}>
-                          {m.experience || "—"}
-                        </span>
-                      </td>
-                      <td style={{ padding: "14px 16px", color: "#555", whiteSpace: "nowrap" }}>
-                        {new Date(m.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        {/* Filter */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+          {[{ value: "all", label: "All" }, ...STATUS_OPTIONS].map(opt => (
+            <button key={opt.value} onClick={() => setFilter(opt.value)}
+              style={{ background: filter === opt.value ? "#DC2626" : "#071426", color: filter === opt.value ? "#fff" : "#B8C1CC", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, padding: "7px 14px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: 2, cursor: "pointer" }}>
+              {opt.label.toUpperCase()}
+            </button>
+          ))}
         </div>
+
+        {/* Orders */}
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 60, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: "#B8C1CC", letterSpacing: 3 }}>LOADING...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 60, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: "#B8C1CC" }}>No orders found.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {filtered.map(order => (
+              <div key={order.id} style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "24px" }}>
+                {/* Top row */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+                  <div>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 4 }}>ORDER #{order.id?.toString().slice(0, 8).toUpperCase()}</div>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 22, color: "#F5F5F5" }}>{order.product_name}</div>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#B8C1CC", marginTop: 4 }}>
+                      {new Date(order.created_at).toLocaleString("en-GB")}
+                    </div>
+                  </div>
+                  <div style={{ background: statusColor(order.status) + "20", border: `1px solid ${statusColor(order.status)}40`, borderRadius: 6, padding: "6px 14px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 2, color: statusColor(order.status) }}>
+                    {statusLabel(order.status)}
+                  </div>
+                </div>
+
+                {/* Customer + order info */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
+                  {[
+                    { label: "Customer", value: order.member_name },
+                    { label: "Email", value: order.member_email },
+                    { label: "Chassis", value: order.chassis },
+                    { label: "Type", value: order.type === "built" ? "Race Ready" : order.type === "boxed" ? "Boxed Kit" : order.type },
+                  ].map(d => (
+                    <div key={d.label} style={{ background: "#050505", borderRadius: 8, padding: "12px 14px" }}>
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: 3, color: "#B8C1CC", marginBottom: 4 }}>{d.label.toUpperCase()}</div>
+                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#F5F5F5", wordBreak: "break-all" }}>{d.value || "—"}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Admin notes */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 6 }}>ADMIN NOTES</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      value={adminNotes[order.id] ?? order.notes ?? ""}
+                      onChange={e => setAdminNotes(prev => ({ ...prev, [order.id]: e.target.value }))}
+                      placeholder="Add a note..."
+                      style={{ ...s, flex: 1 }}
+                    />
+                    <button onClick={() => saveNote(order.id)} disabled={updating === order.id}
+                      style={{ background: "#071426", color: "#F5F5F5", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "8px 14px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: "pointer", whiteSpace: "nowrap" }}>
+                      SAVE
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status controls */}
+                <div>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 8 }}>UPDATE STATUS</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {STATUS_OPTIONS.map(opt => (
+                      <button key={opt.value} onClick={() => updateStatus(order.id, opt.value)}
+                        disabled={order.status === opt.value || updating === order.id}
+                        style={{ background: order.status === opt.value ? opt.color + "22" : "#050505", color: order.status === opt.value ? opt.color : "#B8C1CC", border: `1px solid ${order.status === opt.value ? opt.color + "55" : "rgba(255,255,255,0.08)"}`, borderRadius: 6, padding: "7px 12px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: order.status === opt.value ? "default" : "pointer", opacity: updating === order.id ? 0.5 : 1 }}>
+                        {opt.label.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </main>
+    </div>
   );
 }

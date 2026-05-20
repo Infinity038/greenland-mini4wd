@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { isRegistered, getMemberData, logout } from "@/lib/member";
 
-const NAV_LINKS = [
+const NAV_LINKS = [{ label: "Leaderboard", href: "/leaderboard" },
   { label: "Cars", href: "/cars" },
   { label: "Tournament", href: "/tournament" },
   { label: "Events", href: "/events" },
