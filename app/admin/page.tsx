@@ -54,7 +54,7 @@ export default function AdminOrdersPage() {
 
     // Init notes
     const noteMap: Record<string, string> = {};
-    (ordersData || []).forEach(o => { noteMap[o.id] = o.notes || ''; });
+    (ordersData || []).forEach((o: any) => { noteMap[o.id] = o.notes || ''; });
     setNotes(noteMap);
     setLoading(false);
   };
