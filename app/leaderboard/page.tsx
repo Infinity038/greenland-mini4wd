@@ -1,137 +1,184 @@
-"use client";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+'use client';
 
-// Demo data — replace with Supabase race_results query later
-const DEMO_RACERS = [
-  { rank: 1, name: "Jovannie A.", chassis: "AR Chassis", wins: 8, races: 10, podiums: 9, best_lap: "4.21s", nationality: "🇵🇭" },
-  { rank: 2, name: "Takeshi N.", chassis: "MA Chassis", wins: 6, races: 10, podiums: 8, best_lap: "4.35s", nationality: "🇯🇵" },
-  { rank: 3, name: "Erik H.", chassis: "VS Chassis", wins: 5, races: 9, podiums: 7, best_lap: "4.40s", nationality: "🇬🇱" },
-  { rank: 4, name: "Marco R.", chassis: "S2 Chassis", wins: 4, races: 8, podiums: 5, best_lap: "4.52s", nationality: "🇵🇭" },
-  { rank: 5, name: "Lars B.", chassis: "FM-A Chassis", wins: 3, races: 7, podiums: 4, best_lap: "4.60s", nationality: "🇩🇰" },
-  { rank: 6, name: "Rico M.", chassis: "AR Chassis", wins: 2, races: 6, podiums: 3, best_lap: "4.71s", nationality: "🇵🇭" },
-  { rank: 7, name: "Nuuk Racer", chassis: "MS Chassis", wins: 1, races: 5, podiums: 2, best_lap: "4.88s", nationality: "🇬🇱" },
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { RANK_COLORS } from '@/lib/member';
+import Navbar from '@/components/layout/Navbar';
+import Footer from '@/components/layout/Footer';
+
+type LeaderCategory = 'points' | 'wins' | 'fastest' | 'active' | 'referrals' | 'rookie';
+
+const DEMO_PLAYERS = [
+  { name: 'Jovannie M.', rank: 'Legend', points: 520, wins: 12, fastest_ms: 4820, races: 28, referrals: 5, is_rookie: false },
+  { name: 'Carlo R.', rank: 'Champion', points: 310, wins: 7, fastest_ms: 4950, races: 21, referrals: 3, is_rookie: false },
+  { name: 'Mark A.', rank: 'Contender', points: 185, wins: 4, fastest_ms: 5100, races: 16, referrals: 2, is_rookie: false },
+  { name: 'Renz D.', rank: 'Tuner', points: 90, wins: 2, fastest_ms: 5250, races: 11, referrals: 1, is_rookie: false },
+  { name: 'Jake P.', rank: 'Racer', points: 55, wins: 1, fastest_ms: 5380, races: 8, referrals: 0, is_rookie: false },
+  { name: 'Luis G.', rank: 'Builder', points: 22, wins: 0, fastest_ms: 5600, races: 4, referrals: 2, is_rookie: false },
+  { name: 'Erik N.', rank: 'Rookie', points: 8, wins: 0, fastest_ms: 5900, races: 2, referrals: 1, is_rookie: true },
+  { name: 'Nico B.', rank: 'Rookie', points: 5, wins: 0, fastest_ms: 6100, races: 1, referrals: 0, is_rookie: true },
 ];
 
-const PODIUM_COLORS = ["#FACC15", "#B8C1CC", "#DC2626"];
-const PODIUM_LABELS = ["🥇 1ST", "🥈 2ND", "🥉 3RD"];
-const PODIUM_SIZES = [120, 90, 90];
+const CATEGORIES: { key: LeaderCategory; label: string; icon: string }[] = [
+  { key: 'points', label: 'Overall Points', icon: '🏆' },
+  { key: 'wins', label: 'Most Wins', icon: '🥇' },
+  { key: 'fastest', label: 'Fastest Lap', icon: '⚡' },
+  { key: 'active', label: 'Most Active', icon: '🔥' },
+  { key: 'referrals', label: 'Referral Champs', icon: '📣' },
+  { key: 'rookie', label: 'Rookie Standings', icon: '🌟' },
+];
+
+function formatLap(ms: number) {
+  const s = (ms / 1000).toFixed(3);
+  return `${s}s`;
+}
+
+function getSorted(players: typeof DEMO_PLAYERS, cat: LeaderCategory) {
+  const base = cat === 'rookie' ? players.filter(p => p.is_rookie) : players;
+  switch (cat) {
+    case 'points': return [...base].sort((a, b) => b.points - a.points);
+    case 'wins': return [...base].sort((a, b) => b.wins - a.wins);
+    case 'fastest': return [...base].sort((a, b) => a.fastest_ms - b.fastest_ms);
+    case 'active': return [...base].sort((a, b) => b.races - a.races);
+    case 'referrals': return [...base].sort((a, b) => b.referrals - a.referrals);
+    case 'rookie': return [...base].sort((a, b) => b.points - a.points);
+    default: return base;
+  }
+}
+
+function getStatDisplay(p: typeof DEMO_PLAYERS[0], cat: LeaderCategory) {
+  switch (cat) {
+    case 'points': return { value: p.points, unit: 'pts' };
+    case 'wins': return { value: p.wins, unit: 'wins' };
+    case 'fastest': return { value: formatLap(p.fastest_ms), unit: 'best lap' };
+    case 'active': return { value: p.races, unit: 'races' };
+    case 'referrals': return { value: p.referrals, unit: 'referrals' };
+    case 'rookie': return { value: p.points, unit: 'pts' };
+  }
+}
 
 export default function LeaderboardPage() {
-  const top3 = DEMO_RACERS.slice(0, 3);
-  const rest = DEMO_RACERS.slice(3);
+  const [cat, setCat] = useState<LeaderCategory>('points');
+  const sorted = getSorted(DEMO_PLAYERS, cat);
+  const top3 = sorted.slice(0, 3);
+  const rest = sorted.slice(3);
+
+  const podiumOrder = [top3[1], top3[0], top3[2]].filter(Boolean);
+  const podiumHeights = ['h-24', 'h-32', 'h-20'];
+  const podiumPositions = [2, 1, 3];
 
   return (
-    <>
+    <div className="min-h-screen bg-[#050505]">
       <Navbar />
-      <main style={{ background: "#050505", color: "#F5F5F5", paddingTop: 60 }}>
 
-        {/* Hero */}
-        <section style={{ background: "#071426", borderBottom: "1px solid rgba(220,38,38,0.2)", padding: "64px 24px 56px", textAlign: "center" }}>
-          <div style={{ maxWidth: 600, margin: "0 auto" }}>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#FACC15", marginBottom: 12 }}>SEASON STANDINGS</div>
-            <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(48px, 10vw, 96px)", color: "#F5F5F5", lineHeight: 0.9, marginBottom: 16 }}>
-              LEADER<br /><span style={{ color: "#DC2626" }}>BOARD</span>
-            </h1>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "#B8C1CC", lineHeight: 1.7 }}>
-              Weekly box stock tournament rankings. Updated after every race event.
-            </p>
-          </div>
-        </section>
-
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: "64px 24px 80px" }}>
-
-          {/* Demo notice */}
-          <div style={{ background: "rgba(250,204,21,0.05)", border: "1px solid rgba(250,204,21,0.15)", borderRadius: 10, padding: "12px 18px", marginBottom: 48, display: "flex", gap: 10, alignItems: "center" }}>
-            <span style={{ fontSize: 16 }}>⚠️</span>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#FACC15", margin: 0 }}>
-              Demo data shown. Live rankings will update after the first official tournament.
-            </p>
-          </div>
-
-          {/* Podium — top 3 */}
-          <div style={{ marginBottom: 56 }}>
-            <div style={{ textAlign: "center", marginBottom: 36 }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 8 }}>TOP RACERS</div>
-              <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(28px, 5vw, 44px)", color: "#F5F5F5", margin: 0 }}>PODIUM</h2>
-            </div>
-
-            {/* Podium cards — reordered: 2nd, 1st, 3rd */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, alignItems: "end" }}>
-              {[top3[1], top3[0], top3[2]].map((racer, i) => {
-                const realRank = i === 0 ? 1 : i === 1 ? 0 : 2;
-                const color = PODIUM_COLORS[racer.rank - 1];
-                const label = PODIUM_LABELS[racer.rank - 1];
-                const isFirst = racer.rank === 1;
-                return (
-                  <div key={racer.name} style={{ background: isFirst ? "rgba(250,204,21,0.06)" : "#071426", border: `1px solid ${color}30`, borderRadius: 14, padding: isFirst ? "32px 20px" : "24px 16px", textAlign: "center" }}>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: isFirst ? 18 : 14, color, marginBottom: 12, letterSpacing: 2 }}>{label}</div>
-                    <div style={{ width: isFirst ? 72 : 56, height: isFirst ? 72 : 56, background: color + "22", border: `2px solid ${color}55`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: isFirst ? 28 : 22, color }}>
-                      {racer.name[0]}
-                    </div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: isFirst ? 20 : 16, color: "#F5F5F5", marginBottom: 4 }}>{racer.name}</div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 12 }}>{racer.chassis.toUpperCase()}</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                      <div style={{ background: "#050505", borderRadius: 6, padding: "8px 6px" }}>
-                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 18, color, lineHeight: 1 }}>{racer.wins}</div>
-                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 8, letterSpacing: 2, color: "#B8C1CC", marginTop: 2 }}>WINS</div>
-                      </div>
-                      <div style={{ background: "#050505", borderRadius: 6, padding: "8px 6px" }}>
-                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 18, color: "#F5F5F5", lineHeight: 1 }}>{racer.best_lap}</div>
-                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 8, letterSpacing: 2, color: "#B8C1CC", marginTop: 2 }}>BEST LAP</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Full rankings table */}
-          <div>
-            <div style={{ textAlign: "center", marginBottom: 32 }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 8 }}>FULL STANDINGS</div>
-              <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(24px, 4vw, 40px)", color: "#F5F5F5", margin: 0 }}>ALL RACERS</h2>
-            </div>
-
-            <div style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, overflow: "hidden" }}>
-              {/* Table header */}
-              <div style={{ display: "grid", gridTemplateColumns: "48px 1fr 100px 60px 60px 70px 80px", gap: 8, padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#050505" }}>
-                {["#", "RACER", "CHASSIS", "WINS", "RACES", "PODIUMS", "BEST LAP"].map(h => (
-                  <div key={h} style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: 3, color: "#B8C1CC" }}>{h}</div>
-                ))}
-              </div>
-
-              {/* All racers */}
-              {DEMO_RACERS.map((racer, i) => (
-                <div key={racer.name} style={{ display: "grid", gridTemplateColumns: "48px 1fr 100px 60px 60px 70px 80px", gap: 8, padding: "16px 20px", borderBottom: i < DEMO_RACERS.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", alignItems: "center", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 20, color: racer.rank <= 3 ? PODIUM_COLORS[racer.rank - 1] : "#B8C1CC" }}>{racer.rank}</div>
-                  <div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, color: "#F5F5F5" }}>{racer.nationality} {racer.name}</div>
-                  </div>
-                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#B8C1CC" }}>{racer.chassis}</div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 18, color: "#FACC15" }}>{racer.wins}</div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, color: "#F5F5F5" }}>{racer.races}</div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, color: "#F5F5F5" }}>{racer.podiums}</div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 14, color: "#34D399" }}>{racer.best_lap}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* CTA */}
-          <div style={{ textAlign: "center", marginTop: 56 }}>
-            <h3 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 36, color: "#F5F5F5", marginBottom: 8 }}>WANT YOUR NAME HERE?</h3>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: "#B8C1CC", marginBottom: 24 }}>Register free and join the next tournament.</p>
-            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-              <a href="/tournament" style={{ background: "#DC2626", color: "#fff", padding: "13px 28px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 2, textDecoration: "none" }}>VIEW TOURNAMENTS →</a>
-              <a href="/register" style={{ background: "transparent", color: "#F5F5F5", padding: "13px 28px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 2, textDecoration: "none", border: "1px solid rgba(255,255,255,0.15)" }}>REGISTER FREE</a>
-            </div>
-          </div>
-
+      <div className="pt-24 pb-16 px-4 max-w-4xl mx-auto">
+        <div className="mb-8">
+          <div className="text-[#DC2626] font-barlaw font-black text-sm uppercase tracking-widest mb-2">Rankings</div>
+          <h1 className="text-4xl font-barlaw font-black text-white uppercase">Leaderboard</h1>
+          <p className="text-[#B8C1CC] mt-1 text-sm">Demo data — live rankings unlock after first official race event.</p>
         </div>
-      </main>
+
+        {/* Category tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-8">
+          {CATEGORIES.map(c => (
+            <button
+              key={c.key}
+              onClick={() => setCat(c.key)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-barlaw font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${
+                cat === c.key
+                  ? 'bg-[#DC2626] text-white'
+                  : 'bg-[#071426] text-[#B8C1CC] border border-white/10 hover:text-white'
+              }`}
+            >
+              <span>{c.icon}</span> {c.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Podium */}
+        {sorted.length >= 3 && (
+          <div className="flex items-end justify-center gap-2 mb-10">
+            {podiumOrder.map((player, i) => {
+              const pos = podiumPositions[i];
+              const rankColor = RANK_COLORS[player.rank as keyof typeof RANK_COLORS] || '#6B7280';
+              const stat = getStatDisplay(player, cat);
+              return (
+                <div key={player.name} className="flex flex-col items-center flex-1 max-w-[140px]">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-barlaw font-black mb-2"
+                    style={{ backgroundColor: rankColor + '22', color: rankColor, border: `2px solid ${rankColor}` }}>
+                    {player.name[0]}
+                  </div>
+                  <div className="text-white font-barlaw font-black text-sm text-center leading-tight">{player.name}</div>
+                  <div className="text-xs text-center mt-0.5" style={{ color: rankColor }}>{player.rank}</div>
+                  <div className="text-[#FACC15] font-barlaw font-black text-lg">{stat.value}</div>
+                  <div
+                    className={`w-full ${podiumHeights[i]} rounded-t-xl mt-2 flex items-center justify-center text-2xl font-barlaw font-black`}
+                    style={{
+                      backgroundColor: pos === 1 ? '#FACC1522' : '#071426',
+                      border: `1px solid ${pos === 1 ? '#FACC15' : 'rgba(255,255,255,0.1)'}`,
+                      color: pos === 1 ? '#FACC15' : pos === 2 ? '#D1D5DB' : '#C2773B'
+                    }}
+                  >
+                    {pos === 1 ? '🥇' : pos === 2 ? '🥈' : '🥉'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Full rankings */}
+        <div className="bg-[#071426] rounded-2xl border border-white/10 overflow-hidden">
+          <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+            <span className="font-barlaw font-black text-white uppercase tracking-wider text-sm">Full Rankings</span>
+            <span className="text-xs text-[#B8C1CC]">{sorted.length} racers</span>
+          </div>
+          {sorted.map((player, idx) => {
+            const rankColor = RANK_COLORS[player.rank as keyof typeof RANK_COLORS] || '#6B7280';
+            const stat = getStatDisplay(player, cat);
+            return (
+              <div
+                key={player.name}
+                className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors"
+              >
+                <div className={`w-8 text-center font-barlaw font-black text-lg ${idx < 3 ? 'text-[#FACC15]' : 'text-[#B8C1CC]'}`}>
+                  {idx + 1}
+                </div>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-barlaw font-black flex-shrink-0"
+                  style={{ backgroundColor: rankColor + '22', color: rankColor }}>
+                  {player.name[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-barlaw font-bold text-white truncate">{player.name}</div>
+                  <div className="text-xs" style={{ color: rankColor }}>{player.rank}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-barlaw font-black text-white">{stat.value}</div>
+                  <div className="text-xs text-[#B8C1CC]">{stat.unit}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Rank legend */}
+        <div className="mt-8 bg-[#071426] rounded-2xl border border-white/10 p-5">
+          <h3 className="font-barlaw font-black text-white uppercase tracking-wider mb-4 text-sm">Member Rank System</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Object.entries(RANK_COLORS).map(([rank, color]) => (
+              <div key={rank} className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                <span className="text-sm font-bold" style={{ color }}>{rank}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-[#B8C1CC] mt-3">
+            Ranks are earned through race participation, wins, fastest laps, attendance, referrals, and improvement over time.
+          </p>
+        </div>
+      </div>
+
       <Footer />
-    </>
+    </div>
   );
 }

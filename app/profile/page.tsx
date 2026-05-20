@@ -1,175 +1,339 @@
-"use client";
-import { useEffect, useState } from "react";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
-import { getMemberData, getMemberDataFromSupabase, logout } from "@/lib/member";
+'use client';
 
-const EXP_LABEL: any = {
-  beginner: "Beginner — New to Mini 4WD",
-  intermediate: "Intermediate — Built a few",
-  advanced: "Advanced — Regular racer",
+import { useEffect, useState } from 'react';
+import { getMemberData, getMemberDataFromSupabase, getTicketWallet, getReferralStats, RANK_COLORS, RANK_NEXT_POINTS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, logout } from '@/lib/member';
+import type { Member, TicketWallet, ReferralStats } from '@/lib/member';
+import { getMemberOrdersFromSupabase } from '@/lib/member';
+import Navbar from '@/components/layout/Navbar';
+import Footer from '@/components/layout/Footer';
+
+const DEMO_WALLET: TicketWallet = {
+  paid_total: 3,
+  paid_used: 2,
+  paid_available: 1,
+  bonus_available: 0,
+  loyalty_progress: 3,
+  loyalty_needed: 7,
 };
 
-const STAT_PLACEHOLDER = [
-  { label: "Races Entered", value: "0", icon: "🏁", note: "Coming soon" },
-  { label: "Tournament Wins", value: "0", icon: "🏆", note: "Coming soon" },
-  { label: "Best Lap Time", value: "—", icon: "⚡", note: "Coming soon" },
-  { label: "Global Rank", value: "—", icon: "📊", note: "Coming soon" },
-];
+const DEMO_REFERRAL: ReferralStats = {
+  referral_code: 'DEMO1234',
+  referral_link: 'https://greenland-mini4wd.vercel.app/register?ref=DEMO1234',
+  confirmed_referrals: 1,
+  pending_referrals: 2,
+  bonus_tickets_earned: 1,
+};
 
 export default function ProfilePage() {
-  const [member, setMember] = useState<any>(null);
+  const [member, setMember] = useState<Member | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [wallet, setWallet] = useState<TicketWallet>(DEMO_WALLET);
+  const [referral, setReferral] = useState<ReferralStats>(DEMO_REFERRAL);
+  const [tab, setTab] = useState<'overview' | 'orders' | 'tickets' | 'referral'>('overview');
+  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      let data = getMemberData();
-      if (data?.email) {
-        const fresh = await getMemberDataFromSupabase(data.email);
-        if (fresh) data = fresh;
-      }
-      setMember(data);
+    const local = getMemberData();
+    if (!local?.email) return;
+
+    Promise.all([
+      getMemberDataFromSupabase(local.email),
+      getMemberOrdersFromSupabase(local.email),
+      getTicketWallet(local.email),
+      getReferralStats(local),
+    ]).then(([memberData, ordersData, walletData, referralData]) => {
+      setMember(memberData || local);
+      setOrders(ordersData);
+      setWallet(walletData);
+      setReferral(referralData);
       setLoading(false);
-    }
-    load();
+    }).catch(() => {
+      setMember(local);
+      setLoading(false);
+    });
   }, []);
 
-  const displayName = member
-    ? (member.name || `${member.first_name || ""} ${member.last_name || ""}`.trim() || "Member")
-    : "Loading...";
+  const copyReferral = () => {
+    navigator.clipboard.writeText(referral.referral_link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-  const initial = displayName[0]?.toUpperCase() || "?";
+  const rank = (member?.rank || 'Rookie') as keyof typeof RANK_COLORS;
+  const rankColor = RANK_COLORS[rank] || '#6B7280';
+  const points = member?.total_points || 0;
+  const nextPoints = RANK_NEXT_POINTS[rank] || 5;
+  const progressPct = rank === 'Legend' ? 100 : Math.min((points / nextPoints) * 100, 100);
 
-  const registeredDate = member?.registered_at || member?.created_at
-    ? new Date(member.registered_at || member.created_at).toLocaleDateString("en-GB", {
-        year: "numeric", month: "long", day: "numeric",
-      })
-    : "—";
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+        <div className="text-[#B8C1CC] font-barlow">Loading profile...</div>
+      </div>
+    );
+  }
 
   return (
-    <>
+    <div className="min-h-screen bg-[#050505]">
       <Navbar />
-      <main style={{ background: "#050505", color: "#F5F5F5", minHeight: "100vh", paddingTop: 80, paddingBottom: 80 }}>
-        <div style={{ maxWidth: 780, margin: "0 auto", padding: "0 24px" }}>
 
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 40, paddingBottom: 32, borderBottom: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
-            <div style={{ width: 80, height: 80, background: "#DC2626", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 32, color: "#fff", flexShrink: 0, border: "3px solid rgba(220,38,38,0.3)" }}>
-              {loading ? "..." : initial}
+      {/* Hero bar */}
+      <div className="bg-[#071426] border-b border-white/10 pt-20">
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            {/* Avatar */}
+            <div className="w-16 h-16 rounded-full bg-[#DC2626] flex items-center justify-center text-white text-2xl font-barlow font-black flex-shrink-0">
+              {member?.name?.[0]?.toUpperCase() || 'M'}
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 4, color: "#DC2626", marginBottom: 4 }}>COMMUNITY MEMBER</div>
-              <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(24px, 5vw, 40px)", color: "#F5F5F5", margin: 0, lineHeight: 1 }}>
-                {displayName.toUpperCase()}
-              </h1>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", marginTop: 6 }}>
-                Member since {registeredDate} · {member?.city || "Nuuk, Greenland"}
+            <div className="flex-1">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-2xl font-barlow font-black text-white uppercase tracking-wide">
+                  {member?.name || 'Member'}
+                </h1>
+                <span
+                  className="px-2 py-0.5 rounded text-xs font-barlow font-bold uppercase tracking-wider"
+                  style={{ backgroundColor: rankColor + '22', color: rankColor, border: `1px solid ${rankColor}55` }}
+                >
+                  {rank}
+                </span>
+                {member?.member_status === 'official' && (
+                  <span className="px-2 py-0.5 rounded text-xs font-barlow font-bold uppercase tracking-wider bg-yellow-500/20 text-yellow-400 border border-yellow-500/40">
+                    ✓ Official Member
+                  </span>
+                )}
+              </div>
+              <p className="text-[#B8C1CC] text-sm mt-1">{member?.email}</p>
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex-1 bg-white/10 rounded-full h-1.5 max-w-[200px]">
+                  <div
+                    className="h-1.5 rounded-full transition-all"
+                    style={{ width: `${progressPct}%`, backgroundColor: rankColor }}
+                  />
+                </div>
+                <span className="text-xs text-[#B8C1CC]">
+                  {rank === 'Legend' ? '🏆 Max Rank' : `${points}/${nextPoints} pts to next rank`}
+                </span>
               </div>
             </div>
-            <div style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 6, padding: "6px 14px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 3, color: "#22C55E" }}>
-              ✓ ACTIVE MEMBER
-            </div>
+            <button
+              onClick={logout}
+              className="text-sm text-[#B8C1CC] hover:text-red-400 transition-colors border border-white/10 px-4 py-2 rounded-lg"
+            >
+              Logout
+            </button>
           </div>
 
-          {/* Stats row */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 40 }}>
-            {STAT_PLACEHOLDER.map(s => (
-              <div key={s.label} style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "18px 16px", textAlign: "center" }}>
-                <div style={{ fontSize: 22, marginBottom: 6 }}>{s.icon}</div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 28, color: "#F5F5F5", lineHeight: 1 }}>{s.value}</div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginTop: 4 }}>{s.label.toUpperCase()}</div>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: "#DC2626", marginTop: 3 }}>{s.note}</div>
-              </div>
+          {/* Tabs */}
+          <div className="flex gap-1 mt-6 overflow-x-auto">
+            {(['overview', 'orders', 'tickets', 'referral'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-4 py-2 text-sm font-barlow font-bold uppercase tracking-wider rounded-t-lg whitespace-nowrap transition-colors ${
+                  tab === t
+                    ? 'bg-[#050505] text-[#DC2626] border-t border-x border-white/10'
+                    : 'text-[#B8C1CC] hover:text-white'
+                }`}
+              >
+                {t}
+              </button>
             ))}
           </div>
+        </div>
+      </div>
 
-          {/* Member info */}
-          <div style={{ marginBottom: 32 }}>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 16 }}>MEMBER INFO</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+      <div className="max-w-5xl mx-auto px-4 py-8">
+
+        {/* ── OVERVIEW ── */}
+        {tab === 'overview' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+            {[
+              { label: 'Total Points', value: points, color: '#FACC15' },
+              { label: 'Tickets Available', value: wallet.paid_available + wallet.bonus_available, color: '#22C55E' },
+              { label: 'Orders', value: orders.length, color: '#3B82F6' },
+              { label: 'Referrals', value: referral.confirmed_referrals, color: '#DC2626' },
+            ].map(s => (
+              <div key={s.label} className="bg-[#071426] rounded-xl p-4 border border-white/10">
+                <div className="text-2xl font-barlow font-black" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-xs text-[#B8C1CC] mt-1">{s.label}</div>
+              </div>
+            ))}
+
+            <div className="col-span-2 sm:col-span-4 bg-[#071426] rounded-xl p-4 border border-white/10">
+              <h3 className="text-sm font-barlow font-bold text-white uppercase tracking-wider mb-3">Member Info</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                {[
+                  ['Nationality', member?.nationality || '—'],
+                  ['City', member?.city || '—'],
+                  ['Experience', member?.experience || '—'],
+                  ['Chassis', member?.favorite_chassis || 'Not set'],
+                  ['Member Since', member?.created_at ? new Date(member.created_at).toLocaleDateString() : '—'],
+                  ['Status', member?.member_status === 'official' ? '✓ Official' : 'Registered'],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <div className="text-[#B8C1CC]">{k}</div>
+                    <div className="text-white font-medium capitalize">{v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── ORDERS ── */}
+        {tab === 'orders' && (
+          <div className="space-y-4">
+            {orders.length === 0 ? (
+              <div className="bg-[#071426] rounded-xl p-8 border border-white/10 text-center text-[#B8C1CC]">
+                No orders yet. <a href="/shop" className="text-[#DC2626] hover:underline">Visit the shop →</a>
+              </div>
+            ) : orders.map(order => {
+              const statusColor = ORDER_STATUS_COLORS[order.payment_status || order.status] || '#6B7280';
+              const statusLabel = ORDER_STATUS_LABELS[order.payment_status || order.status] || order.status;
+              return (
+                <div key={order.id} className="bg-[#071426] rounded-xl p-4 border border-white/10">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div>
+                      <div className="font-barlow font-bold text-white text-lg">{order.product_name}</div>
+                      <div className="text-xs text-[#B8C1CC] mt-1">
+                        {order.chassis && <span className="mr-3">Chassis: {order.chassis}</span>}
+                        <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                      </div>
+                      {order.payment_reference && (
+                        <div className="text-xs text-[#FACC15] mt-1 font-mono">Ref: {order.payment_reference}</div>
+                      )}
+                    </div>
+                    <span
+                      className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex-shrink-0"
+                      style={{ backgroundColor: statusColor + '22', color: statusColor }}
+                    >
+                      {statusLabel}
+                    </span>
+                  </div>
+                  {order.payment_status === 'awaiting_payment' && (
+                    <div className="mt-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs text-yellow-400">
+                      💳 Send MobilePay to <strong>+299 XXXX XXXX</strong> with ref: <strong>{order.payment_reference || order.id?.slice(0, 8).toUpperCase()}</strong>
+                    </div>
+                  )}
+                  {order.payment_status === 'proof_uploaded' && (
+                    <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs text-blue-400">
+                      📋 Payment proof received. Awaiting admin confirmation.
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── TICKETS ── */}
+        {tab === 'tickets' && (
+          <div className="space-y-4">
+            {/* Wallet summary */}
+            <div className="grid grid-cols-3 gap-4">
               {[
-                { label: "Email", value: member?.email },
-                { label: "Phone", value: member?.phone || "Not provided" },
-                { label: "Nationality", value: member?.nationality || "Not provided" },
-                { label: "City / Town", value: member?.city || "Not provided" },
-                { label: "Experience Level", value: EXP_LABEL[member?.experience] || member?.experience || "Not provided" },
-                { label: "Favorite Chassis", value: member?.favorite_chassis || "Not set yet" },
-              ].map(item => (
-                <div key={item.label} style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "16px 18px" }}>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 4, color: "#B8C1CC", marginBottom: 5 }}>{item.label.toUpperCase()}</div>
-                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: "#F5F5F5" }}>{item.value || "—"}</div>
+                { label: 'Paid Available', value: wallet.paid_available, color: '#22C55E' },
+                { label: 'Bonus Available', value: wallet.bonus_available, color: '#FACC15' },
+                { label: 'Used', value: wallet.paid_used, color: '#6B7280' },
+              ].map(s => (
+                <div key={s.label} className="bg-[#071426] rounded-xl p-4 border border-white/10 text-center">
+                  <div className="text-3xl font-barlow font-black" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-xs text-[#B8C1CC] mt-1">{s.label}</div>
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* My Cars placeholder */}
-          <div style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "24px", marginBottom: 32 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-              <div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 4 }}>GARAGE</div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 22, color: "#F5F5F5" }}>MY CARS</div>
+            {/* Loyalty progress */}
+            <div className="bg-[#071426] rounded-xl p-5 border border-white/10">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-barlow font-black text-white uppercase tracking-wider">Loyalty Reward</h3>
+                <span className="text-sm text-[#FACC15] font-bold">{wallet.loyalty_progress}/10</span>
               </div>
-              <div style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.2)", borderRadius: 6, padding: "5px 12px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#DC2626" }}>COMING SOON</div>
+              <div className="bg-white/10 rounded-full h-3 overflow-hidden">
+                <div
+                  className="h-3 rounded-full bg-gradient-to-r from-yellow-500 to-yellow-400 transition-all"
+                  style={{ width: `${(wallet.loyalty_progress / 10) * 100}%` }}
+                />
+              </div>
+              <p className="text-xs text-[#B8C1CC] mt-2">
+                {wallet.loyalty_progress >= 10
+                  ? '🎉 You earned a free bonus ticket! Check with admin.'
+                  : `${wallet.loyalty_needed} more confirmed paid tickets to earn 1 FREE bonus ticket`}
+              </p>
             </div>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", margin: "0 0 16px", lineHeight: 1.6 }}>
-              Track your Mini 4WD collection here. Add cars, log upgrades, and manage your race roster.
-            </p>
-            <a href="/shop" style={{ display: "inline-block", background: "#DC2626", color: "#fff", padding: "10px 22px", borderRadius: 6, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 13, letterSpacing: 2, textDecoration: "none" }}>
-              PREORDER A CAR →
+
+            <div className="bg-[#071426] rounded-xl p-5 border border-white/10">
+              <h3 className="font-barlow font-black text-white uppercase tracking-wider mb-2">How Tickets Work</h3>
+              <ul className="text-sm text-[#B8C1CC] space-y-1">
+                <li>🏁 1 ticket = 1 car entry into tournament</li>
+                <li>⚡ 1 ticket gives 2 qualification lives</li>
+                <li>🏆 Finals are single elimination</li>
+                <li>🚫 Same car cannot be entered twice under one ticket</li>
+                <li>🎁 Every 10 paid tickets = 1 FREE bonus ticket</li>
+                <li>📵 Cancelled tickets don't count toward loyalty</li>
+              </ul>
+            </div>
+
+            <a
+              href="/tournament"
+              className="block w-full text-center bg-[#DC2626] hover:bg-red-700 text-white font-barlow font-black uppercase tracking-wider py-3 rounded-xl transition-colors"
+            >
+              View Upcoming Tournaments →
             </a>
           </div>
+        )}
 
-          {/* Race history placeholder */}
-          <div style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "24px", marginBottom: 32 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-              <div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#FACC15", marginBottom: 4 }}>HISTORY</div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 22, color: "#F5F5F5" }}>RACE HISTORY</div>
-              </div>
-              <div style={{ background: "rgba(250,204,21,0.08)", border: "1px solid rgba(250,204,21,0.2)", borderRadius: 6, padding: "5px 12px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#FACC15" }}>COMING SOON</div>
-            </div>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", margin: "0 0 16px", lineHeight: 1.6 }}>
-              Your full tournament and race history will appear here once events begin.
-            </p>
-            <a href="/tournament" style={{ display: "inline-block", background: "transparent", color: "#FACC15", padding: "10px 22px", borderRadius: 6, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 13, letterSpacing: 2, textDecoration: "none", border: "1px solid rgba(250,204,21,0.3)" }}>
-              VIEW TOURNAMENTS →
-            </a>
-          </div>
-
-          {/* Quick links */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 40 }}>
-            <a href="/orders" style={{ background: "#DC2626", color: "#fff", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 2, textDecoration: "none", textAlign: "center" }}>MY ORDERS →</a>
-            <a href="/tournament" style={{ background: "#071426", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 2, textDecoration: "none", textAlign: "center", border: "1px solid rgba(255,255,255,0.1)" }}>TOURNAMENTS →</a>
-            <a href="/shop" style={{ background: "#071426", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 2, textDecoration: "none", textAlign: "center", border: "1px solid rgba(255,255,255,0.1)" }}>SHOP →</a>
-          </div>
-
-          {/* Social links */}
-          <div style={{ background: "#071426", border: "1px solid rgba(250,204,21,0.12)", borderRadius: 12, padding: "22px 24px", marginBottom: 32 }}>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 4, color: "#FACC15", marginBottom: 12 }}>FOLLOW THE ARCTIC HUSTLE</div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {/* ── REFERRAL ── */}
+        {tab === 'referral' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4">
               {[
-                { label: "Facebook Group", href: "https://www.facebook.com/share/g/18gBxyY1Wd/?mibextid=wwXIfr" },
-                { label: "Instagram", href: "https://www.instagram.com/thearctichustle" },
-                { label: "TikTok", href: "https://www.tiktok.com/@the.arctic.hustle" },
-                { label: "YouTube", href: "https://youtube.com/@thearctichustle-038" },
+                { label: 'Confirmed', value: referral.confirmed_referrals, color: '#22C55E' },
+                { label: 'Pending', value: referral.pending_referrals, color: '#FACC15' },
+                { label: 'Bonus Tickets', value: referral.bonus_tickets_earned, color: '#DC2626' },
               ].map(s => (
-                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, padding: "8px 14px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: "#F5F5F5", textDecoration: "none", letterSpacing: 1 }}>
-                  {s.label}
-                </a>
+                <div key={s.label} className="bg-[#071426] rounded-xl p-4 border border-white/10 text-center">
+                  <div className="text-3xl font-barlow font-black" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-xs text-[#B8C1CC] mt-1">{s.label}</div>
+                </div>
               ))}
             </div>
+
+            <div className="bg-[#071426] rounded-xl p-5 border border-white/10">
+              <h3 className="font-barlow font-black text-white uppercase tracking-wider mb-3">Your Referral Code</h3>
+              <div className="flex items-center gap-2 bg-[#050505] border border-white/10 rounded-lg p-3">
+                <span className="font-mono text-lg font-bold text-[#FACC15] flex-1 tracking-widest">
+                  {referral.referral_code}
+                </span>
+                <button
+                  onClick={copyReferral}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                    copied ? 'bg-green-600 text-white' : 'bg-[#DC2626] text-white hover:bg-red-700'
+                  }`}
+                >
+                  {copied ? '✓ Copied!' : 'Copy Link'}
+                </button>
+              </div>
+              <p className="text-xs text-[#B8C1CC] mt-2 break-all">{referral.referral_link}</p>
+            </div>
+
+            <div className="bg-[#071426] rounded-xl p-5 border border-white/10">
+              <h3 className="font-barlaw font-black text-white uppercase tracking-wider mb-2">How Referrals Work</h3>
+              <ul className="text-sm text-[#B8C1CC] space-y-1">
+                <li>📤 Share your referral link with friends</li>
+                <li>✅ They sign up and complete a qualifying purchase</li>
+                <li>🎟️ You earn 1 free bonus race ticket per confirmed referral</li>
+                <li>❌ Registration alone does NOT trigger the reward</li>
+                <li>❌ Unpaid or cancelled orders do NOT count</li>
+                <li>⚠️ Admin reviews all referral rewards before granting</li>
+              </ul>
+            </div>
           </div>
+        )}
+      </div>
 
-          <button onClick={logout}
-            style={{ background: "transparent", border: "1px solid rgba(220,38,38,0.3)", color: "#DC2626", padding: "12px 28px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: 2, cursor: "pointer" }}>
-            LOGOUT
-          </button>
-
-        </div>
-      </main>
       <Footer />
-    </>
+    </div>
   );
 }

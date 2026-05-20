@@ -1,313 +1,350 @@
-"use client";
-import { useState } from "react";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
-import { supabase } from "@/lib/supabase";
-import { getMemberData } from "@/lib/member";
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { getMemberData, isRegistered, generatePaymentRef } from '@/lib/member';
+import { supabase } from '@/lib/supabase';
+import Navbar from '@/components/layout/Navbar';
+import Footer from '@/components/layout/Footer';
 
 const PRODUCTS = [
   {
-    id: "ar-chassis",
-    name: "Tamiya AR Chassis",
-    subtitle: "Avante R — All-Round Performer",
-    price_boxed: 280,
-    price_built: 450,
-    badge: "IN STOCK",
-    badgeColor: "#16A34A",
-    chassis: "AR",
-    description: "One of the most versatile and stable chassis for beginners and experienced racers alike. Great for box stock racing.",
-    specs: ["AR Chassis", "Rear-wheel drive", "Great stability", "Beginner friendly"],
-    available: true,
+    id: 'ar-boxed',
+    name: 'Tamiya AR Chassis Kit',
+    chassis: 'AR',
+    type: 'boxed',
+    price_dkk: 280,
+    description: 'Build-your-own AR chassis. Great beginner kit with wide compatibility.',
+    badge: 'POPULAR',
+    badgeColor: '#22C55E',
   },
   {
-    id: "ma-chassis",
-    name: "Tamiya MA Chassis",
-    subtitle: "Mini 4WD — Mid-Motor Layout",
-    price_boxed: 260,
-    price_built: 420,
-    badge: "IN STOCK",
-    badgeColor: "#16A34A",
-    chassis: "MA",
-    description: "Mid-motor layout provides excellent balance and handling. Popular choice for competitive box stock racing.",
-    specs: ["MA Chassis", "Mid-motor layout", "Balanced weight", "Race proven"],
-    available: true,
+    id: 'ma-boxed',
+    name: 'Tamiya MA Chassis Kit',
+    chassis: 'MA',
+    type: 'boxed',
+    price_dkk: 290,
+    description: 'Mid-range all-rounder. Ideal for technical tracks.',
+    badge: null,
+    badgeColor: null,
   },
   {
-    id: "vs-chassis",
-    name: "Tamiya VS Chassis",
-    subtitle: "Victorysaurus — Speed Focused",
-    price_boxed: 270,
-    price_built: 440,
-    badge: "PREORDER",
-    badgeColor: "#FACC15",
-    chassis: "VS",
-    description: "Lightweight and fast. The VS chassis is built for speed with a slim profile and efficient motor placement.",
-    specs: ["VS Chassis", "Lightweight body", "Speed optimized", "Slim profile"],
-    available: true,
+    id: 'vs-boxed',
+    name: 'Tamiya VS Chassis Kit',
+    chassis: 'VS',
+    type: 'boxed',
+    price_dkk: 295,
+    description: 'Vertical layout for low center of gravity and speed.',
+    badge: null,
+    badgeColor: null,
   },
   {
-    id: "fma-chassis",
-    name: "Tamiya FM-A Chassis",
-    subtitle: "Front-Motor — Unique Handling",
-    price_boxed: 265,
-    price_built: 435,
-    badge: "PREORDER",
-    badgeColor: "#FACC15",
-    chassis: "FM-A",
-    description: "Front-motor layout gives a distinct handling feel. Great for racers who want something different.",
-    specs: ["FM-A Chassis", "Front-motor drive", "Unique handling", "Advanced racers"],
-    available: true,
+    id: 'ar-built',
+    name: 'AR Race-Ready (Built)',
+    chassis: 'AR',
+    type: 'built',
+    price_dkk: 450,
+    description: 'Assembled, tuned, and tested. Race the same day you pick it up.',
+    badge: 'READY TO RACE',
+    badgeColor: '#DC2626',
   },
   {
-    id: "s2-chassis",
-    name: "Tamiya S2 Chassis",
-    subtitle: "Super II — Classic Choice",
-    price_boxed: 240,
-    price_built: 400,
-    badge: "PREORDER",
-    badgeColor: "#FACC15",
-    chassis: "S2",
-    description: "The classic Super II chassis. A timeless design that remains competitive and easy to tune.",
-    specs: ["S2 Chassis", "Classic design", "Easy to tune", "Wide parts support"],
-    available: true,
+    id: 'ms-boxed',
+    name: 'Tamiya MS Chassis Kit',
+    chassis: 'MS',
+    type: 'boxed',
+    price_dkk: 310,
+    description: 'Mid-ship layout for balance and acceleration.',
+    badge: 'PREORDER',
+    badgeColor: '#FACC15',
   },
   {
-    id: "accessories-bundle",
-    name: "Starter Bundle",
-    subtitle: "Everything to get racing",
-    price_boxed: 150,
-    price_built: null,
-    badge: "IN STOCK",
-    badgeColor: "#16A34A",
-    chassis: "N/A",
-    description: "Alkaline AA batteries (8 pack), pit mat, and club sticker pack. Perfect for your first race day.",
-    specs: ["8x Alkaline AA", "Pit mat", "Club stickers", "Race day essentials"],
-    available: true,
+    id: 'fma-boxed',
+    name: 'Tamiya FM-A Chassis Kit',
+    chassis: 'FM-A',
+    type: 'boxed',
+    price_dkk: 300,
+    description: 'Front motor for unique handling. Great for experienced builders.',
+    badge: 'PREORDER',
+    badgeColor: '#FACC15',
   },
 ];
 
-type Product = typeof PRODUCTS[0];
+type ModalStep = 'confirm' | 'payment' | 'upload' | 'done';
 
-function ProductCard({ product, onPreorder }: { product: Product; onPreorder: (p: Product) => void }) {
-  return (
-    <div style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-      {/* Image placeholder */}
-      <div style={{ background: "#0D1B2A", height: 180, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-        <div style={{ fontSize: 64 }}>🏎️</div>
-        <div style={{ position: "absolute", top: 12, left: 12, background: product.badgeColor + "22", border: `1px solid ${product.badgeColor}55`, borderRadius: 4, padding: "3px 10px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: product.badgeColor }}>
-          {product.badge}
-        </div>
-      </div>
+export default function ShopPage() {
+  const [member, setMember] = useState<any>(null);
+  const [selected, setSelected] = useState<typeof PRODUCTS[0] | null>(null);
+  const [step, setStep] = useState<ModalStep>('confirm');
+  const [orderId, setOrderId] = useState('');
+  const [payRef, setPayRef] = useState('');
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofPreview, setProofPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
 
-      <div style={{ padding: "22px 20px", flex: 1, display: "flex", flexDirection: "column" }}>
-        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 4, color: "#DC2626", marginBottom: 4 }}>{product.chassis} CHASSIS</div>
-        <h3 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 22, color: "#F5F5F5", margin: "0 0 4px" }}>{product.name}</h3>
-        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", marginBottom: 12 }}>{product.subtitle}</div>
-        <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", lineHeight: 1.6, margin: "0 0 16px", flex: 1 }}>{product.description}</p>
+  useEffect(() => {
+    setMember(getMemberData());
+  }, []);
 
-        {/* Specs */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20 }}>
-          {product.specs.map(s => (
-            <span key={s} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4, padding: "3px 8px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 2, color: "#B8C1CC" }}>{s}</span>
-          ))}
-        </div>
-
-        {/* Pricing */}
-        <div style={{ display: "grid", gridTemplateColumns: product.price_built ? "1fr 1fr" : "1fr", gap: 8, marginBottom: 16 }}>
-          <div style={{ background: "#050505", borderRadius: 8, padding: "12px", textAlign: "center" }}>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 4 }}>BOXED KIT</div>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 22, color: "#F5F5F5" }}>DKK {product.price_boxed}</div>
-          </div>
-          {product.price_built && (
-            <div style={{ background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)", borderRadius: 8, padding: "12px", textAlign: "center" }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 4 }}>RACE READY</div>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 22, color: "#DC2626" }}>DKK {product.price_built}</div>
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={() => onPreorder(product)}
-          style={{ width: "100%", background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "13px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 2, cursor: "pointer" }}
-        >
-          PREORDER NOW →
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PreorderModal({ product, onClose }: { product: Product; onClose: () => void }) {
-  const member = getMemberData();
-  const [type, setType] = useState<"boxed" | "built">("boxed");
-  const [notes, setNotes] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState("");
-
-  const price = type === "boxed" ? product.price_boxed : product.price_built;
-
-  const handleSubmit = async () => {
-    setError("");
-    if (!member?.email) {
-      setError("Could not find your member data. Please log out and register again.");
+  const openModal = (product: typeof PRODUCTS[0]) => {
+    if (!isRegistered()) {
+      window.location.href = '/register';
       return;
     }
-    setLoading(true);
+    setSelected(product);
+    setStep('confirm');
+    setOrderId('');
+    setPayRef('');
+    setProofFile(null);
+    setProofPreview(null);
+    setError('');
+  };
+
+  const placeOrder = async () => {
+    if (!selected || !member) return;
+    setUploading(true);
+    setError('');
     try {
-      const { error: insertError } = await supabase.from("orders").insert([{
+      const { data, error: err } = await supabase.from('orders').insert({
         member_email: member.email,
-        member_name: member.name || member.first_name || "Member",
-        product_name: product.name,
-        chassis: product.chassis,
-        type,
-        notes: notes.trim() || null,
-        status: "pending",
-      }]);
-      if (insertError) throw insertError;
-      setDone(true);
-    } catch (err: any) {
-      setError(err.message || "Failed to submit preorder. Try again.");
-    } finally {
-      setLoading(false);
+        member_name: member.name,
+        product_name: selected.name,
+        chassis: selected.chassis,
+        type: selected.type,
+        status: 'pending',
+        payment_status: 'awaiting_payment',
+        notes: `Price: ${selected.price_dkk} DKK`,
+      }).select().single();
+
+      if (err || !data) throw new Error('Order failed');
+
+      const ref = generatePaymentRef(data.id);
+      await supabase.from('orders').update({ payment_reference: ref }).eq('id', data.id);
+
+      setOrderId(data.id);
+      setPayRef(ref);
+      setStep('payment');
+    } catch {
+      setError('Something went wrong. Please try again.');
+    }
+    setUploading(false);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProofFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setProofPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const uploadProof = async () => {
+    if (!proofFile || !orderId) return;
+    setUploading(true);
+    setError('');
+    try {
+      // Convert to base64 and store in payment_proofs table as data URL
+      // (No Supabase Storage bucket needed for MVP)
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        await supabase.from('payment_proofs').insert({
+          order_id: orderId,
+          member_email: member.email,
+          proof_url: base64,
+          status: 'pending',
+        });
+        await supabase.from('orders').update({ payment_status: 'proof_uploaded' }).eq('id', orderId);
+        setStep('done');
+        setUploading(false);
+      };
+      reader.readAsDataURL(proofFile);
+    } catch {
+      setError('Upload failed. Try again.');
+      setUploading(false);
     }
   };
 
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: "#071426", border: "1px solid rgba(220,38,38,0.2)", borderRadius: 16, padding: "32px 28px", width: "100%", maxWidth: 480 }}>
-        {done ? (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-            <h3 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 28, color: "#F5F5F5", marginBottom: 8 }}>PREORDER SUBMITTED!</h3>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: "#B8C1CC", lineHeight: 1.6, marginBottom: 24 }}>
-              We'll contact you at <strong style={{ color: "#FACC15" }}>{member?.email}</strong> to confirm payment and pickup details.
-            </p>
-            <button onClick={onClose} style={{ background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "12px 32px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 2, cursor: "pointer" }}>
-              CLOSE
-            </button>
-          </div>
-        ) : (
-          <>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 4, color: "#DC2626", marginBottom: 6 }}>PREORDER</div>
-            <h3 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 26, color: "#F5F5F5", marginBottom: 20, marginTop: 0 }}>{product.name}</h3>
-
-            {/* Member info */}
-            <div style={{ background: "#050505", borderRadius: 8, padding: "12px 16px", marginBottom: 20 }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 4 }}>ORDERING AS</div>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, color: "#F5F5F5" }}>{member?.name || member?.first_name || "Member"}</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#B8C1CC" }}>{member?.email}</div>
-            </div>
-
-            {/* Type selector */}
-            {product.price_built && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 10 }}>SELECT TYPE</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  {(["boxed", "built"] as const).map(t => (
-                    <button key={t} onClick={() => setType(t)}
-                      style={{ background: type === t ? "rgba(220,38,38,0.15)" : "#050505", border: `1px solid ${type === t ? "#DC2626" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, padding: "14px", cursor: "pointer", textAlign: "center" }}>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 14, color: type === t ? "#DC2626" : "#F5F5F5", letterSpacing: 2, textTransform: "uppercase" }}>{t === "boxed" ? "Boxed Kit" : "Race Ready"}</div>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 20, color: "#F5F5F5", marginTop: 4 }}>DKK {t === "boxed" ? product.price_boxed : product.price_built}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Notes */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 8 }}>NOTES (OPTIONAL)</div>
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="Any special requests or questions..."
-                rows={3}
-                style={{ width: "100%", background: "#050505", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "12px 14px", color: "#F5F5F5", fontFamily: "'DM Sans', sans-serif", fontSize: 13, resize: "none", outline: "none", boxSizing: "border-box" }}
-              />
-            </div>
-
-            {/* Notice */}
-            <div style={{ background: "rgba(250,204,21,0.06)", border: "1px solid rgba(250,204,21,0.15)", borderRadius: 8, padding: "12px 14px", marginBottom: 20 }}>
-              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#FACC15", margin: 0, lineHeight: 1.6 }}>
-                ⚠️ No payment required now. We'll contact you to confirm payment and arrange pickup.
-              </p>
-            </div>
-
-            {error && <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#DC2626", marginBottom: 12 }}>{error}</p>}
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <button onClick={onClose}
-                style={{ background: "transparent", color: "#B8C1CC", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "13px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: 2, cursor: "pointer" }}>
-                CANCEL
-              </button>
-              <button onClick={handleSubmit} disabled={loading}
-                style={{ background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "13px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: 2, cursor: "pointer", opacity: loading ? 0.6 : 1 }}>
-                {loading ? "SUBMITTING..." : `CONFIRM — DKK ${price}`}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export default function ShopPage() {
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const closeModal = () => setSelected(null);
 
   return (
-    <>
+    <div className="min-h-screen bg-[#050505]">
       <Navbar />
-      <main style={{ background: "#050505", color: "#F5F5F5", paddingTop: 60 }}>
 
-        {/* Hero */}
-        <section style={{ background: "#071426", borderBottom: "1px solid rgba(220,38,38,0.2)", padding: "64px 24px 56px", textAlign: "center" }}>
-          <div style={{ maxWidth: 640, margin: "0 auto" }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(220,38,38,0.1)", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 20, padding: "5px 14px", marginBottom: 20 }}>
-              <span style={{ width: 6, height: 6, background: "#DC2626", borderRadius: "50%", display: "inline-block" }} />
-              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: 10, color: "#FACC15", letterSpacing: 4 }}>PREORDER — NO PAYMENT REQUIRED</span>
-            </div>
-            <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(42px, 9vw, 80px)", color: "#F5F5F5", lineHeight: 0.95, marginBottom: 16 }}>
-              TAMIYA CARS<br /><span style={{ color: "#DC2626" }}>& PARTS</span>
-            </h1>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "#B8C1CC", lineHeight: 1.7, maxWidth: 480, margin: "0 auto" }}>
-              Reserve your car now. No payment needed — we'll contact you to confirm and arrange pickup in Nuuk.
-            </p>
-          </div>
-        </section>
+      <div className="pt-24 pb-16 px-4 max-w-6xl mx-auto">
+        <div className="mb-10">
+          <div className="text-[#DC2626] font-barlow font-black text-sm uppercase tracking-widest mb-2">Shop</div>
+          <h1 className="text-4xl font-barlow font-black text-white uppercase leading-tight">
+            Mini 4WD Cars & Kits
+          </h1>
+          <p className="text-[#B8C1CC] mt-2 max-w-xl">
+            Preorder only — no online payment. Pay via MobilePay after reserving. Pickup in Nuuk.
+          </p>
+        </div>
 
-        {/* Products grid */}
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "64px 24px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 }}>
-            {PRODUCTS.map(p => (
-              <ProductCard key={p.id} product={p} onPreorder={setSelectedProduct} />
-            ))}
-          </div>
-
-          {/* Info banner */}
-          <div style={{ marginTop: 56, background: "#071426", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px 28px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 24 }}>
-            {[
-              { icon: "📦", title: "Boxed Kit", desc: "Build it yourself. Great for learning and customizing your own car." },
-              { icon: "🏎️", title: "Race Ready", desc: "Assembled and tested. Just add batteries and race." },
-              { icon: "💬", title: "Preorder Only", desc: "No online payment. We contact you to confirm and arrange pickup." },
-              { icon: "📍", title: "Pickup in Nuuk", desc: "All orders are collected in person. Location shared on confirmation." },
-            ].map(item => (
-              <div key={item.title}>
-                <div style={{ fontSize: 28, marginBottom: 10 }}>{item.icon}</div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, color: "#F5F5F5", marginBottom: 6 }}>{item.title}</div>
-                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", lineHeight: 1.6, margin: 0 }}>{item.desc}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {PRODUCTS.map(p => (
+            <div
+              key={p.id}
+              className="bg-[#071426] border border-white/10 rounded-2xl p-5 flex flex-col relative overflow-hidden hover:border-white/20 transition-colors"
+            >
+              {p.badge && (
+                <div
+                  className="absolute top-0 right-0 px-3 py-1 text-xs font-barlow font-black uppercase tracking-wider rounded-bl-xl"
+                  style={{ backgroundColor: p.badgeColor + '22', color: p.badgeColor, borderLeft: `2px solid ${p.badgeColor}`, borderBottom: `2px solid ${p.badgeColor}` }}
+                >
+                  {p.badge}
+                </div>
+              )}
+              {/* Chassis icon area */}
+              <div className="h-24 bg-[#050505] rounded-xl mb-4 flex items-center justify-center border border-white/5">
+                <span className="text-5xl font-barlow font-black text-white/10">{p.chassis}</span>
               </div>
-            ))}
+              <div className="text-xs text-[#B8C1CC] uppercase tracking-wider mb-1">{p.type === 'built' ? '⚡ Built & Ready' : '🔧 Build Yourself'}</div>
+              <h3 className="font-barlow font-black text-white text-xl mb-2">{p.name}</h3>
+              <p className="text-[#B8C1CC] text-sm flex-1">{p.description}</p>
+              <div className="flex items-center justify-between mt-5">
+                <span className="text-[#FACC15] font-barlow font-black text-2xl">{p.price_dkk} kr</span>
+                <button
+                  onClick={() => openModal(p)}
+                  className="bg-[#DC2626] hover:bg-red-700 text-white font-barlow font-bold uppercase tracking-wider text-sm px-4 py-2 rounded-lg transition-colors"
+                >
+                  Reserve
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Modal */}
+      {selected && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-4" onClick={closeModal}>
+          <div
+            className="bg-[#071426] border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-white/10 flex items-center justify-between">
+              <h2 className="font-barlow font-black text-white text-xl uppercase">
+                {step === 'confirm' && 'Confirm Order'}
+                {step === 'payment' && 'Pay via MobilePay'}
+                {step === 'upload' && 'Upload Payment Proof'}
+                {step === 'done' && 'Order Placed! 🎉'}
+              </h2>
+              <button onClick={closeModal} className="text-[#B8C1CC] hover:text-white text-xl">✕</button>
+            </div>
+
+            <div className="p-5">
+              {/* STEP: Confirm */}
+              {step === 'confirm' && (
+                <div className="space-y-4">
+                  <div className="bg-[#050505] rounded-xl p-4 border border-white/10">
+                    <div className="font-barlow font-black text-white text-lg">{selected.name}</div>
+                    <div className="text-sm text-[#B8C1CC] mt-1">{selected.description}</div>
+                    <div className="text-[#FACC15] font-barlow font-black text-2xl mt-3">{selected.price_dkk} DKK</div>
+                  </div>
+                  <div className="bg-[#050505] rounded-xl p-4 border border-white/10 text-sm text-[#B8C1CC] space-y-1">
+                    <div>👤 <span className="text-white">{member?.name}</span></div>
+                    <div>📧 <span className="text-white">{member?.email}</span></div>
+                    <div>📍 Pickup: Nuuk, Greenland</div>
+                    <div>💳 Payment: MobilePay (after reservation)</div>
+                  </div>
+                  {error && <div className="text-red-400 text-sm">{error}</div>}
+                  <button
+                    onClick={placeOrder}
+                    disabled={uploading}
+                    className="w-full bg-[#DC2626] hover:bg-red-700 disabled:opacity-50 text-white font-barlow font-black uppercase tracking-wider py-3 rounded-xl transition-colors"
+                  >
+                    {uploading ? 'Placing Order...' : 'Reserve Now →'}
+                  </button>
+                </div>
+              )}
+
+              {/* STEP: Payment */}
+              {step === 'payment' && (
+                <div className="space-y-4">
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                    <div className="text-yellow-400 font-barlow font-black text-lg mb-2">💳 MobilePay Instructions</div>
+                    <ol className="text-sm text-yellow-200 space-y-2 list-decimal list-inside">
+                      <li>Open MobilePay on your phone</li>
+                      <li>Send <strong>{selected.price_dkk} DKK</strong> to <strong>+299 XXXX XXXX</strong></li>
+                      <li>Use this reference in the message: <strong className="text-yellow-400 font-mono">{payRef}</strong></li>
+                      <li>Take a screenshot of the confirmation</li>
+                      <li>Upload the screenshot below</li>
+                    </ol>
+                  </div>
+                  <div className="bg-[#050505] rounded-xl p-3 border border-white/10 text-center">
+                    <div className="text-xs text-[#B8C1CC]">Order Reference</div>
+                    <div className="text-[#FACC15] font-mono font-black text-xl tracking-widest">{payRef}</div>
+                  </div>
+                  <button
+                    onClick={() => setStep('upload')}
+                    className="w-full bg-[#DC2626] hover:bg-red-700 text-white font-barlow font-black uppercase tracking-wider py-3 rounded-xl transition-colors"
+                  >
+                    I've Paid — Upload Proof →
+                  </button>
+                  <button onClick={closeModal} className="w-full text-[#B8C1CC] text-sm text-center hover:text-white">
+                    I'll pay later (order is saved)
+                  </button>
+                </div>
+              )}
+
+              {/* STEP: Upload */}
+              {step === 'upload' && (
+                <div className="space-y-4">
+                  <p className="text-[#B8C1CC] text-sm">Upload your MobilePay payment screenshot. Admin will verify and confirm your order.</p>
+                  <div
+                    onClick={() => fileRef.current?.click()}
+                    className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center cursor-pointer hover:border-[#DC2626]/50 transition-colors"
+                  >
+                    {proofPreview ? (
+                      <img src={proofPreview} alt="proof" className="max-h-40 mx-auto rounded-lg" />
+                    ) : (
+                      <>
+                        <div className="text-4xl mb-2">📷</div>
+                        <div className="text-white font-barlow font-bold">Tap to select screenshot</div>
+                        <div className="text-[#B8C1CC] text-xs mt-1">JPG, PNG, or HEIC</div>
+                      </>
+                    )}
+                  </div>
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                  {error && <div className="text-red-400 text-sm">{error}</div>}
+                  <button
+                    onClick={uploadProof}
+                    disabled={!proofFile || uploading}
+                    className="w-full bg-[#DC2626] hover:bg-red-700 disabled:opacity-40 text-white font-barlow font-black uppercase tracking-wider py-3 rounded-xl transition-colors"
+                  >
+                    {uploading ? 'Uploading...' : 'Submit Proof →'}
+                  </button>
+                </div>
+              )}
+
+              {/* STEP: Done */}
+              {step === 'done' && (
+                <div className="text-center space-y-4 py-4">
+                  <div className="text-5xl">🏁</div>
+                  <h3 className="font-barlow font-black text-white text-2xl uppercase">Proof Submitted!</h3>
+                  <p className="text-[#B8C1CC] text-sm">Admin will verify your payment and confirm your order. Check your order status in your profile.</p>
+                  <div className="bg-[#050505] rounded-xl p-3 border border-white/10">
+                    <div className="text-xs text-[#B8C1CC]">Reference</div>
+                    <div className="text-[#FACC15] font-mono font-black">{payRef}</div>
+                  </div>
+                  <a
+                    href="/profile"
+                    className="block w-full bg-[#DC2626] hover:bg-red-700 text-white font-barlaw font-black uppercase tracking-wider py-3 rounded-xl transition-colors"
+                  >
+                    View My Orders →
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </main>
-      <Footer />
-
-      {selectedProduct && (
-        <PreorderModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />
       )}
-    </>
+
+      <Footer />
+    </div>
   );
 }

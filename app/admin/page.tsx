@@ -1,216 +1,363 @@
-"use client";
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+'use client';
 
-const PASSWORD = "mini4wd2026";
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '@/lib/member';
 
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending Confirmation", color: "#FACC15" },
-  { value: "reserved", label: "Reserved", color: "#60A5FA" },
-  { value: "awaiting_stock", label: "Awaiting Stock", color: "#F97316" },
-  { value: "in_transit", label: "In Transit", color: "#A78BFA" },
-  { value: "ready_for_pickup", label: "Ready for Pickup", color: "#34D399" },
-  { value: "completed", label: "Completed", color: "#B8C1CC" },
-  { value: "cancelled", label: "Cancelled", color: "#DC2626" },
+const ADMIN_PASSWORD = 'mini4wd2026';
+
+const ALL_STATUSES = [
+  'awaiting_payment',
+  'proof_uploaded',
+  'payment_confirmed',
+  'rejected',
+  'reserved',
+  'awaiting_stock',
+  'in_transit',
+  'ready_for_pickup',
+  'completed',
+  'cancelled',
 ];
-
-function statusColor(s: string) {
-  return STATUS_OPTIONS.find(o => o.value === s)?.color || "#B8C1CC";
-}
-function statusLabel(s: string) {
-  return STATUS_OPTIONS.find(o => o.value === s)?.label || s;
-}
 
 export default function AdminOrdersPage() {
   const [authed, setAuthed] = useState(false);
-  const [pw, setPw] = useState("");
-  const [pwError, setPwError] = useState("");
+  const [pw, setPw] = useState('');
   const [orders, setOrders] = useState<any[]>([]);
+  const [proofs, setProofs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
-  const [updating, setUpdating] = useState<string | null>(null);
-  const [filter, setFilter] = useState("all");
-  const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
+  const [activeProof, setActiveProof] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState<string>('all');
+  const [saving, setSaving] = useState<string | null>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [tab, setTab] = useState<'orders' | 'members'>('orders');
 
-  const fetchOrders = async () => {
+  const login = () => {
+    if (pw === ADMIN_PASSWORD) setAuthed(true);
+  };
+
+  const fetchData = async () => {
     setLoading(true);
-    const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
-    setOrders(data || []);
+    const [{ data: ordersData }, { data: proofData }, { data: membersData }] = await Promise.all([
+      supabase.from('orders').select('*').order('created_at', { ascending: false }),
+      supabase.from('payment_proofs').select('*'),
+      supabase.from('members').select('*').order('created_at', { ascending: false }),
+    ]);
+
+    setOrders(ordersData || []);
+    setMembers(membersData || []);
+
+    // Index proofs by order_id
+    const proofMap: Record<string, any> = {};
+    (proofData || []).forEach(p => { proofMap[p.order_id] = p; });
+    setProofs(proofMap);
+
+    // Init notes
+    const noteMap: Record<string, string> = {};
+    (ordersData || []).forEach(o => { noteMap[o.id] = o.notes || ''; });
+    setNotes(noteMap);
     setLoading(false);
   };
 
   useEffect(() => {
-    if (authed) fetchOrders();
+    if (authed) fetchData();
   }, [authed]);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pw === PASSWORD) { setAuthed(true); setPwError(""); }
-    else setPwError("Incorrect password.");
+  const updateOrder = async (orderId: string, updates: any) => {
+    setSaving(orderId);
+    await supabase.from('orders').update(updates).eq('id', orderId);
+    await fetchData();
+    setSaving(null);
   };
 
-  const updateStatus = async (id: string, status: string) => {
-    setUpdating(id);
-    await supabase.from("orders").update({ status }).eq("id", id);
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-    setUpdating(null);
+  const confirmPayment = async (order: any) => {
+    setSaving(order.id);
+    await supabase.from('orders').update({
+      payment_status: 'payment_confirmed',
+      status: 'reserved',
+    }).eq('id', order.id);
+
+    if (proofs[order.id]) {
+      await supabase.from('payment_proofs').update({ status: 'confirmed', reviewed_at: new Date().toISOString() }).eq('order_id', order.id);
+    }
+
+    // Loyalty: count confirmed paid tickets (orders acting as tickets)
+    // Give bonus ticket every 10
+    const { data: confirmedOrders } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('member_email', order.member_email)
+      .eq('payment_status', 'payment_confirmed');
+
+    const confirmedCount = (confirmedOrders || []).length + 1;
+    if (confirmedCount % 10 === 0) {
+      await supabase.from('tickets').insert({
+        member_email: order.member_email,
+        member_name: order.member_name,
+        ticket_type: 'bonus',
+        status: 'available',
+      });
+    }
+
+    await fetchData();
+    setSaving(null);
   };
 
-  const saveNote = async (id: string) => {
-    setUpdating(id);
-    await supabase.from("orders").update({ notes: adminNotes[id] }).eq("id", id);
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, notes: adminNotes[id] } : o));
-    setUpdating(null);
+  const rejectProof = async (orderId: string) => {
+    setSaving(orderId);
+    await supabase.from('orders').update({ payment_status: 'rejected' }).eq('id', orderId);
+    if (proofs[orderId]) {
+      await supabase.from('payment_proofs').update({ status: 'rejected' }).eq('order_id', orderId);
+    }
+    await fetchData();
+    setSaving(null);
   };
 
-  const filtered = filter === "all" ? orders : orders.filter(o => o.status === filter);
-
-  const counts: Record<string, number> = {};
-  orders.forEach(o => { counts[o.status] = (counts[o.status] || 0) + 1; });
-
-  const s: React.CSSProperties = {
-    background: "#050505", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6,
-    color: "#F5F5F5", fontFamily: "'DM Sans', sans-serif", fontSize: 13,
-    padding: "8px 12px", outline: "none", width: "100%",
+  const unlockMembership = async (memberEmail: string) => {
+    await supabase.from('members').update({ member_status: 'official' }).eq('email', memberEmail);
+    await fetchData();
   };
+
+  const filteredOrders = filter === 'all' ? orders : orders.filter(o => (o.payment_status || o.status) === filter);
 
   if (!authed) {
     return (
-      <div style={{ minHeight: "100vh", background: "#050505", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <div style={{ width: "100%", maxWidth: 380 }}>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 8 }}>ADMIN PANEL</div>
-            <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 36, color: "#F5F5F5", margin: 0 }}>ORDER MANAGEMENT</h1>
-          </div>
-          <form onSubmit={handleLogin} style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "32px 28px" }}>
-            <label style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 4, color: "#B8C1CC", display: "block", marginBottom: 8 }}>ADMIN PASSWORD</label>
-            <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Enter password" style={{ ...s, marginBottom: 8 }} />
-            {pwError && <p style={{ color: "#DC2626", fontSize: 12, marginBottom: 8 }}>{pwError}</p>}
-            <button type="submit" style={{ width: "100%", background: "#DC2626", color: "#fff", border: "none", borderRadius: 6, padding: "12px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: 2, cursor: "pointer", marginTop: 8 }}>
-              LOGIN →
-            </button>
-          </form>
-          <div style={{ textAlign: "center", marginTop: 20 }}>
-            <a href="/admin" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: "#B8C1CC", textDecoration: "none", letterSpacing: 2 }}>← BACK TO ADMIN</a>
-          </div>
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+        <div className="bg-[#071426] border border-white/10 rounded-2xl p-8 w-full max-w-sm">
+          <h1 className="font-barlow font-black text-white text-2xl uppercase mb-6 text-center">Admin Access</h1>
+          <input
+            type="password"
+            value={pw}
+            onChange={e => setPw(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && login()}
+            placeholder="Enter admin password"
+            className="w-full bg-[#050505] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-[#B8C1CC] mb-4 focus:outline-none focus:border-[#DC2626]"
+          />
+          <button
+            onClick={login}
+            className="w-full bg-[#DC2626] text-white font-barlaw font-black uppercase py-3 rounded-xl hover:bg-red-700 transition-colors"
+          >
+            Login
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#050505", color: "#F5F5F5", padding: "32px 24px" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 4 }}>ADMIN PANEL</div>
-            <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 36, color: "#F5F5F5", margin: 0 }}>PREORDER MANAGEMENT</h1>
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={fetchOrders} style={{ background: "#071426", color: "#F5F5F5", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "10px 18px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: 2, cursor: "pointer" }}>
-              REFRESH
-            </button>
-            <a href="/admin" style={{ background: "transparent", color: "#B8C1CC", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "10px 18px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: 2, textDecoration: "none" }}>
-              ← ADMIN HOME
-            </a>
-          </div>
+    <div className="min-h-screen bg-[#050505]">
+      <div className="bg-[#071426] border-b border-white/10 px-4 py-4 flex items-center justify-between">
+        <div>
+          <h1 className="font-barlow font-black text-white text-2xl uppercase">Admin Panel</h1>
+          <p className="text-[#B8C1CC] text-xs">Greenland Mini 4WD Club</p>
         </div>
+        <div className="flex gap-2 text-sm">
+          <a href="/admin" className="text-[#B8C1CC] hover:text-white px-3 py-1 rounded-lg border border-white/10">Dashboard</a>
+          <a href="/" className="text-[#B8C1CC] hover:text-white px-3 py-1 rounded-lg border border-white/10">← Site</a>
+        </div>
+      </div>
 
-        {/* Stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 32 }}>
+      {/* Quick stats */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           {[
-            { label: "Total", value: orders.length, color: "#F5F5F5" },
-            { label: "Pending", value: counts["pending"] || 0, color: "#FACC15" },
-            { label: "Reserved", value: counts["reserved"] || 0, color: "#60A5FA" },
-            { label: "Pickup Ready", value: counts["ready_for_pickup"] || 0, color: "#34D399" },
-            { label: "Completed", value: counts["completed"] || 0, color: "#B8C1CC" },
-            { label: "Cancelled", value: counts["cancelled"] || 0, color: "#DC2626" },
-          ].map(stat => (
-            <div key={stat.label} style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "16px", textAlign: "center" }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 32, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginTop: 4 }}>{stat.label.toUpperCase()}</div>
+            { label: 'Total Orders', value: orders.length, color: '#F5F5F5' },
+            { label: 'Proof Uploaded', value: orders.filter(o => o.payment_status === 'proof_uploaded').length, color: '#3B82F6' },
+            { label: 'Awaiting Payment', value: orders.filter(o => o.payment_status === 'awaiting_payment').length, color: '#FACC15' },
+            { label: 'Total Members', value: members.length, color: '#22C55E' },
+          ].map(s => (
+            <div key={s.label} className="bg-[#071426] rounded-xl p-4 border border-white/10">
+              <div className="text-2xl font-barlaw font-black" style={{ color: s.color }}>{s.value}</div>
+              <div className="text-xs text-[#B8C1CC]">{s.label}</div>
             </div>
           ))}
         </div>
 
-        {/* Filter */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-          {[{ value: "all", label: "All" }, ...STATUS_OPTIONS].map(opt => (
-            <button key={opt.value} onClick={() => setFilter(opt.value)}
-              style={{ background: filter === opt.value ? "#DC2626" : "#071426", color: filter === opt.value ? "#fff" : "#B8C1CC", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, padding: "7px 14px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: 2, cursor: "pointer" }}>
-              {opt.label.toUpperCase()}
-            </button>
-          ))}
+        {/* Tab switch */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setTab('orders')}
+            className={`px-5 py-2 rounded-lg font-barlaw font-bold uppercase text-sm transition-colors ${tab === 'orders' ? 'bg-[#DC2626] text-white' : 'bg-[#071426] text-[#B8C1CC] border border-white/10 hover:text-white'}`}
+          >
+            Orders ({orders.length})
+          </button>
+          <button
+            onClick={() => setTab('members')}
+            className={`px-5 py-2 rounded-lg font-barlaw font-bold uppercase text-sm transition-colors ${tab === 'members' ? 'bg-[#DC2626] text-white' : 'bg-[#071426] text-[#B8C1CC] border border-white/10 hover:text-white'}`}
+          >
+            Members ({members.length})
+          </button>
         </div>
 
-        {/* Orders */}
-        {loading ? (
-          <div style={{ textAlign: "center", padding: 60, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: "#B8C1CC", letterSpacing: 3 }}>LOADING...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 60, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: "#B8C1CC" }}>No orders found.</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {filtered.map(order => (
-              <div key={order.id} style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "24px" }}>
-                {/* Top row */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
-                  <div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 4 }}>ORDER #{order.id?.toString().slice(0, 8).toUpperCase()}</div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 22, color: "#F5F5F5" }}>{order.product_name}</div>
-                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#B8C1CC", marginTop: 4 }}>
-                      {new Date(order.created_at).toLocaleString("en-GB")}
+        {/* ── ORDERS TAB ── */}
+        {tab === 'orders' && (
+          <>
+            {/* Filter */}
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+              {['all', 'proof_uploaded', 'awaiting_payment', 'payment_confirmed', 'rejected'].map(f => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${
+                    filter === f ? 'bg-[#DC2626] text-white' : 'bg-[#071426] text-[#B8C1CC] border border-white/10 hover:text-white'
+                  }`}
+                >
+                  {f === 'all' ? 'All' : ORDER_STATUS_LABELS[f] || f}
+                  {f === 'proof_uploaded' && ` (${orders.filter(o => o.payment_status === 'proof_uploaded').length})`}
+                </button>
+              ))}
+            </div>
+
+            {loading ? (
+              <div className="text-[#B8C1CC] text-center py-12">Loading...</div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="text-[#B8C1CC] text-center py-12">No orders found.</div>
+            ) : (
+              <div className="space-y-4">
+                {filteredOrders.map(order => {
+                  const payStatus = order.payment_status || order.status;
+                  const statusColor = ORDER_STATUS_COLORS[payStatus] || '#6B7280';
+                  const proof = proofs[order.id];
+
+                  return (
+                    <div key={order.id} className="bg-[#071426] border border-white/10 rounded-2xl overflow-hidden">
+                      {/* Header */}
+                      <div className="flex flex-wrap items-start justify-between gap-2 p-4 border-b border-white/10">
+                        <div>
+                          <div className="font-barlaw font-black text-white text-lg">{order.product_name}</div>
+                          <div className="text-sm text-[#B8C1CC]">{order.member_name} · {order.member_email}</div>
+                          <div className="text-xs text-[#B8C1CC] mt-1">
+                            {order.chassis && <span className="mr-3">Chassis: {order.chassis}</span>}
+                            <span>{new Date(order.created_at).toLocaleString()}</span>
+                          </div>
+                          {order.payment_reference && (
+                            <div className="text-xs font-mono text-[#FACC15] mt-1">Ref: {order.payment_reference}</div>
+                          )}
+                        </div>
+                        <span
+                          className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex-shrink-0"
+                          style={{ backgroundColor: statusColor + '22', color: statusColor }}
+                        >
+                          {ORDER_STATUS_LABELS[payStatus] || payStatus}
+                        </span>
+                      </div>
+
+                      {/* Proof section */}
+                      {proof && (
+                        <div className="p-4 border-b border-white/10 bg-blue-500/5">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="text-blue-400 text-sm font-bold">📸 Payment Proof Uploaded</span>
+                            <button
+                              onClick={() => setActiveProof(activeProof === order.id ? null : order.id)}
+                              className="text-xs text-[#B8C1CC] hover:text-white border border-white/10 px-3 py-1 rounded-lg"
+                            >
+                              {activeProof === order.id ? 'Hide' : 'View Proof'}
+                            </button>
+                          </div>
+                          {activeProof === order.id && proof.proof_url && (
+                            <div className="mt-3">
+                              <img
+                                src={proof.proof_url}
+                                alt="Payment proof"
+                                className="max-h-64 rounded-xl border border-white/10 mx-auto"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="p-4 space-y-3">
+                        {/* Quick action buttons */}
+                        <div className="flex flex-wrap gap-2">
+                          {payStatus === 'proof_uploaded' && (
+                            <>
+                              <button
+                                onClick={() => confirmPayment(order)}
+                                disabled={saving === order.id}
+                                className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-bold uppercase px-4 py-2 rounded-lg transition-colors"
+                              >
+                                ✓ Confirm Payment
+                              </button>
+                              <button
+                                onClick={() => rejectProof(order.id)}
+                                disabled={saving === order.id}
+                                className="bg-red-700 hover:bg-red-800 disabled:opacity-50 text-white text-xs font-bold uppercase px-4 py-2 rounded-lg transition-colors"
+                              >
+                                ✕ Reject Proof
+                              </button>
+                            </>
+                          )}
+                          {payStatus === 'payment_confirmed' && (
+                            <button
+                              onClick={() => unlockMembership(order.member_email)}
+                              className="bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/40 text-xs font-bold uppercase px-4 py-2 rounded-lg transition-colors"
+                            >
+                              🏅 Unlock Official Membership
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Status select */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <select
+                            value={order.status || ''}
+                            onChange={e => updateOrder(order.id, { status: e.target.value })}
+                            className="bg-[#050505] border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#DC2626]"
+                          >
+                            {ALL_STATUSES.map(s => (
+                              <option key={s} value={s}>{ORDER_STATUS_LABELS[s] || s}</option>
+                            ))}
+                          </select>
+
+                          {/* Notes */}
+                          <input
+                            value={notes[order.id] || ''}
+                            onChange={e => setNotes(prev => ({ ...prev, [order.id]: e.target.value }))}
+                            placeholder="Admin notes..."
+                            className="flex-1 min-w-[150px] bg-[#050505] border border-white/10 rounded-lg px-3 py-2 text-white text-xs placeholder-[#B8C1CC] focus:outline-none focus:border-[#DC2626]"
+                          />
+                          <button
+                            onClick={() => updateOrder(order.id, { notes: notes[order.id] })}
+                            disabled={saving === order.id}
+                            className="bg-[#DC2626] hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold uppercase px-3 py-2 rounded-lg transition-colors"
+                          >
+                            {saving === order.id ? '...' : 'Save'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div style={{ background: statusColor(order.status) + "20", border: `1px solid ${statusColor(order.status)}40`, borderRadius: 6, padding: "6px 14px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 2, color: statusColor(order.status) }}>
-                    {statusLabel(order.status)}
-                  </div>
-                </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
 
-                {/* Customer + order info */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
-                  {[
-                    { label: "Customer", value: order.member_name },
-                    { label: "Email", value: order.member_email },
-                    { label: "Chassis", value: order.chassis },
-                    { label: "Type", value: order.type === "built" ? "Race Ready" : order.type === "boxed" ? "Boxed Kit" : order.type },
-                  ].map(d => (
-                    <div key={d.label} style={{ background: "#050505", borderRadius: 8, padding: "12px 14px" }}>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: 3, color: "#B8C1CC", marginBottom: 4 }}>{d.label.toUpperCase()}</div>
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#F5F5F5", wordBreak: "break-all" }}>{d.value || "—"}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Admin notes */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 6 }}>ADMIN NOTES</div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      value={adminNotes[order.id] ?? order.notes ?? ""}
-                      onChange={e => setAdminNotes(prev => ({ ...prev, [order.id]: e.target.value }))}
-                      placeholder="Add a note..."
-                      style={{ ...s, flex: 1 }}
-                    />
-                    <button onClick={() => saveNote(order.id)} disabled={updating === order.id}
-                      style={{ background: "#071426", color: "#F5F5F5", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "8px 14px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: "pointer", whiteSpace: "nowrap" }}>
-                      SAVE
-                    </button>
-                  </div>
-                </div>
-
-                {/* Status controls */}
+        {/* ── MEMBERS TAB ── */}
+        {tab === 'members' && (
+          <div className="space-y-3">
+            {members.map(m => (
+              <div key={m.id} className="bg-[#071426] border border-white/10 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 8 }}>UPDATE STATUS</div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {STATUS_OPTIONS.map(opt => (
-                      <button key={opt.value} onClick={() => updateStatus(order.id, opt.value)}
-                        disabled={order.status === opt.value || updating === order.id}
-                        style={{ background: order.status === opt.value ? opt.color + "22" : "#050505", color: order.status === opt.value ? opt.color : "#B8C1CC", border: `1px solid ${order.status === opt.value ? opt.color + "55" : "rgba(255,255,255,0.08)"}`, borderRadius: 6, padding: "7px 12px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: order.status === opt.value ? "default" : "pointer", opacity: updating === order.id ? 0.5 : 1 }}>
-                        {opt.label.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
+                  <div className="font-barlaw font-black text-white">{m.name}</div>
+                  <div className="text-xs text-[#B8C1CC]">{m.email} · {m.nationality} · {m.city}</div>
+                  <div className="text-xs text-[#B8C1CC]">Joined: {new Date(m.created_at).toLocaleDateString()}</div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                    m.member_status === 'official' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10 text-[#B8C1CC]'
+                  }`}>
+                    {m.member_status || 'registered'}
+                  </span>
+                  {m.member_status !== 'official' && (
+                    <button
+                      onClick={() => unlockMembership(m.email)}
+                      className="text-xs border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/20 px-3 py-1 rounded-lg transition-colors"
+                    >
+                      Make Official
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
