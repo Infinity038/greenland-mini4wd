@@ -2,10 +2,21 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { adminLogin, isAdminAuthed } from '@/lib/adminAuth';
 
+const ADMIN_PASSWORD = 'mini4wd2026';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
+
+function checkAuth() {
+  if (typeof window === 'undefined') return false;
+  const expiry = localStorage.getItem('gm4wd_admin_expiry');
+  if (!expiry || Date.now() > parseInt(expiry)) return false;
+  return localStorage.getItem('gm4wd_admin_authed') === '1';
+}
+function saveAuth() {
+  localStorage.setItem('gm4wd_admin_authed', '1');
+  localStorage.setItem('gm4wd_admin_expiry', String(Date.now() + 8 * 60 * 60 * 1000));
+}
 
 const NAV = [
   { href: '/admin/orders',      icon: '📦', label: 'Orders',      desc: 'Payments & proofs' },
@@ -19,6 +30,7 @@ const NAV = [
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
+  const [checked, setChecked] = useState(false);
   const [pw, setPw] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loginError, setLoginError] = useState(false);
@@ -31,79 +43,62 @@ export default function AdminPage() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Check existing session on load
   useEffect(() => {
-    if (isAdminAuthed()) {
-      setAuthed(true);
-    }
+    const ok = checkAuth();
+    setAuthed(ok);
+    setChecked(true);
+    if (ok) fetchStats();
   }, []);
 
   const login = () => {
-    const ok = adminLogin(pw);
-    if (ok) { setAuthed(true); setLoginError(false); }
+    if (pw === ADMIN_PASSWORD) { saveAuth(); setAuthed(true); setLoginError(false); fetchStats(); }
     else setLoginError(true);
   };
 
-  useEffect(() => {
-    if (!authed) return;
+  const fetchStats = async () => {
     setLoading(true);
-    Promise.all([
+    const [{ data: m }, { data: o }, { data: t }, { data: p }, { data: tk }] = await Promise.all([
       supabase.from('members').select('id, member_status, created_at, name, email'),
       supabase.from('orders').select('id, payment_status, status, created_at, member_name, product_name').order('created_at', { ascending: false }),
       supabase.from('tournaments').select('id, status'),
       supabase.from('products').select('id, status, stock_qty'),
       supabase.from('tickets').select('id, ticket_type, status'),
-    ]).then(([{ data: m }, { data: o }, { data: t }, { data: p }, { data: tk }]) => {
-      const members = m || [];
-      const orders = o || [];
-      const tournaments = t || [];
-      const products = p || [];
-      const tickets = tk || [];
+    ]);
+    const members = m || []; const orders = o || []; const tournaments = t || []; const products = p || []; const tickets = tk || [];
+    setStats({
+      totalMembers: members.length,
+      officialMembers: members.filter((x: any) => x.member_status === 'official').length,
+      pendingOrders: orders.filter((x: any) => x.payment_status === 'awaiting_payment').length,
+      pendingProofs: orders.filter((x: any) => x.payment_status === 'proof_uploaded').length,
+      activeTournaments: tournaments.filter((x: any) => x.status === 'upcoming' || x.status === 'ongoing').length,
+      productsInStock: products.filter((x: any) => x.status === 'in stock').length,
+      bonusTickets: tickets.filter((x: any) => x.ticket_type === 'bonus' && x.status === 'available').length,
+      preordersWaiting: orders.filter((x: any) => x.status === 'pending').length,
+    });
+    setRecentOrders(orders.slice(0, 5));
+    setLoading(false);
+  };
 
-      // Debug: log member statuses to console
-      console.log('Members:', members.map((x: any) => ({ name: x.name, status: x.member_status })));
-
-      setStats({
-        totalMembers: members.length,
-        officialMembers: members.filter((x: any) => x.member_status === 'official').length,
-        pendingOrders: orders.filter((x: any) => x.payment_status === 'awaiting_payment').length,
-        pendingProofs: orders.filter((x: any) => x.payment_status === 'proof_uploaded').length,
-        activeTournaments: tournaments.filter((x: any) => x.status === 'upcoming' || x.status === 'ongoing').length,
-        productsInStock: products.filter((x: any) => x.status === 'in stock').length,
-        bonusTickets: tickets.filter((x: any) => x.ticket_type === 'bonus' && x.status === 'available').length,
-        preordersWaiting: orders.filter((x: any) => x.status === 'pending').length,
-      });
-      setRecentOrders(orders.slice(0, 5));
-      setLoading(false);
-    }).catch(err => { console.error('Stats error:', err); setLoading(false); });
-  }, [authed]);
+  if (!checked) return null;
 
   if (!authed) return (
     <div style={{ minHeight: '100vh', background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(220,38,38,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(220,38,38,0.03) 1px, transparent 1px)', backgroundSize: '40px 40px', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', width: 500, height: 300, background: 'radial-gradient(ellipse, rgba(220,38,38,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
-
       <div style={{ width: '100%', maxWidth: 400, position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, background: '#DC2626', borderRadius: 14, ...F, fontWeight: 900, fontSize: 22, color: '#fff', marginBottom: 16, boxShadow: '0 0 32px rgba(220,38,38,0.25)' }}>4W</div>
           <div style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', letterSpacing: 2, lineHeight: 1, marginBottom: 6 }}>ADMIN ACCESS</div>
           <div style={{ ...FB, fontSize: 13, color: '#6B7280' }}>Greenland Mini 4WD — Control Center</div>
         </div>
-
         <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '32px 28px', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
           <label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 8 }}>PASSWORD</label>
           <div style={{ position: 'relative', marginBottom: loginError ? 8 : 20 }}>
-            <input
-              type={showPw ? 'text' : 'password'}
-              value={pw}
+            <input type={showPw ? 'text' : 'password'} value={pw}
               onChange={e => { setPw(e.target.value); setLoginError(false); }}
               onKeyDown={e => e.key === 'Enter' && login()}
-              placeholder="Enter admin password"
-              autoFocus
-              style={{ width: '100%', background: '#050505', border: `1px solid ${loginError ? '#DC2626' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: '14px 48px 14px 16px', color: '#F5F5F5', ...FB, fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
-              onFocus={e => { if (!loginError) e.target.style.borderColor = 'rgba(220,38,38,0.5)'; }}
-              onBlur={e => { if (!loginError) e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }}
-            />
+              placeholder="Enter admin password" autoFocus
+              style={{ width: '100%', background: '#050505', border: `1px solid ${loginError ? '#DC2626' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: '14px 48px 14px 16px', color: '#F5F5F5', ...FB, fontSize: 15, outline: 'none', boxSizing: 'border-box' }} />
             <button onClick={() => setShowPw(!showPw)} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#6B7280', cursor: 'pointer', fontSize: 18 }}>
               {showPw ? '🙈' : '👁️'}
             </button>
@@ -115,7 +110,7 @@ export default function AdminPage() {
             ACCESS DASHBOARD →
           </button>
         </div>
-        <div style={{ textAlign: 'center', marginTop: 20, ...FB, fontSize: 12, color: '#374151' }}>🔒 Session lasts 8 hours</div>
+        <div style={{ textAlign: 'center', marginTop: 20, ...FB, fontSize: 12, color: '#374151' }}>🔒 Session lasts 8 hours across all admin pages</div>
       </div>
     </div>
   );
@@ -174,7 +169,6 @@ export default function AdminPage() {
           </a>
         )}
 
-        {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, marginBottom: 28 }}>
           {STAT_CARDS.map(s => (
             <a key={s.label} href={s.href} style={{ textDecoration: 'none' }}>
@@ -191,7 +185,6 @@ export default function AdminPage() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 28 }}>
-          {/* Quick actions */}
           <div>
             <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>QUICK ACTIONS</div>
             <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden' }}>
@@ -210,7 +203,6 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Recent orders */}
           <div>
             <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>RECENT ORDERS</div>
             <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden' }}>
@@ -219,10 +211,10 @@ export default function AdminPage() {
               ) : recentOrders.length === 0 ? (
                 <div style={{ padding: '32px 18px', textAlign: 'center', ...FB, fontSize: 13, color: '#6B7280' }}>No orders yet.</div>
               ) : recentOrders.map((o: any, i: number) => {
-                const dotColor = o.payment_status === 'proof_uploaded' ? '#F97316' : o.payment_status === 'payment_confirmed' ? '#22C55E' : '#6B7280';
+                const dot = o.payment_status === 'proof_uploaded' ? '#F97316' : o.payment_status === 'payment_confirmed' ? '#22C55E' : '#6B7280';
                 return (
                   <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderBottom: i < recentOrders.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.product_name}</div>
                       <div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{o.member_name}</div>
@@ -238,7 +230,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* All modules */}
         <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>ALL MODULES</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
           {NAV.map(m => (
