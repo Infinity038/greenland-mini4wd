@@ -3,23 +3,63 @@
 import { useState, useEffect, useRef } from 'react';
 import { getMemberData, isRegistered, generatePaymentRef } from '@/lib/member';
 import { supabase } from '@/lib/supabase';
-import { PRODUCTS, STOCK_COLORS, type Product, type ProductType } from '@/data/products';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
-type FilterCat = 'all' | 'standard' | 'premium' | 'limited' | 'built' | 'unbuilt';
+type ProductCategory = 'standard' | 'premium' | 'limited';
+type ProductStatus = 'in stock' | 'preorder only' | 'limited' | 'sold out' | 'coming soon';
+type ProductType = 'boxed' | 'built';
+type FilterCat = 'all' | 'standard' | 'premium' | 'limited';
 type ModalStep = 'confirm' | 'payment' | 'upload' | 'done';
 
+interface Product {
+  id: string;
+  name: string;
+  category: ProductCategory;
+  chassis: string;
+  rarity: number;
+  unbuiltPrice: number;
+  builtPrice: number;
+  image: string;
+  imageAlt?: string;
+  status: ProductStatus;
+  preorder: boolean;
+  collector: boolean;
+  featured: boolean;
+  description: string;
+  badge?: string;
+  badgeColor?: string;
+}
+
+const STOCK_COLORS: Record<ProductStatus, string> = {
+  'in stock': '#22C55E',
+  'preorder only': '#3B82F6',
+  'limited': '#FACC15',
+  'sold out': '#DC2626',
+  'coming soon': '#6B7280',
+};
+
+const PRODUCTS: Product[] = [
+  { id: 'ray-spear', name: 'Ray Spear', category: 'standard', chassis: 'AR', rarity: 1, unbuiltPrice: 449, builtPrice: 649, image: 'https://www.tamiya.com/english/products/18091ray_spear/ray.jpg', status: 'in stock', preorder: false, collector: false, featured: true, description: 'Classic aerodynamic design on the versatile AR chassis. Perfect entry point for new racers.', badge: 'POPULAR', badgeColor: '#22C55E' },
+  { id: 'flame-astute', name: 'Flame Astute', category: 'standard', chassis: 'MA', rarity: 1, unbuiltPrice: 449, builtPrice: 649, image: 'https://www.tamiya.com/english/products/18090flame_astute/flame.jpg', status: 'in stock', preorder: false, collector: false, featured: true, description: 'High-speed body design with the balanced MA chassis. Great for technical tracks.' },
+  { id: 'shadow-shark', name: 'Shadow Shark', category: 'standard', chassis: 'MS', rarity: 1, unbuiltPrice: 499, builtPrice: 699, image: 'https://www.tamiya.com/english/products/95567shadow_shark/shadow.jpg', status: 'in stock', preorder: false, collector: false, featured: false, description: 'Aggressive shark-inspired body on the mid-ship MS chassis. Excellent stability at speed.' },
+  { id: 'diospada-premium', name: 'Diospada Premium', category: 'standard', chassis: 'AR', rarity: 2, unbuiltPrice: 549, builtPrice: 799, image: 'https://www.tamiya.com/english/products/95542diospada/dios.jpg', status: 'preorder only', preorder: true, collector: false, featured: false, description: 'Premium sword-inspired body with upgraded AR chassis components.', badge: 'PREORDER', badgeColor: '#3B82F6' },
+  { id: 'gun-bluster', name: 'Gun Bluster XTO Premium', category: 'standard', chassis: 'FM-A', rarity: 2, unbuiltPrice: 599, builtPrice: 849, image: 'https://www.tamiya.com/english/products/95569gun_bluster/gun.jpg', status: 'preorder only', preorder: true, collector: false, featured: false, description: 'Front-motor FM-A chassis with the iconic Gun Bluster body. Unique handling.', badge: 'PREORDER', badgeColor: '#3B82F6' },
+  { id: 'beak-stinger', name: 'Beak Stinger G', category: 'standard', chassis: 'VS', rarity: 2, unbuiltPrice: 649, builtPrice: 899, image: 'https://www.tamiya.com/english/products/95570beak_stinger/beak.jpg', status: 'preorder only', preorder: true, collector: false, featured: false, description: 'Vertical layout VS chassis with the aggressive Beak Stinger G body.', badge: 'PREORDER', badgeColor: '#3B82F6' },
+  { id: 'exflowly-purple', name: 'Exflowly Polycarbonate Special', category: 'premium', chassis: 'MA', rarity: 3, unbuiltPrice: 799, builtPrice: 1099, image: 'https://www.tamiya.com/english/products/95557exflowly/exflowly.jpg', status: 'limited', preorder: true, collector: true, featured: true, description: 'Stunning purple polycarbonate body with precision MA chassis. A showpiece and a serious racer.', badge: 'SPECIAL EDITION', badgeColor: '#A855F7' },
+  { id: 'mach-frame-ph', name: 'Mach Frame Philippine Cup Special', category: 'premium', chassis: 'AR', rarity: 4, unbuiltPrice: 999, builtPrice: 1299, image: 'https://www.tamiya.com/english/products/95554mach_frame/mach.jpg', status: 'limited', preorder: true, collector: true, featured: false, description: 'Philippine Cup exclusive colorway. Built for champions, designed for collectors.', badge: 'EXCLUSIVE', badgeColor: '#DC2626' },
+  { id: 'cyclone-25th', name: 'Cyclone Magnum 25th Anniversary', category: 'limited', chassis: 'AR', rarity: 5, unbuiltPrice: 1299, builtPrice: 1699, image: 'https://www.tamiya.com/english/products/95551cyclone_magnum/cyclone.jpg', status: 'limited', preorder: true, collector: true, featured: true, description: '25th anniversary edition of the legendary Cyclone Magnum. Gold-accented chassis, collector packaging.', badge: '25TH ANNIVERSARY', badgeColor: '#FACC15' },
+  { id: 'geo-glider-2026', name: 'Geo Glider Asia Challenge 2026', category: 'limited', chassis: 'MS', rarity: 5, unbuiltPrice: 1499, builtPrice: 1899, image: 'https://www.tamiya.com/english/products/95568geo_glider/geo.jpg', status: 'limited', preorder: true, collector: true, featured: true, description: 'Asia Challenge 2026 special edition. Extremely limited quantities. May not be restocked.', badge: 'COLLECTOR', badgeColor: '#FACC15' },
+];
+
 const FILTER_TABS: { key: FilterCat; label: string }[] = [
-  { key: 'all',      label: 'All Products' },
+  { key: 'all', label: 'All Products' },
   { key: 'standard', label: 'Standard' },
-  { key: 'premium',  label: 'Premium' },
-  { key: 'limited',  label: 'Limited / Rare' },
-  { key: 'built',    label: '⚡ Built Only' },
-  { key: 'unbuilt',  label: '🔧 Unbuilt Only' },
+  { key: 'premium', label: 'Premium' },
+  { key: 'limited', label: 'Limited / Rare' },
 ];
 
 function ProductImage({ product }: { product: Product }) {
@@ -27,11 +67,8 @@ function ProductImage({ product }: { product: Product }) {
   const [failed, setFailed] = useState(false);
 
   const tryAlt = () => {
-    if (product.imageAlt && src !== product.imageAlt) {
-      setSrc(product.imageAlt);
-    } else {
-      setFailed(true);
-    }
+    if (product.imageAlt && src !== product.imageAlt) setSrc(product.imageAlt);
+    else setFailed(true);
   };
 
   if (failed) return (
@@ -41,14 +78,7 @@ function ProductImage({ product }: { product: Product }) {
     </div>
   );
 
-  return (
-    <img
-      src={src}
-      alt={product.name}
-      onError={tryAlt}
-      style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', transition: 'transform 0.3s ease' }}
-    />
-  );
+  return <img src={src} alt={product.name} onError={tryAlt} style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />;
 }
 
 export default function ShopPage() {
@@ -78,7 +108,6 @@ export default function ShopPage() {
     return true;
   });
 
-  const featured = PRODUCTS.filter(p => p.featured && p.collector);
   const collectors = PRODUCTS.filter(p => p.collector);
 
   const openModal = (p: Product) => {
@@ -97,8 +126,7 @@ export default function ShopPage() {
       const { data, error: err } = await supabase.from('orders').insert({
         member_email: member.email, member_name: member.name,
         product_name: `${selected.name} (${type === 'built' ? 'Built/Ready' : 'Unbuilt/Boxed'})`,
-        chassis: selected.chassis, type,
-        status: 'pending', payment_status: 'awaiting_payment',
+        chassis: selected.chassis, type, status: 'pending', payment_status: 'awaiting_payment',
         notes: `Price: ${price} DKK | Category: ${selected.category}`,
       }).select().single();
       if (err || !data) throw new Error('failed');
@@ -144,9 +172,7 @@ export default function ShopPage() {
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>PREORDER SHOP</div>
             <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px, 8vw, 72px)', color: '#F5F5F5', margin: '0 0 10px', lineHeight: 0.95 }}>MINI 4WD CARS & KITS</h1>
-            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', margin: 0, maxWidth: 560 }}>
-              Preorder only — no online payment. Pay via MobilePay after reserving. Pickup in Nuuk, Greenland.
-            </p>
+            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', margin: 0, maxWidth: 560 }}>Preorder only — no online payment. Pay via MobilePay after reserving. Pickup in Nuuk, Greenland.</p>
           </div>
         </section>
 
@@ -159,30 +185,24 @@ export default function ShopPage() {
                 <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(250,204,21,0.3), transparent)' }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-                {collectors.map(p => {
-                  const stars = '★'.repeat(p.rarity) + '☆'.repeat(5 - p.rarity);
-                  return (
-                    <div key={p.id} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden' }}>
-                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
-                      <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15', marginBottom: 4 }}>✦ COLLECTOR</div>
-                      <div style={{ color: '#FACC15', fontSize: 11, marginBottom: 12, letterSpacing: 2 }}>{stars}</div>
-                      <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                        <ProductImage product={p} />
-                      </div>
-                      <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 4, lineHeight: 1.1 }}>{p.name}</div>
-                      <div style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC', marginBottom: 12 }}>{p.chassis} CHASSIS</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#FACC15' }}>FROM</div>
-                          <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{p.unbuiltPrice.toLocaleString()} kr</div>
-                        </div>
-                        <button onClick={() => openModal(p)} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>
-                          RESERVE
-                        </button>
-                      </div>
+                {collectors.map(p => (
+                  <div key={p.id} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
+                    <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15', marginBottom: 4 }}>✦ COLLECTOR · {'★'.repeat(p.rarity)}{'☆'.repeat(5 - p.rarity)}</div>
+                    <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                      <ProductImage product={p} />
                     </div>
-                  );
-                })}
+                    <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 4, lineHeight: 1.1 }}>{p.name}</div>
+                    <div style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC', marginBottom: 12 }}>{p.chassis} CHASSIS</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#FACC15' }}>FROM</div>
+                        <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{p.unbuiltPrice.toLocaleString()} kr</div>
+                      </div>
+                      <button onClick={() => openModal(p)} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
@@ -190,82 +210,59 @@ export default function ShopPage() {
 
         {/* Main catalog */}
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
-
-          {/* Filter tabs */}
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 32, WebkitOverflowScrolling: 'touch' as any }}>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 32 }}>
             {FILTER_TABS.map(tab => (
               <button key={tab.key} onClick={() => setFilter(tab.key)}
-                style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, padding: '10px 18px', border: filter === tab.key ? 'none' : '1px solid rgba(255,255,255,0.08)', borderRadius: 10, background: filter === tab.key ? '#DC2626' : '#071426', color: filter === tab.key ? '#fff' : '#B8C1CC', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.2s' }}>
+                style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, padding: '10px 18px', border: filter === tab.key ? 'none' : '1px solid rgba(255,255,255,0.08)', borderRadius: 10, background: filter === tab.key ? '#DC2626' : '#071426', color: filter === tab.key ? '#fff' : '#B8C1CC', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
                 {tab.label}
               </button>
             ))}
           </div>
 
-          {/* Product grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
             {filtered.map(p => {
               const type = getType(p.id);
               const price = type === 'built' ? p.builtPrice : p.unbuiltPrice;
               const sc = STOCK_COLORS[p.status];
-              const isCollector = p.collector;
-
               return (
-                <div
-                  key={p.id}
-                  style={{ background: isCollector ? 'linear-gradient(135deg, #0a0f1a, #071426)' : '#071426', border: `1px solid ${isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', transition: 'border-color 0.2s, transform 0.2s' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.5)' : 'rgba(220,38,38,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                <div key={p.id}
+                  style={{ background: p.collector ? 'linear-gradient(135deg, #0a0f1a, #071426)' : '#071426', border: `1px solid ${p.collector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = p.collector ? 'rgba(250,204,21,0.5)' : 'rgba(220,38,38,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = p.collector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'translateY(0)'; }}
                 >
-                  {isCollector && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)', zIndex: 1 }} />}
+                  {p.collector && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)', zIndex: 1 }} />}
+                  {p.badge && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: (p.badgeColor || '#fff') + '22', color: p.badgeColor, border: `1px solid ${p.badgeColor}44` }}>{p.badge}</div>}
 
-                  {/* Badge */}
-                  {p.badge && (
-                    <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: (p.badgeColor || '#fff') + '22', color: p.badgeColor, border: `1px solid ${p.badgeColor}44` }}>
-                      {p.badge}
-                    </div>
-                  )}
-
-                  {/* Image area */}
-                  <div
-                    style={{ height: 180, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', overflow: 'hidden', cursor: 'pointer' }}
-                    onClick={() => openModal(p)}
-                  >
+                  <div style={{ height: 180, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }} onClick={() => openModal(p)}>
                     <ProductImage product={p} />
                   </div>
 
                   <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    {/* Tags */}
                     <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
                       <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#B8C1CC' }}>{p.chassis}</span>
                       <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: sc + '18', color: sc }}>● {p.status.toUpperCase()}</span>
                     </div>
-
                     <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
                     <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, flex: 1, margin: '0 0 14px' }}>{p.description}</p>
 
-                    {/* Built/Unbuilt toggle */}
                     <div style={{ display: 'flex', background: '#050505', borderRadius: 8, padding: 3, marginBottom: 14, border: '1px solid rgba(255,255,255,0.05)' }}>
                       {(['boxed', 'built'] as ProductType[]).map(t => (
                         <button key={t} onClick={() => setType(p.id, t)}
-                          style={{ flex: 1, ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '8px 0', border: 'none', borderRadius: 6, background: type === t ? (t === 'built' ? '#DC2626' : 'rgba(255,255,255,0.1)') : 'transparent', color: type === t ? '#fff' : '#6B7280', cursor: 'pointer', transition: 'all 0.2s' }}>
+                          style={{ flex: 1, ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '8px 0', border: 'none', borderRadius: 6, background: type === t ? (t === 'built' ? '#DC2626' : 'rgba(255,255,255,0.1)') : 'transparent', color: type === t ? '#fff' : '#6B7280', cursor: 'pointer' }}>
                           {t === 'boxed' ? '🔧 UNBUILT' : '⚡ BUILT'}
                         </button>
                       ))}
                     </div>
 
-                    {/* Price + CTA */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div>
                         <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#B8C1CC' }}>{type === 'built' ? 'BUILT PRICE' : 'KIT PRICE'}</div>
-                        <div style={{ ...F, fontWeight: 900, fontSize: 26, color: isCollector ? '#FACC15' : '#F5F5F5', transition: 'color 0.2s' }}>{price.toLocaleString()} kr</div>
+                        <div style={{ ...F, fontWeight: 900, fontSize: 26, color: p.collector ? '#FACC15' : '#F5F5F5' }}>{price.toLocaleString()} kr</div>
                       </div>
-                      <button
-                        onClick={() => openModal(p)}
-                        disabled={p.status === 'sold out'}
-                        style={{ background: p.status === 'sold out' ? '#1a1a1a' : '#DC2626', color: p.status === 'sold out' ? '#444' : '#fff', border: 'none', borderRadius: 10, padding: '11px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: p.status === 'sold out' ? 'not-allowed' : 'pointer', transition: 'background 0.2s' }}
+                      <button onClick={() => openModal(p)} disabled={p.status === 'sold out'}
+                        style={{ background: p.status === 'sold out' ? '#1a1a1a' : '#DC2626', color: p.status === 'sold out' ? '#444' : '#fff', border: 'none', borderRadius: 10, padding: '11px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: p.status === 'sold out' ? 'not-allowed' : 'pointer' }}
                         onMouseEnter={e => { if (p.status !== 'sold out') e.currentTarget.style.background = '#B91C1C'; }}
-                        onMouseLeave={e => { if (p.status !== 'sold out') e.currentTarget.style.background = '#DC2626'; }}
-                      >
+                        onMouseLeave={e => { if (p.status !== 'sold out') e.currentTarget.style.background = '#DC2626'; }}>
                         {p.status === 'sold out' ? 'SOLD OUT' : 'RESERVE →'}
                       </button>
                     </div>
@@ -275,15 +272,14 @@ export default function ShopPage() {
             })}
           </div>
 
-          {/* Notice */}
           <div style={{ marginTop: 48, background: '#071426', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 14, padding: '20px 24px', ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.7 }}>
             <strong style={{ color: '#F5F5F5', ...F, fontSize: 15, letterSpacing: 1 }}>📋 PREORDER NOTICE</strong><br />
-            All orders are reservation-based. No online payment required. After reserving you will receive a MobilePay reference — send payment, upload your proof, and we will confirm your order and arrange pickup in Nuuk. Prices include Greenland availability, import handling, and limited stock access.
+            All orders are reservation-based. No online payment required. After reserving you will receive a MobilePay reference — send payment, upload your proof, and we will confirm your order and arrange pickup in Nuuk.
           </div>
         </div>
       </main>
 
-      {/* ORDER MODAL */}
+      {/* MODAL */}
       {selected && (
         <div onClick={closeModal} style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, maxHeight: '92vh', overflowY: 'auto' }}>
@@ -296,7 +292,6 @@ export default function ShopPage() {
               </h2>
               <button onClick={closeModal} style={{ background: 'none', border: 'none', color: '#B8C1CC', fontSize: 22, cursor: 'pointer' }}>✕</button>
             </div>
-
             <div style={{ padding: '20px 24px' }}>
               {step === 'confirm' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -319,7 +314,6 @@ export default function ShopPage() {
                   </button>
                 </div>
               )}
-
               {step === 'payment' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div style={{ background: 'rgba(250,204,21,0.07)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 12, padding: 18 }}>
@@ -344,14 +338,10 @@ export default function ShopPage() {
                   </button>
                 </div>
               )}
-
               {step === 'upload' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', margin: 0 }}>Upload your MobilePay screenshot. Admin will verify and confirm your order.</p>
-                  <div onClick={() => fileRef.current?.click()} style={{ border: '2px dashed rgba(255,255,255,0.1)', borderRadius: 12, padding: '36px 20px', textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.2s' }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(220,38,38,0.4)'}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'}
-                  >
+                  <div onClick={() => fileRef.current?.click()} style={{ border: '2px dashed rgba(255,255,255,0.1)', borderRadius: 12, padding: '36px 20px', textAlign: 'center', cursor: 'pointer' }}>
                     {proofPreview
                       ? <img src={proofPreview} alt="proof" style={{ maxHeight: 160, borderRadius: 8, margin: '0 auto', display: 'block' }} />
                       : <><div style={{ fontSize: 36, marginBottom: 8 }}>📷</div><div style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F5F5F5' }}>Tap to select screenshot</div><div style={{ ...FB, fontSize: 11, color: '#6B7280', marginTop: 4 }}>JPG, PNG, HEIC</div></>
@@ -364,7 +354,6 @@ export default function ShopPage() {
                   </button>
                 </div>
               )}
-
               {step === 'done' && (
                 <div style={{ textAlign: 'center', padding: '12px 0' }}>
                   <div style={{ fontSize: 52, marginBottom: 14 }}>🏁</div>
@@ -374,16 +363,13 @@ export default function ShopPage() {
                     <div style={{ ...F, fontSize: 10, letterSpacing: 4, color: '#B8C1CC', marginBottom: 4 }}>REFERENCE</div>
                     <div style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 18, color: '#FACC15' }}>{payRef}</div>
                   </div>
-                  <a href="/orders" style={{ display: 'block', background: '#DC2626', color: '#fff', borderRadius: 12, padding: '15px', ...F, fontWeight: 900, fontSize: 17, letterSpacing: 2, textDecoration: 'none' }}>
-                    VIEW MY ORDERS →
-                  </a>
+                  <a href="/orders" style={{ display: 'block', background: '#DC2626', color: '#fff', borderRadius: 12, padding: '15px', ...F, fontWeight: 900, fontSize: 17, letterSpacing: 2, textDecoration: 'none' }}>VIEW MY ORDERS →</a>
                 </div>
               )}
             </div>
           </div>
         </div>
       )}
-
       <Footer />
     </>
   );
