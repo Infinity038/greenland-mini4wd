@@ -1,162 +1,249 @@
-"use client";
-import { useEffect, useState } from "react";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
-import { getMemberData, getMemberOrdersFromSupabase } from "@/lib/member";
+'use client';
 
-const STATUS_CONFIG: any = {
-  pending: { label: "Pending Confirmation", color: "#FACC15", bg: "rgba(250,204,21,0.08)" },
-  pending_confirmation: { label: "Pending Confirmation", color: "#FACC15", bg: "rgba(250,204,21,0.08)" },
-  reserved: { label: "Reserved", color: "#60A5FA", bg: "rgba(96,165,250,0.08)" },
-  awaiting_stock: { label: "Awaiting Stock", color: "#F97316", bg: "rgba(249,115,22,0.08)" },
-  ready_for_pickup: { label: "Ready for Pickup ✓", color: "#34D399", bg: "rgba(52,211,153,0.08)" },
-  completed: { label: "Completed", color: "#B8C1CC", bg: "rgba(184,193,204,0.08)" },
-  cancelled: { label: "Cancelled", color: "#DC2626", bg: "rgba(220,38,38,0.08)" },
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+
+const ADMIN_PASSWORD = 'mini4wd2026';
+const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
+const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
+
+const STATUS_LABELS: Record<string, string> = {
+  awaiting_payment: 'Awaiting Payment', proof_uploaded: 'Proof Uploaded',
+  payment_confirmed: 'Payment Confirmed', rejected: 'Proof Rejected',
+  pending: 'Pending', reserved: 'Reserved', awaiting_stock: 'Awaiting Stock',
+  in_transit: 'In Transit', ready_for_pickup: 'Ready for Pickup',
+  completed: 'Completed', cancelled: 'Cancelled',
 };
+const STATUS_COLORS: Record<string, string> = {
+  awaiting_payment: '#FACC15', proof_uploaded: '#3B82F6', payment_confirmed: '#22C55E',
+  rejected: '#DC2626', pending: '#FACC15', reserved: '#22C55E', awaiting_stock: '#F97316',
+  in_transit: '#3B82F6', ready_for_pickup: '#10B981', completed: '#6B7280', cancelled: '#DC2626',
+};
+const ALL_STATUSES = ['awaiting_payment','proof_uploaded','payment_confirmed','rejected','reserved','awaiting_stock','in_transit','ready_for_pickup','completed','cancelled'];
 
-const STEPS = ["pending", "reserved", "awaiting_stock", "ready_for_pickup", "completed"];
-
-function StatusBar({ status }: { status: string }) {
-  const current = STEPS.indexOf(status);
-  if (current === -1 || status === "cancelled") return null;
+function TopBar({ title }: { title: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 0, marginTop: 16, overflowX: "auto" }}>
-      {STEPS.map((step, i) => {
-        const done = i <= current;
-        const labels: any = {
-          pending: "Received",
-          reserved: "Reserved",
-          awaiting_stock: "In Transit",
-          ready_for_pickup: "Pickup Ready",
-          completed: "Done",
-        };
-        return (
-          <div key={step} style={{ display: "flex", alignItems: "center", flex: i < STEPS.length - 1 ? 1 : "none" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 60 }}>
-              <div style={{ width: 10, height: 10, borderRadius: "50%", background: done ? "#DC2626" : "rgba(255,255,255,0.15)", border: `2px solid ${done ? "#DC2626" : "rgba(255,255,255,0.1)"}`, flexShrink: 0 }} />
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: 1, color: done ? "#F5F5F5" : "#B8C1CC", marginTop: 4, textAlign: "center" }}>{labels[step]}</div>
-            </div>
-            {i < STEPS.length - 1 && (
-              <div style={{ flex: 1, height: 2, background: i < current ? "#DC2626" : "rgba(255,255,255,0.08)", margin: "0 2px", marginBottom: 16 }} />
-            )}
-          </div>
-        );
-      })}
+    <div style={{ background: '#071426', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <a href="/admin" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 28, height: 28, background: '#DC2626', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', ...F, fontWeight: 900, fontSize: 12, color: '#fff' }}>4W</div>
+        </a>
+        <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', letterSpacing: 1 }}>{title}</div>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <a href="/admin" style={{ ...FB, fontSize: 12, color: '#B8C1CC', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '6px 12px' }}>← Dashboard</a>
+        <a href="/" style={{ ...FB, fontSize: 12, color: '#B8C1CC', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '6px 12px' }}>Site</a>
+      </div>
     </div>
   );
 }
 
-export default function OrdersPage() {
-  const [member, setMember] = useState<any>(null);
+export default function AdminOrdersPage() {
+  const [authed, setAuthed] = useState(false);
+  const [pw, setPw] = useState('');
   const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [proofs, setProofs] = useState<Record<string, any>>({});
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [activeProof, setActiveProof] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState('all');
+  const [tab, setTab] = useState<'orders' | 'members'>('orders');
 
-  useEffect(() => {
-    async function load() {
-      const data = getMemberData();
-      setMember(data);
-      if (data?.email) {
-        const fetched = await getMemberOrdersFromSupabase(data.email);
-        setOrders(fetched);
-      }
-      setLoading(false);
-    }
-    load();
-  }, []);
+  const login = () => { if (pw === ADMIN_PASSWORD) setAuthed(true); };
 
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric" });
+  const fetchData = async () => {
+    setLoading(true);
+    const [{ data: o }, { data: pr }, { data: m }] = await Promise.all([
+      supabase.from('orders').select('*').order('created_at', { ascending: false }),
+      supabase.from('payment_proofs').select('*'),
+      supabase.from('members').select('*').order('created_at', { ascending: false }),
+    ]);
+    setOrders(o || []);
+    setMembers(m || []);
+    const pm: Record<string, any> = {};
+    (pr || []).forEach((p: any) => { pm[p.order_id] = p; });
+    setProofs(pm);
+    const nm: Record<string, string> = {};
+    (o || []).forEach((x: any) => { nm[x.id] = x.notes || ''; });
+    setNotes(nm);
+    setLoading(false);
+  };
+
+  useEffect(() => { if (authed) fetchData(); }, [authed]);
+
+  const updateOrder = async (id: string, updates: any) => {
+    setSaving(id);
+    await supabase.from('orders').update(updates).eq('id', id);
+    await fetchData();
+    setSaving(null);
+  };
+
+  const confirmPayment = async (order: any) => {
+    setSaving(order.id);
+    await supabase.from('orders').update({ payment_status: 'payment_confirmed', status: 'reserved' }).eq('id', order.id);
+    if (proofs[order.id]) await supabase.from('payment_proofs').update({ status: 'confirmed', reviewed_at: new Date().toISOString() }).eq('order_id', order.id);
+    await fetchData();
+    setSaving(null);
+  };
+
+  const rejectProof = async (id: string) => {
+    setSaving(id);
+    await supabase.from('orders').update({ payment_status: 'rejected' }).eq('id', id);
+    if (proofs[id]) await supabase.from('payment_proofs').update({ status: 'rejected' }).eq('order_id', id);
+    await fetchData();
+    setSaving(null);
+  };
+
+  const unlockMembership = async (email: string) => {
+    await supabase.from('members').update({ member_status: 'official' }).eq('email', email);
+    await fetchData();
+  };
+
+  const filtered = filter === 'all' ? orders : orders.filter(o => (o.payment_status || o.status) === filter);
+
+  if (!authed) return (
+    <div style={{ minHeight: '100vh', background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, padding: '32px 28px', width: '100%', maxWidth: 380 }}>
+        <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#F5F5F5', marginBottom: 24 }}>ADMIN ACCESS</div>
+        <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} placeholder="Password"
+          style={{ width: '100%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '13px 16px', color: '#F5F5F5', ...FB, fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 14 }} />
+        <button onClick={login} style={{ width: '100%', background: '#DC2626', color: '#fff', border: 'none', borderRadius: 10, padding: '13px', ...F, fontWeight: 900, fontSize: 17, letterSpacing: 2, cursor: 'pointer' }}>LOGIN →</button>
+      </div>
+    </div>
+  );
 
   return (
-    <>
-      <Navbar />
-      <main style={{ background: "#050505", color: "#F5F5F5", minHeight: "100vh", paddingTop: 80, paddingBottom: 80 }}>
-        <div style={{ maxWidth: 800, margin: "0 auto", padding: "0 24px" }}>
+    <div style={{ minHeight: '100vh', background: '#050505', color: '#F5F5F5' }}>
+      <TopBar title="ORDERS & PAYMENTS" />
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px' }}>
 
-          {/* Header */}
-          <div style={{ marginBottom: 40 }}>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 8 }}>MEMBER ACCOUNT</div>
-            <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(32px, 6vw, 56px)", color: "#F5F5F5", margin: 0, lineHeight: 1 }}>MY ORDERS</h1>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: "#B8C1CC", marginTop: 8 }}>
-              Your preorders and reservation history.
-            </p>
-          </div>
-
-          {/* Notice */}
-          <div style={{ background: "rgba(250,204,21,0.05)", border: "1px solid rgba(250,204,21,0.15)", borderRadius: 10, padding: "14px 18px", marginBottom: 32 }}>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#FACC15", margin: 0, lineHeight: 1.6 }}>
-              📦 All orders are reservation-based. No online payment required. We will contact you via <strong>{member?.email || "your registered email"}</strong> to confirm payment and arrange pickup.
-            </p>
-          </div>
-
-          {/* Orders */}
-          {loading ? (
-            <div style={{ textAlign: "center", padding: "60px 0" }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: "#B8C1CC", letterSpacing: 3 }}>LOADING ORDERS...</div>
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, marginBottom: 24 }}>
+          {[
+            { label: 'Total Orders', value: orders.length, color: '#F5F5F5' },
+            { label: 'Proof Uploaded', value: orders.filter(o => o.payment_status === 'proof_uploaded').length, color: '#3B82F6' },
+            { label: 'Awaiting Payment', value: orders.filter(o => o.payment_status === 'awaiting_payment').length, color: '#FACC15' },
+            { label: 'Confirmed', value: orders.filter(o => o.payment_status === 'payment_confirmed').length, color: '#22C55E' },
+          ].map(s => (
+            <div key={s.label} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ ...F, fontWeight: 900, fontSize: 30, color: s.color }}>{s.value}</div>
+              <div style={{ ...F, fontSize: 11, letterSpacing: 1, color: '#B8C1CC' }}>{s.label}</div>
             </div>
-          ) : orders.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "60px 24px" }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 24, color: "#F5F5F5", marginBottom: 8 }}>No orders yet</div>
-              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: "#B8C1CC", marginBottom: 24 }}>Visit the shop to browse and reserve your first car.</p>
-              <a href="/shop" style={{ background: "#DC2626", color: "#fff", padding: "14px 32px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 2, textDecoration: "none" }}>BROWSE SHOP →</a>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {orders.map((order, i) => {
-                const s = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
-                const orderId = order.id?.toString().slice(0, 8).toUpperCase() || `ORD-${i + 1}`;
-                return (
-                  <div key={order.id || i} style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "24px" }}>
-                    {/* Top row */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
-                      <div>
-                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 4 }}>ORDER #{orderId}</div>
-                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 20, color: "#F5F5F5", lineHeight: 1 }}>{order.product_name}</div>
-                      </div>
-                      <div style={{ background: s.bg, border: `1px solid ${s.color}40`, borderRadius: 6, padding: "5px 12px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 2, color: s.color, whiteSpace: "nowrap" as const }}>
-                        {s.label}
-                      </div>
-                    </div>
-
-                    {/* Details */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 8 }}>
-                      {[
-                        { label: "Type", value: order.type === "built" ? "Race Ready" : order.type === "boxed" ? "Boxed Kit" : order.type },
-                        { label: "Chassis", value: order.chassis },
-                        { label: "Ordered", value: order.created_at ? formatDate(order.created_at) : "—" },
-                        { label: "Notes", value: order.notes || "None" },
-                      ].map(d => (
-                        <div key={d.label}>
-                          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: "#B8C1CC", marginBottom: 3 }}>{d.label.toUpperCase()}</div>
-                          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#F5F5F5" }}>{d.value || "—"}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Status progress bar */}
-                    <StatusBar status={order.status} />
-
-                    {order.status === "cancelled" && (
-                      <div style={{ marginTop: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#DC2626" }}>
-                        This order has been cancelled. Contact us if you have questions.
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Footer links */}
-          <div style={{ marginTop: 40, display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <a href="/shop" style={{ background: "#DC2626", color: "#fff", padding: "13px 24px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 2, textDecoration: "none" }}>BROWSE SHOP</a>
-            <a href="/profile" style={{ background: "transparent", color: "#F5F5F5", padding: "13px 24px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 2, textDecoration: "none", border: "1px solid rgba(255,255,255,0.15)" }}>MY PROFILE</a>
-          </div>
-
+          ))}
         </div>
-      </main>
-      <Footer />
-    </>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          {(['orders', 'members'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{ ...F, fontWeight: 700, fontSize: 14, letterSpacing: 1, padding: '9px 20px', border: 'none', borderRadius: 8, background: tab === t ? '#DC2626' : '#071426', color: tab === t ? '#fff' : '#B8C1CC', cursor: 'pointer', border: tab === t ? 'none' : '1px solid rgba(255,255,255,0.08)' } as any}>
+              {t === 'orders' ? `ORDERS (${orders.length})` : `MEMBERS (${members.length})`}
+            </button>
+          ))}
+        </div>
+
+        {/* ORDERS TAB */}
+        {tab === 'orders' && (
+          <>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 20, paddingBottom: 4 }}>
+              {['all', 'proof_uploaded', 'awaiting_payment', 'payment_confirmed', 'rejected'].map(f => (
+                <button key={f} onClick={() => setFilter(f)} style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, padding: '7px 14px', borderRadius: 8, border: filter === f ? 'none' : '1px solid rgba(255,255,255,0.08)', background: filter === f ? '#DC2626' : '#071426', color: filter === f ? '#fff' : '#B8C1CC', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {f === 'all' ? 'ALL' : (STATUS_LABELS[f] || f).toUpperCase()}
+                  {f === 'proof_uploaded' ? ` (${orders.filter(o => o.payment_status === 'proof_uploaded').length})` : ''}
+                </button>
+              ))}
+            </div>
+
+            {loading ? <div style={{ textAlign: 'center', padding: 60, ...FB, color: '#B8C1CC' }}>Loading...</div>
+            : filtered.length === 0 ? <div style={{ textAlign: 'center', padding: 60, ...FB, color: '#B8C1CC' }}>No orders found.</div>
+            : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {filtered.map(order => {
+                  const ps = order.payment_status || order.status;
+                  const sc = STATUS_COLORS[ps] || '#6B7280';
+                  const proof = proofs[order.id];
+                  return (
+                    <div key={order.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
+                      <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                        <div>
+                          <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 2 }}>{order.product_name}</div>
+                          <div style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>{order.member_name} · {order.member_email}</div>
+                          <div style={{ ...FB, fontSize: 11, color: '#6B7280', marginTop: 2 }}>{new Date(order.created_at).toLocaleString()}</div>
+                          {order.payment_reference && <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#FACC15', marginTop: 4 }}>Ref: {order.payment_reference}</div>}
+                        </div>
+                        <span style={{ ...F, fontSize: 11, letterSpacing: 2, padding: '4px 12px', borderRadius: 20, background: sc + '22', color: sc, flexShrink: 0 }}>{STATUS_LABELS[ps] || ps}</span>
+                      </div>
+
+                      {proof && (
+                        <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(59,130,246,0.05)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ ...F, fontWeight: 700, fontSize: 13, color: '#3B82F6' }}>📸 Payment Proof Uploaded</span>
+                            <button onClick={() => setActiveProof(activeProof === order.id ? null : order.id)} style={{ ...FB, fontSize: 12, color: '#B8C1CC', background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>
+                              {activeProof === order.id ? 'Hide' : 'View'}
+                            </button>
+                          </div>
+                          {activeProof === order.id && proof.proof_url && (
+                            <img src={proof.proof_url} alt="proof" style={{ maxHeight: 240, borderRadius: 8, marginTop: 10, border: '1px solid rgba(255,255,255,0.1)', display: 'block', margin: '10px auto 0' }} />
+                          )}
+                        </div>
+                      )}
+
+                      <div style={{ padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {ps === 'proof_uploaded' && (
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={() => confirmPayment(order)} disabled={saving === order.id} style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer', opacity: saving === order.id ? 0.5 : 1 }}>✓ CONFIRM PAYMENT</button>
+                            <button onClick={() => rejectProof(order.id)} disabled={saving === order.id} style={{ background: 'transparent', color: '#DC2626', border: '1px solid rgba(220,38,38,0.4)', borderRadius: 8, padding: '9px 16px', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>✕ REJECT</button>
+                          </div>
+                        )}
+                        {ps === 'payment_confirmed' && (
+                          <button onClick={() => unlockMembership(order.member_email)} style={{ alignSelf: 'flex-start', background: 'rgba(250,204,21,0.12)', color: '#FACC15', border: '1px solid rgba(250,204,21,0.3)', borderRadius: 8, padding: '9px 16px', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>🏅 UNLOCK OFFICIAL MEMBERSHIP</button>
+                        )}
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <select value={order.status || ''} onChange={e => updateOrder(order.id, { status: e.target.value })}
+                            style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#F5F5F5', ...FB, fontSize: 13, outline: 'none', cursor: 'pointer' }}>
+                            {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}
+                          </select>
+                          <input value={notes[order.id] || ''} onChange={e => setNotes(p => ({ ...p, [order.id]: e.target.value }))} placeholder="Admin notes..."
+                            style={{ flex: 1, minWidth: 140, background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#F5F5F5', ...FB, fontSize: 13, outline: 'none' }} />
+                          <button onClick={() => updateOrder(order.id, { notes: notes[order.id] })} disabled={saving === order.id}
+                            style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', ...F, fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving === order.id ? 0.5 : 1 }}>
+                            {saving === order.id ? '...' : 'SAVE'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            }
+          </>
+        )}
+
+        {/* MEMBERS TAB */}
+        {tab === 'members' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {members.map(m => (
+              <div key={m.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ ...F, fontWeight: 700, fontSize: 18, color: '#F5F5F5' }}>{m.name}</div>
+                  <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>{m.email} · {m.nationality} · {m.city}</div>
+                  <div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>Joined: {new Date(m.created_at).toLocaleDateString()}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ ...F, fontSize: 11, letterSpacing: 2, padding: '3px 10px', borderRadius: 4, background: m.member_status === 'official' ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)', color: m.member_status === 'official' ? '#FACC15' : '#B8C1CC' }}>
+                    {(m.member_status || 'registered').toUpperCase()}
+                  </span>
+                  {m.member_status !== 'official' && (
+                    <button onClick={() => unlockMembership(m.email)} style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '6px 12px', borderRadius: 6, background: 'transparent', border: '1px solid rgba(250,204,21,0.3)', color: '#FACC15', cursor: 'pointer' }}>
+                      MAKE OFFICIAL
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
