@@ -2,367 +2,267 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '@/lib/member';
 
 const ADMIN_PASSWORD = 'mini4wd2026';
+const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
+const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
-const ALL_STATUSES = [
-  'awaiting_payment',
-  'proof_uploaded',
-  'payment_confirmed',
-  'rejected',
-  'reserved',
-  'awaiting_stock',
-  'in_transit',
-  'ready_for_pickup',
-  'completed',
-  'cancelled',
+const NAV = [
+  { href: '/admin/orders',      icon: '📦', label: 'Orders',      desc: 'Payments & proofs' },
+  { href: '/admin/products',    icon: '🛒', label: 'Products',    desc: 'Shop catalog' },
+  { href: '/admin/members',     icon: '👥', label: 'Members',     desc: 'Accounts & status' },
+  { href: '/admin/tournaments', icon: '🏁', label: 'Tournaments', desc: 'Race events' },
+  { href: '/admin/tickets',     icon: '🎟️', label: 'Tickets',     desc: 'Loyalty & bonus' },
+  { href: '/admin/news',        icon: '📰', label: 'News',        desc: 'Posts & updates' },
+  { href: '/admin/gallery',     icon: '🖼️', label: 'Gallery',     desc: 'Photos & media' },
 ];
 
-export default function AdminOrdersPage() {
+export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
   const [pw, setPw] = useState('');
-  const [orders, setOrders] = useState<any[]>([]);
-  const [proofs, setProofs] = useState<Record<string, any>>({});
+  const [showPw, setShowPw] = useState(false);
+  const [loginError, setLoginError] = useState(false);
+  const [stats, setStats] = useState({
+    totalMembers: 0, officialMembers: 0,
+    pendingOrders: 0, pendingProofs: 0,
+    activeTournaments: 0, productsInStock: 0,
+    bonusTickets: 0, preordersWaiting: 0,
+  });
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [recentMembers, setRecentMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeProof, setActiveProof] = useState<string | null>(null);
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const [filter, setFilter] = useState<string>('all');
-  const [saving, setSaving] = useState<string | null>(null);
-  const [members, setMembers] = useState<any[]>([]);
-  const [tab, setTab] = useState<'orders' | 'members'>('orders');
 
   const login = () => {
-    if (pw === ADMIN_PASSWORD) setAuthed(true);
-  };
-
-  const fetchData = async () => {
-    setLoading(true);
-    const [{ data: ordersData }, { data: proofData }, { data: membersData }] = await Promise.all([
-      supabase.from('orders').select('*').order('created_at', { ascending: false }),
-      supabase.from('payment_proofs').select('*'),
-      supabase.from('members').select('*').order('created_at', { ascending: false }),
-    ]);
-
-    setOrders(ordersData || []);
-    setMembers(membersData || []);
-
-    // Index proofs by order_id
-    const proofMap: Record<string, any> = {};
-    (proofData || []).forEach((p: any) => { proofMap[p.order_id] = p; });
-    setProofs(proofMap);
-
-    // Init notes
-    const noteMap: Record<string, string> = {};
-    (ordersData || []).forEach((o: any) => { noteMap[o.id] = o.notes || ''; });
-    setNotes(noteMap);
-    setLoading(false);
+    if (pw === ADMIN_PASSWORD) { setAuthed(true); setLoginError(false); }
+    else setLoginError(true);
   };
 
   useEffect(() => {
-    if (authed) fetchData();
+    if (!authed) return;
+    setLoading(true);
+    Promise.all([
+      supabase.from('members').select('member_status, created_at, name, email'),
+      supabase.from('orders').select('payment_status, status, created_at, member_name, product_name, id').order('created_at', { ascending: false }),
+      supabase.from('tournaments').select('status'),
+      supabase.from('products').select('status, stock_qty'),
+      supabase.from('tickets').select('ticket_type, status'),
+    ]).then(([{ data: m }, { data: o }, { data: t }, { data: p }, { data: tk }]) => {
+      const members = m || [];
+      const orders = o || [];
+      const tournaments = t || [];
+      const products = p || [];
+      const tickets = tk || [];
+      setStats({
+        totalMembers: members.length,
+        officialMembers: members.filter((x: any) => x.member_status === 'official').length,
+        pendingOrders: orders.filter((x: any) => x.payment_status === 'awaiting_payment').length,
+        pendingProofs: orders.filter((x: any) => x.payment_status === 'proof_uploaded').length,
+        activeTournaments: tournaments.filter((x: any) => ['upcoming', 'ongoing'].includes(x.status)).length,
+        productsInStock: products.filter((x: any) => x.status === 'in stock').length,
+        bonusTickets: tickets.filter((x: any) => x.ticket_type === 'bonus' && x.status === 'available').length,
+        preordersWaiting: orders.filter((x: any) => x.status === 'pending').length,
+      });
+      setRecentOrders(orders.slice(0, 5));
+      setRecentMembers(members.slice(0, 5));
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, [authed]);
 
-  const updateOrder = async (orderId: string, updates: any) => {
-    setSaving(orderId);
-    await supabase.from('orders').update(updates).eq('id', orderId);
-    await fetchData();
-    setSaving(null);
-  };
+  // LOGIN SCREEN
+  if (!authed) return (
+    <div style={{ minHeight: '100vh', background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(220,38,38,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(220,38,38,0.03) 1px, transparent 1px)', backgroundSize: '40px 40px', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', width: 500, height: 300, background: 'radial-gradient(ellipse, rgba(220,38,38,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-  const confirmPayment = async (order: any) => {
-    setSaving(order.id);
-    await supabase.from('orders').update({
-      payment_status: 'payment_confirmed',
-      status: 'reserved',
-    }).eq('id', order.id);
+      <div style={{ width: '100%', maxWidth: 400, position: 'relative', zIndex: 1 }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, background: '#DC2626', borderRadius: 14, ...F, fontWeight: 900, fontSize: 22, color: '#fff', marginBottom: 16, boxShadow: '0 0 32px rgba(220,38,38,0.25)' }}>4W</div>
+          <div style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', letterSpacing: 2, lineHeight: 1, marginBottom: 6 }}>ADMIN ACCESS</div>
+          <div style={{ ...FB, fontSize: 13, color: '#6B7280' }}>Greenland Mini 4WD — Control Center</div>
+        </div>
 
-    if (proofs[order.id]) {
-      await supabase.from('payment_proofs').update({ status: 'confirmed', reviewed_at: new Date().toISOString() }).eq('order_id', order.id);
-    }
-
-    // Loyalty: count confirmed paid tickets (orders acting as tickets)
-    // Give bonus ticket every 10
-    const { data: confirmedOrders } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('member_email', order.member_email)
-      .eq('payment_status', 'payment_confirmed');
-
-    const confirmedCount = (confirmedOrders || []).length + 1;
-    if (confirmedCount % 10 === 0) {
-      await supabase.from('tickets').insert({
-        member_email: order.member_email,
-        member_name: order.member_name,
-        ticket_type: 'bonus',
-        status: 'available',
-      });
-    }
-
-    await fetchData();
-    setSaving(null);
-  };
-
-  const rejectProof = async (orderId: string) => {
-    setSaving(orderId);
-    await supabase.from('orders').update({ payment_status: 'rejected' }).eq('id', orderId);
-    if (proofs[orderId]) {
-      await supabase.from('payment_proofs').update({ status: 'rejected' }).eq('order_id', orderId);
-    }
-    await fetchData();
-    setSaving(null);
-  };
-
-  const unlockMembership = async (memberEmail: string) => {
-    await supabase.from('members').update({ member_status: 'official' }).eq('email', memberEmail);
-    await fetchData();
-  };
-
-  const filteredOrders = filter === 'all' ? orders : orders.filter(o => (o.payment_status || o.status) === filter);
-
-  if (!authed) {
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
-        <div className="bg-[#071426] border border-white/10 rounded-2xl p-8 w-full max-w-sm">
-          <h1 className="font-barlow font-black text-white text-2xl uppercase mb-6 text-center">Admin Access</h1>
-          <input
-            type="password"
-            value={pw}
-            onChange={e => setPw(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && login()}
-            placeholder="Enter admin password"
-            className="w-full bg-[#050505] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-[#B8C1CC] mb-4 focus:outline-none focus:border-[#DC2626]"
-          />
+        {/* Card */}
+        <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '32px 28px', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+          <label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 8 }}>PASSWORD</label>
+          <div style={{ position: 'relative', marginBottom: loginError ? 8 : 20 }}>
+            <input
+              type={showPw ? 'text' : 'password'}
+              value={pw}
+              onChange={e => { setPw(e.target.value); setLoginError(false); }}
+              onKeyDown={e => e.key === 'Enter' && login()}
+              placeholder="Enter admin password"
+              autoFocus
+              style={{ width: '100%', background: '#050505', border: `1px solid ${loginError ? '#DC2626' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: '14px 48px 14px 16px', color: '#F5F5F5', ...FB, fontSize: 15, outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+              onFocus={e => { if (!loginError) e.target.style.borderColor = 'rgba(220,38,38,0.5)'; }}
+              onBlur={e => { if (!loginError) e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+            />
+            <button onClick={() => setShowPw(!showPw)} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#6B7280', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>
+              {showPw ? '🙈' : '👁️'}
+            </button>
+          </div>
+          {loginError && <div style={{ ...FB, fontSize: 13, color: '#DC2626', marginBottom: 16 }}>⚠ Incorrect password. Access denied.</div>}
           <button
             onClick={login}
-            className="w-full bg-[#DC2626] text-white font-barlaw font-black uppercase py-3 rounded-xl hover:bg-red-700 transition-colors"
+            style={{ width: '100%', background: '#DC2626', color: '#fff', border: 'none', borderRadius: 10, padding: '14px', ...F, fontWeight: 900, fontSize: 18, letterSpacing: 3, cursor: 'pointer', transition: 'background 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#B91C1C'}
+            onMouseLeave={e => e.currentTarget.style.background = '#DC2626'}
           >
-            Login
+            ACCESS DASHBOARD →
           </button>
         </div>
+        <div style={{ textAlign: 'center', marginTop: 20, ...FB, fontSize: 12, color: '#374151' }}>🔒 Restricted — Greenland Mini 4WD Club Admin</div>
       </div>
-    );
-  }
+    </div>
+  );
+
+  // DASHBOARD
+  const STAT_CARDS = [
+    { label: 'Total Members',    value: stats.totalMembers,     color: '#3B82F6', icon: '👥', href: '/admin/members' },
+    { label: 'Official Members', value: stats.officialMembers,  color: '#22C55E', icon: '✓',  href: '/admin/members' },
+    { label: 'Pending Orders',   value: stats.pendingOrders,    color: '#FACC15', icon: '⏳', href: '/admin/orders', alert: stats.pendingOrders > 0 },
+    { label: 'Proof Uploads',    value: stats.pendingProofs,    color: '#F97316', icon: '📸', href: '/admin/orders', alert: stats.pendingProofs > 0 },
+    { label: 'Tournaments',      value: stats.activeTournaments,color: '#DC2626', icon: '🏁', href: '/admin/tournaments' },
+    { label: 'In Stock',         value: stats.productsInStock,  color: '#22C55E', icon: '📦', href: '/admin/products' },
+    { label: 'Preorders',        value: stats.preordersWaiting, color: '#A855F7', icon: '🛒', href: '/admin/orders' },
+    { label: 'Bonus Tickets',    value: stats.bonusTickets,     color: '#FACC15', icon: '🎟️', href: '/admin/tickets' },
+  ];
+
+  const QUICK_ACTIONS = [
+    { label: 'Confirm Payments', icon: '✅', href: '/admin/orders',      color: '#22C55E', badge: stats.pendingProofs > 0 ? stats.pendingProofs : null },
+    { label: 'Add Product',      icon: '➕', href: '/admin/products',    color: '#3B82F6', badge: null },
+    { label: 'Create Tournament',icon: '🏁', href: '/admin/tournaments', color: '#DC2626', badge: null },
+    { label: 'Manage Members',   icon: '👥', href: '/admin/members',     color: '#A855F7', badge: null },
+    { label: 'Post News',        icon: '📰', href: '/admin/news',        color: '#F97316', badge: null },
+    { label: 'Upload Gallery',   icon: '🖼️', href: '/admin/gallery',     color: '#FACC15', badge: null },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#050505]">
-      <div className="bg-[#071426] border-b border-white/10 px-4 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="font-barlow font-black text-white text-2xl uppercase">Admin Panel</h1>
-          <p className="text-[#B8C1CC] text-xs">Greenland Mini 4WD Club</p>
+    <div style={{ minHeight: '100vh', background: '#050505', color: '#F5F5F5' }}>
+
+      {/* Top bar */}
+      <div style={{ background: '#071426', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 30, height: 30, background: '#DC2626', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', ...F, fontWeight: 900, fontSize: 13, color: '#fff' }}>4W</div>
+          <div>
+            <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#F5F5F5', letterSpacing: 1, lineHeight: 1 }}>ADMIN DASHBOARD</div>
+            <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#DC2626', lineHeight: 1 }}>CONTROL CENTER</div>
+          </div>
         </div>
-        <div className="flex gap-2 text-sm">
-          <a href="/admin" className="text-[#B8C1CC] hover:text-white px-3 py-1 rounded-lg border border-white/10">Dashboard</a>
-          <a href="/" className="text-[#B8C1CC] hover:text-white px-3 py-1 rounded-lg border border-white/10">← Site</a>
-        </div>
+        <a href="/" style={{ ...FB, fontSize: 12, color: '#B8C1CC', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '6px 12px' }}>← Back to Site</a>
       </div>
 
-      {/* Quick stats */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          {[
-            { label: 'Total Orders', value: orders.length, color: '#F5F5F5' },
-            { label: 'Proof Uploaded', value: orders.filter(o => o.payment_status === 'proof_uploaded').length, color: '#3B82F6' },
-            { label: 'Awaiting Payment', value: orders.filter(o => o.payment_status === 'awaiting_payment').length, color: '#FACC15' },
-            { label: 'Total Members', value: members.length, color: '#22C55E' },
-          ].map(s => (
-            <div key={s.label} className="bg-[#071426] rounded-xl p-4 border border-white/10">
-              <div className="text-2xl font-barlaw font-black" style={{ color: s.color }}>{s.value}</div>
-              <div className="text-xs text-[#B8C1CC]">{s.label}</div>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 20px' }}>
+
+        {/* Welcome */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ ...F, fontWeight: 900, fontSize: 'clamp(22px, 5vw, 32px)', color: '#F5F5F5', marginBottom: 4 }}>Welcome back 👋</div>
+          <div style={{ ...FB, fontSize: 14, color: '#6B7280' }}>Here's what's happening at Greenland Mini 4WD Club.</div>
+        </div>
+
+        {/* Alert banner if proofs pending */}
+        {stats.pendingProofs > 0 && (
+          <a href="/admin/orders" style={{ textDecoration: 'none', display: 'block', marginBottom: 20 }}>
+            <div style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 20 }}>📸</span>
+                <div>
+                  <div style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F97316' }}>{stats.pendingProofs} payment proof{stats.pendingProofs > 1 ? 's' : ''} awaiting review</div>
+                  <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>Confirm or reject to update order status</div>
+                </div>
+              </div>
+              <span style={{ ...F, fontWeight: 700, fontSize: 13, color: '#F97316', letterSpacing: 1 }}>REVIEW →</span>
             </div>
+          </a>
+        )}
+
+        {/* Stats grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, marginBottom: 28 }}>
+          {STAT_CARDS.map(s => (
+            <a key={s.label} href={s.href} style={{ textDecoration: 'none' }}>
+              <div style={{ background: '#071426', border: `1px solid ${s.alert ? s.color + '44' : 'rgba(255,255,255,0.06)'}`, borderRadius: 14, padding: '16px 14px', position: 'relative', overflow: 'hidden', transition: 'transform 0.15s, border-color 0.15s', cursor: 'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = s.color + '66'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = s.alert ? s.color + '44' : 'rgba(255,255,255,0.06)'; }}
+              >
+                {s.alert && <div style={{ position: 'absolute', top: 10, right: 10, width: 8, height: 8, background: s.color, borderRadius: '50%', boxShadow: `0 0 6px ${s.color}` }} />}
+                <div style={{ fontSize: 20, marginBottom: 8 }}>{s.icon}</div>
+                <div style={{ ...F, fontWeight: 900, fontSize: 32, color: s.color, lineHeight: 1, marginBottom: 4 }}>{s.value}</div>
+                <div style={{ ...F, fontSize: 11, letterSpacing: 1, color: '#B8C1CC' }}>{s.label}</div>
+              </div>
+            </a>
           ))}
         </div>
 
-        {/* Tab switch */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setTab('orders')}
-            className={`px-5 py-2 rounded-lg font-barlaw font-bold uppercase text-sm transition-colors ${tab === 'orders' ? 'bg-[#DC2626] text-white' : 'bg-[#071426] text-[#B8C1CC] border border-white/10 hover:text-white'}`}
-          >
-            Orders ({orders.length})
-          </button>
-          <button
-            onClick={() => setTab('members')}
-            className={`px-5 py-2 rounded-lg font-barlaw font-bold uppercase text-sm transition-colors ${tab === 'members' ? 'bg-[#DC2626] text-white' : 'bg-[#071426] text-[#B8C1CC] border border-white/10 hover:text-white'}`}
-          >
-            Members ({members.length})
-          </button>
-        </div>
+        {/* Two column */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 28 }}>
 
-        {/* ── ORDERS TAB ── */}
-        {tab === 'orders' && (
-          <>
-            {/* Filter */}
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-              {['all', 'proof_uploaded', 'awaiting_payment', 'payment_confirmed', 'rejected'].map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${
-                    filter === f ? 'bg-[#DC2626] text-white' : 'bg-[#071426] text-[#B8C1CC] border border-white/10 hover:text-white'
-                  }`}
-                >
-                  {f === 'all' ? 'All' : ORDER_STATUS_LABELS[f] || f}
-                  {f === 'proof_uploaded' && ` (${orders.filter(o => o.payment_status === 'proof_uploaded').length})`}
-                </button>
+          {/* Quick actions */}
+          <div>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>QUICK ACTIONS</div>
+            <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden' }}>
+              {QUICK_ACTIONS.map((a, i) => (
+                <a key={a.label} href={a.href} style={{ textDecoration: 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderBottom: i < QUICK_ACTIONS.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', transition: 'background 0.15s', cursor: 'pointer' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: a.color + '18', border: `1px solid ${a.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>{a.icon}</div>
+                    <span style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F5F5F5', letterSpacing: 1, flex: 1 }}>{a.label}</span>
+                    {a.badge ? <span style={{ background: a.color, color: '#050505', ...F, fontWeight: 900, fontSize: 11, padding: '2px 8px', borderRadius: 10 }}>{a.badge}</span> : null}
+                    <span style={{ color: '#6B7280', fontSize: 13 }}>→</span>
+                  </div>
+                </a>
               ))}
             </div>
-
-            {loading ? (
-              <div className="text-[#B8C1CC] text-center py-12">Loading...</div>
-            ) : filteredOrders.length === 0 ? (
-              <div className="text-[#B8C1CC] text-center py-12">No orders found.</div>
-            ) : (
-              <div className="space-y-4">
-                {filteredOrders.map(order => {
-                  const payStatus = order.payment_status || order.status;
-                  const statusColor = ORDER_STATUS_COLORS[payStatus] || '#6B7280';
-                  const proof = proofs[order.id];
-
-                  return (
-                    <div key={order.id} className="bg-[#071426] border border-white/10 rounded-2xl overflow-hidden">
-                      {/* Header */}
-                      <div className="flex flex-wrap items-start justify-between gap-2 p-4 border-b border-white/10">
-                        <div>
-                          <div className="font-barlaw font-black text-white text-lg">{order.product_name}</div>
-                          <div className="text-sm text-[#B8C1CC]">{order.member_name} · {order.member_email}</div>
-                          <div className="text-xs text-[#B8C1CC] mt-1">
-                            {order.chassis && <span className="mr-3">Chassis: {order.chassis}</span>}
-                            <span>{new Date(order.created_at).toLocaleString()}</span>
-                          </div>
-                          {order.payment_reference && (
-                            <div className="text-xs font-mono text-[#FACC15] mt-1">Ref: {order.payment_reference}</div>
-                          )}
-                        </div>
-                        <span
-                          className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex-shrink-0"
-                          style={{ backgroundColor: statusColor + '22', color: statusColor }}
-                        >
-                          {ORDER_STATUS_LABELS[payStatus] || payStatus}
-                        </span>
-                      </div>
-
-                      {/* Proof section */}
-                      {proof && (
-                        <div className="p-4 border-b border-white/10 bg-blue-500/5">
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <span className="text-blue-400 text-sm font-bold">📸 Payment Proof Uploaded</span>
-                            <button
-                              onClick={() => setActiveProof(activeProof === order.id ? null : order.id)}
-                              className="text-xs text-[#B8C1CC] hover:text-white border border-white/10 px-3 py-1 rounded-lg"
-                            >
-                              {activeProof === order.id ? 'Hide' : 'View Proof'}
-                            </button>
-                          </div>
-                          {activeProof === order.id && proof.proof_url && (
-                            <div className="mt-3">
-                              <img
-                                src={proof.proof_url}
-                                alt="Payment proof"
-                                className="max-h-64 rounded-xl border border-white/10 mx-auto"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Actions */}
-                      <div className="p-4 space-y-3">
-                        {/* Quick action buttons */}
-                        <div className="flex flex-wrap gap-2">
-                          {payStatus === 'proof_uploaded' && (
-                            <>
-                              <button
-                                onClick={() => confirmPayment(order)}
-                                disabled={saving === order.id}
-                                className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-bold uppercase px-4 py-2 rounded-lg transition-colors"
-                              >
-                                ✓ Confirm Payment
-                              </button>
-                              <button
-                                onClick={() => rejectProof(order.id)}
-                                disabled={saving === order.id}
-                                className="bg-red-700 hover:bg-red-800 disabled:opacity-50 text-white text-xs font-bold uppercase px-4 py-2 rounded-lg transition-colors"
-                              >
-                                ✕ Reject Proof
-                              </button>
-                            </>
-                          )}
-                          {payStatus === 'payment_confirmed' && (
-                            <button
-                              onClick={() => unlockMembership(order.member_email)}
-                              className="bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/40 text-xs font-bold uppercase px-4 py-2 rounded-lg transition-colors"
-                            >
-                              🏅 Unlock Official Membership
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Status select */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <select
-                            value={order.status || ''}
-                            onChange={e => updateOrder(order.id, { status: e.target.value })}
-                            className="bg-[#050505] border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#DC2626]"
-                          >
-                            {ALL_STATUSES.map(s => (
-                              <option key={s} value={s}>{ORDER_STATUS_LABELS[s] || s}</option>
-                            ))}
-                          </select>
-
-                          {/* Notes */}
-                          <input
-                            value={notes[order.id] || ''}
-                            onChange={e => setNotes(prev => ({ ...prev, [order.id]: e.target.value }))}
-                            placeholder="Admin notes..."
-                            className="flex-1 min-w-[150px] bg-[#050505] border border-white/10 rounded-lg px-3 py-2 text-white text-xs placeholder-[#B8C1CC] focus:outline-none focus:border-[#DC2626]"
-                          />
-                          <button
-                            onClick={() => updateOrder(order.id, { notes: notes[order.id] })}
-                            disabled={saving === order.id}
-                            className="bg-[#DC2626] hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold uppercase px-3 py-2 rounded-lg transition-colors"
-                          >
-                            {saving === order.id ? '...' : 'Save'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ── MEMBERS TAB ── */}
-        {tab === 'members' && (
-          <div className="space-y-3">
-            {members.map(m => (
-              <div key={m.id} className="bg-[#071426] border border-white/10 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="font-barlaw font-black text-white">{m.name}</div>
-                  <div className="text-xs text-[#B8C1CC]">{m.email} · {m.nationality} · {m.city}</div>
-                  <div className="text-xs text-[#B8C1CC]">Joined: {new Date(m.created_at).toLocaleDateString()}</div>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                    m.member_status === 'official' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10 text-[#B8C1CC]'
-                  }`}>
-                    {m.member_status || 'registered'}
-                  </span>
-                  {m.member_status !== 'official' && (
-                    <button
-                      onClick={() => unlockMembership(m.email)}
-                      className="text-xs border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/20 px-3 py-1 rounded-lg transition-colors"
-                    >
-                      Make Official
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
           </div>
-        )}
+
+          {/* Recent orders */}
+          <div>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>RECENT ORDERS</div>
+            <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden' }}>
+              {loading ? (
+                <div style={{ padding: '32px 18px', textAlign: 'center', ...FB, fontSize: 13, color: '#6B7280' }}>Loading...</div>
+              ) : recentOrders.length === 0 ? (
+                <div style={{ padding: '32px 18px', textAlign: 'center', ...FB, fontSize: 13, color: '#6B7280' }}>No orders yet.</div>
+              ) : recentOrders.map((o: any, i: number) => {
+                const isProof = o.payment_status === 'proof_uploaded';
+                const isConfirmed = o.payment_status === 'payment_confirmed';
+                const dotColor = isProof ? '#F97316' : isConfirmed ? '#22C55E' : '#6B7280';
+                return (
+                  <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderBottom: i < recentOrders.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.product_name}</div>
+                      <div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{o.member_name}</div>
+                    </div>
+                    <div style={{ ...FB, fontSize: 11, color: '#6B7280', flexShrink: 0 }}>{new Date(o.created_at).toLocaleDateString()}</div>
+                  </div>
+                );
+              })}
+              <div style={{ padding: '10px 18px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                <a href="/admin/orders" style={{ ...F, fontSize: 12, letterSpacing: 2, color: '#DC2626', textDecoration: 'none' }}>VIEW ALL ORDERS →</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* All modules grid */}
+        <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>ALL MODULES</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+          {NAV.map(m => (
+            <a key={m.href} href={m.href} style={{ textDecoration: 'none' }}>
+              <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px 14px', cursor: 'pointer', transition: 'border-color 0.15s, transform 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.35)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              >
+                <div style={{ fontSize: 22, marginBottom: 8 }}>{m.icon}</div>
+                <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', letterSpacing: 1, marginBottom: 2 }}>{m.label}</div>
+                <div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{m.desc}</div>
+              </div>
+            </a>
+          ))}
+        </div>
+
       </div>
     </div>
   );
