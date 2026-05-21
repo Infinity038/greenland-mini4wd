@@ -5,106 +5,90 @@ import { supabase } from '@/lib/supabase';
 const ADMIN_PASSWORD = 'mini4wd2026';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
-const STATUS_COLORS: Record<string,string> = { upcoming:'#3B82F6', ongoing:'#22C55E', completed:'#6B7280', cancelled:'#DC2626' };
+const SC: Record<string,string> = {upcoming:'#3B82F6',ongoing:'#22C55E',completed:'#6B7280',cancelled:'#DC2626'};
 const STATUSES = ['upcoming','ongoing','completed','cancelled'];
-const EMPTY = { name:'', date:'', location:'Nuuk Community Hall', type:'box_stock', ticket_price_dkk:60, max_participants:16, status:'upcoming' };
-const inp = (extra?: any) => ({ width:'100%', background:'#050505', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'11px 14px', color:'#F5F5F5', fontFamily:"'DM Sans',sans-serif", fontSize:14, outline:'none', boxSizing:'border-box' as const, ...extra });
+const inp = (x?:any) => ({width:'100%',background:'#050505',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'11px 14px',color:'#F5F5F5',fontFamily:"'DM Sans',sans-serif",fontSize:14,outline:'none',boxSizing:'border-box' as const,...x});
+
+function checkAuth(){if(typeof window==='undefined')return false;const e=localStorage.getItem('gm4wd_admin_expiry');if(!e||Date.now()>parseInt(e))return false;return localStorage.getItem('gm4wd_admin_authed')==='1';}
+function saveAuth(){localStorage.setItem('gm4wd_admin_authed','1');localStorage.setItem('gm4wd_admin_expiry',String(Date.now()+8*60*60*1000));}
+
+function LoginScreen({title,onLogin}:{title:string;onLogin:()=>void}){
+  const [pw,setPw]=useState('');const [error,setError]=useState(false);
+  const login=()=>{if(pw===ADMIN_PASSWORD){saveAuth();onLogin();}else setError(true);};
+  return(<div style={{minHeight:'100vh',background:'#050505',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}><div style={{width:'100%',maxWidth:380}}><div style={{textAlign:'center',marginBottom:28}}><a href="/admin" style={{textDecoration:'none'}}><div style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:48,height:48,background:'#DC2626',borderRadius:12,...F,fontWeight:900,fontSize:20,color:'#fff',marginBottom:12}}>4W</div></a><div style={{...F,fontWeight:900,fontSize:22,color:'#F5F5F5',letterSpacing:2}}>ADMIN ACCESS</div><div style={{...FB,fontSize:12,color:'#6B7280',marginTop:4}}>{title}</div></div><div style={{background:'#071426',border:'1px solid rgba(255,255,255,0.08)',borderRadius:18,padding:'28px 24px'}}><input type="password" value={pw} onChange={e=>{setPw(e.target.value);setError(false);}} onKeyDown={e=>e.key==='Enter'&&login()} placeholder="Admin password" autoFocus style={{width:'100%',background:'#050505',border:`1px solid ${error?'#DC2626':'rgba(255,255,255,0.1)'}`,borderRadius:10,padding:'13px 16px',color:'#F5F5F5',...FB,fontSize:14,outline:'none',boxSizing:'border-box',marginBottom:error?8:16}}/>{error&&<div style={{...FB,fontSize:13,color:'#DC2626',marginBottom:12}}>⚠ Incorrect password.</div>}<button onClick={login} style={{width:'100%',background:'#DC2626',color:'#fff',border:'none',borderRadius:10,padding:'13px',...F,fontWeight:900,fontSize:17,letterSpacing:2,cursor:'pointer'}}>LOGIN →</button><div style={{textAlign:'center',marginTop:12}}><a href="/admin" style={{...FB,fontSize:12,color:'#6B7280',textDecoration:'none'}}>← Dashboard</a></div></div></div></div>);
+}
 
 export default function AdminTournamentsPage() {
-  const [authed, setAuthed] = useState(false);
-  const [pw, setPw] = useState('');
-  const [tournaments, setTournaments] = useState<any[]>([]);
-  const [editing, setEditing] = useState<any>(null);
-  const [saving, setSaving] = useState(false);
+  const [authed,setAuthed]=useState(false);const [checked,setChecked]=useState(false);
+  const [tournaments,setTournaments]=useState<any[]>([]);const [editing,setEditing]=useState<any>(null);const [saving,setSaving]=useState(false);
+  const EMPTY={name:'',date:'',location:'Nuuk Community Hall',type:'box_stock',ticket_price_dkk:60,max_participants:16,status:'upcoming'};
 
-  const login = () => { if (pw === ADMIN_PASSWORD) { setAuthed(true); fetch(); } };
-  const fetch = async () => { const { data } = await supabase.from('tournaments').select('*').order('date', { ascending: true }); setTournaments(data || []); };
-  const save = async () => {
-    if (!editing) return; setSaving(true);
-    if (editing.id) await supabase.from('tournaments').update(editing).eq('id', editing.id);
-    else await supabase.from('tournaments').insert({ ...editing });
-    await fetch(); setEditing(null); setSaving(false);
-  };
-  const del = async (id: string) => { if (!confirm('Delete?')) return; await supabase.from('tournaments').delete().eq('id', id); await fetch(); };
-  const quickStatus = async (id: string, status: string) => { await supabase.from('tournaments').update({ status }).eq('id', id); await fetch(); };
+  useEffect(()=>{const ok=checkAuth();setAuthed(ok);setChecked(true);if(ok)fetch();},[]);
+  const fetch=async()=>{const{data}=await supabase.from('tournaments').select('*').order('date',{ascending:true});setTournaments(data||[]);};
+  const save=async()=>{if(!editing)return;setSaving(true);if(editing.id)await supabase.from('tournaments').update(editing).eq('id',editing.id);else await supabase.from('tournaments').insert({...editing});await fetch();setEditing(null);setSaving(false);};
+  const del=async(id:string)=>{if(!confirm('Delete?'))return;await supabase.from('tournaments').delete().eq('id',id);await fetch();};
+  const qs=async(id:string,status:string)=>{await supabase.from('tournaments').update({status}).eq('id',id);await fetch();};
 
-  if (!authed) return (
-    <div style={{ minHeight:'100vh', background:'#050505', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-      <div style={{ background:'#071426', border:'1px solid rgba(255,255,255,0.08)', borderRadius:18, padding:'32px 28px', width:'100%', maxWidth:380 }}>
-        <div style={{ ...F, fontWeight:900, fontSize:24, color:'#F5F5F5', marginBottom:24 }}>ADMIN ACCESS</div>
-        <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key==='Enter'&&login()} placeholder="Password"
-          style={{ width:'100%', background:'#050505', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'13px 16px', color:'#F5F5F5', ...FB, fontSize:14, outline:'none', boxSizing:'border-box', marginBottom:14 }} />
-        <button onClick={login} style={{ width:'100%', background:'#DC2626', color:'#fff', border:'none', borderRadius:10, padding:'13px', ...F, fontWeight:900, fontSize:17, letterSpacing:2, cursor:'pointer' }}>LOGIN →</button>
-      </div>
-    </div>
-  );
+  if(!checked)return null;
+  if(!authed)return<LoginScreen title="Manage Tournaments" onLogin={()=>{setAuthed(true);fetch();}}/>;
 
-  return (
-    <div style={{ minHeight:'100vh', background:'#050505', color:'#F5F5F5' }}>
-      <div style={{ background:'#071426', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:56, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <a href="/admin" style={{ textDecoration:'none' }}><div style={{ width:28, height:28, background:'#DC2626', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', ...F, fontWeight:900, fontSize:12, color:'#fff' }}>4W</div></a>
-          <div style={{ ...F, fontWeight:900, fontSize:18, color:'#F5F5F5', letterSpacing:1 }}>MANAGE TOURNAMENTS</div>
+  return(
+    <div style={{minHeight:'100vh',background:'#050505',color:'#F5F5F5'}}>
+      <div style={{background:'#071426',borderBottom:'1px solid rgba(255,255,255,0.06)',padding:'0 20px',height:56,display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:50}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <a href="/admin" style={{textDecoration:'none'}}><div style={{width:28,height:28,background:'#DC2626',borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',...F,fontWeight:900,fontSize:12,color:'#fff'}}>4W</div></a>
+          <div style={{...F,fontWeight:900,fontSize:18,color:'#F5F5F5',letterSpacing:1}}>MANAGE TOURNAMENTS</div>
         </div>
-        <a href="/admin" style={{ ...FB, fontSize:12, color:'#B8C1CC', textDecoration:'none', border:'1px solid rgba(255,255,255,0.08)', borderRadius:6, padding:'6px 12px' }}>← Dashboard</a>
+        <a href="/admin" style={{...FB,fontSize:12,color:'#B8C1CC',textDecoration:'none',border:'1px solid rgba(255,255,255,0.08)',borderRadius:6,padding:'6px 12px'}}>← Dashboard</a>
       </div>
-      <div style={{ maxWidth:900, margin:'0 auto', padding:'24px 20px' }}>
-        <button onClick={() => setEditing({ ...EMPTY })} style={{ background:'#DC2626', color:'#fff', border:'none', borderRadius:8, padding:'10px 20px', ...F, fontWeight:700, fontSize:15, letterSpacing:1, cursor:'pointer', marginBottom:20 }}>+ NEW TOURNAMENT</button>
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          {tournaments.map(t => {
-            const sc = STATUS_COLORS[t.status] || '#6B7280';
-            return (
-              <div key={t.id} style={{ background:'#071426', border:'1px solid rgba(255,255,255,0.07)', borderRadius:14, padding:'20px' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', gap:12, flexWrap:'wrap', marginBottom:12 }}>
+      <div style={{maxWidth:900,margin:'0 auto',padding:'24px 20px'}}>
+        <button onClick={()=>setEditing({...EMPTY})} style={{background:'#DC2626',color:'#fff',border:'none',borderRadius:8,padding:'10px 20px',...F,fontWeight:700,fontSize:15,letterSpacing:1,cursor:'pointer',marginBottom:20}}>+ NEW TOURNAMENT</button>
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          {tournaments.map(t=>{
+            const c=SC[t.status]||'#6B7280';
+            return(
+              <div key={t.id} style={{background:'#071426',border:'1px solid rgba(255,255,255,0.07)',borderRadius:14,padding:'20px'}}>
+                <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',marginBottom:12}}>
                   <div>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
-                      <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 10px', borderRadius:20, background:sc+'22', color:sc }}>● {t.status.toUpperCase()}</span>
-                    </div>
-                    <div style={{ ...F, fontWeight:900, fontSize:22, color:'#F5F5F5', marginBottom:4 }}>{t.name}</div>
-                    <div style={{ ...FB, fontSize:13, color:'#B8C1CC' }}>
-                      📅 {t.date ? new Date(t.date).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'long',year:'numeric'}) : '—'} &nbsp;·&nbsp; 📍 {t.location}
-                    </div>
-                    <div style={{ display:'flex', gap:16, marginTop:8 }}>
-                      <div><span style={{ ...F, fontSize:10, letterSpacing:2, color:'#B8C1CC' }}>TICKET </span><span style={{ ...F, fontWeight:700, fontSize:14, color:'#FACC15' }}>{t.ticket_price_dkk} kr</span></div>
-                      <div><span style={{ ...F, fontSize:10, letterSpacing:2, color:'#B8C1CC' }}>MAX </span><span style={{ ...F, fontWeight:700, fontSize:14, color:'#F5F5F5' }}>{t.max_participants}</span></div>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}><span style={{...F,fontSize:10,letterSpacing:2,padding:'2px 10px',borderRadius:20,background:c+'22',color:c}}>● {t.status.toUpperCase()}</span></div>
+                    <div style={{...F,fontWeight:900,fontSize:22,color:'#F5F5F5',marginBottom:4}}>{t.name}</div>
+                    <div style={{...FB,fontSize:13,color:'#B8C1CC'}}>📅 {t.date?new Date(t.date).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'long',year:'numeric'}):'—'} · 📍 {t.location}</div>
+                    <div style={{display:'flex',gap:16,marginTop:8}}>
+                      <div><span style={{...F,fontSize:10,letterSpacing:2,color:'#B8C1CC'}}>TICKET </span><span style={{...F,fontWeight:700,fontSize:14,color:'#FACC15'}}>{t.ticket_price_dkk} kr</span></div>
+                      <div><span style={{...F,fontSize:10,letterSpacing:2,color:'#B8C1CC'}}>MAX </span><span style={{...F,fontWeight:700,fontSize:14,color:'#F5F5F5'}}>{t.max_participants}</span></div>
                     </div>
                   </div>
-                  <div style={{ display:'flex', gap:6 }}>
-                    <button onClick={() => setEditing(t)} style={{ ...F, fontSize:12, letterSpacing:1, padding:'8px 14px', borderRadius:6, background:'transparent', border:'1px solid rgba(255,255,255,0.15)', color:'#F5F5F5', cursor:'pointer' }}>EDIT</button>
-                    <button onClick={() => del(t.id)} style={{ ...F, fontSize:12, letterSpacing:1, padding:'8px 14px', borderRadius:6, background:'transparent', border:'1px solid rgba(220,38,38,0.3)', color:'#DC2626', cursor:'pointer' }}>DEL</button>
+                  <div style={{display:'flex',gap:6}}>
+                    <button onClick={()=>setEditing(t)} style={{...F,fontSize:12,letterSpacing:1,padding:'8px 14px',borderRadius:6,background:'transparent',border:'1px solid rgba(255,255,255,0.15)',color:'#F5F5F5',cursor:'pointer'}}>EDIT</button>
+                    <button onClick={()=>del(t.id)} style={{...F,fontSize:12,letterSpacing:1,padding:'8px 14px',borderRadius:6,background:'transparent',border:'1px solid rgba(220,38,38,0.3)',color:'#DC2626',cursor:'pointer'}}>DEL</button>
                   </div>
                 </div>
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                  {STATUSES.map(s => (
-                    <button key={s} onClick={() => quickStatus(t.id, s)} style={{ ...F, fontWeight:700, fontSize:11, letterSpacing:1, padding:'5px 12px', borderRadius:6, border:`1px solid ${STATUS_COLORS[s]}55`, background:t.status===s?STATUS_COLORS[s]+'22':'transparent', color:STATUS_COLORS[s], cursor:'pointer' }}>{s.toUpperCase()}</button>
-                  ))}
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {STATUSES.map(s=><button key={s} onClick={()=>qs(t.id,s)} style={{...F,fontWeight:700,fontSize:11,letterSpacing:1,padding:'5px 12px',borderRadius:6,border:`1px solid ${SC[s]}55`,background:t.status===s?SC[s]+'22':'transparent',color:SC[s],cursor:'pointer'}}>{s.toUpperCase()}</button>)}
                 </div>
               </div>
             );
           })}
-          {tournaments.length === 0 && <div style={{ textAlign:'center', padding:60, ...FB, color:'#B8C1CC' }}>No tournaments yet.</div>}
+          {tournaments.length===0&&<div style={{textAlign:'center',padding:60,...FB,color:'#B8C1CC'}}>No tournaments yet.</div>}
         </div>
       </div>
-      {editing && (
-        <div onClick={() => setEditing(null)} style={{ position:'fixed', inset:0, zIndex:50, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'20px 16px', overflowY:'auto' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background:'#071426', border:'1px solid rgba(255,255,255,0.1)', borderRadius:18, width:'100%', maxWidth:480, marginBottom:24 }}>
-            <div style={{ padding:'18px 22px', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <div style={{ ...F, fontWeight:900, fontSize:20, color:'#F5F5F5' }}>{editing.id?'EDIT TOURNAMENT':'NEW TOURNAMENT'}</div>
-              <button onClick={() => setEditing(null)} style={{ background:'none', border:'none', color:'#B8C1CC', fontSize:20, cursor:'pointer' }}>✕</button>
+      {editing&&(
+        <div onClick={()=>setEditing(null)} style={{position:'fixed',inset:0,zIndex:50,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'20px 16px',overflowY:'auto'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:'#071426',border:'1px solid rgba(255,255,255,0.1)',borderRadius:18,width:'100%',maxWidth:480,marginBottom:24}}>
+            <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div style={{...F,fontWeight:900,fontSize:20,color:'#F5F5F5'}}>{editing.id?'EDIT TOURNAMENT':'NEW TOURNAMENT'}</div>
+              <button onClick={()=>setEditing(null)} style={{background:'none',border:'none',color:'#B8C1CC',fontSize:20,cursor:'pointer'}}>✕</button>
             </div>
-            <div style={{ padding:22, display:'flex', flexDirection:'column', gap:14 }}>
-              <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>NAME</label><input value={editing.name} onChange={e => setEditing({...editing,name:e.target.value})} style={inp()} /></div>
-              <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>DATE & TIME</label><input type="datetime-local" value={editing.date} onChange={e => setEditing({...editing,date:e.target.value})} style={inp()} /></div>
-              <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>LOCATION</label><input value={editing.location} onChange={e => setEditing({...editing,location:e.target.value})} style={inp()} /></div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>TICKET (DKK)</label><input type="number" value={editing.ticket_price_dkk} onChange={e => setEditing({...editing,ticket_price_dkk:Number(e.target.value)})} style={inp()} /></div>
-                <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>MAX SPOTS</label><input type="number" value={editing.max_participants} onChange={e => setEditing({...editing,max_participants:Number(e.target.value)})} style={inp()} /></div>
+            <div style={{padding:22,display:'flex',flexDirection:'column',gap:14}}>
+              <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>NAME</label><input value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})} style={inp()}/></div>
+              <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>DATE & TIME</label><input type="datetime-local" value={editing.date} onChange={e=>setEditing({...editing,date:e.target.value})} style={inp()}/></div>
+              <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>LOCATION</label><input value={editing.location} onChange={e=>setEditing({...editing,location:e.target.value})} style={inp()}/></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>TICKET (DKK)</label><input type="number" value={editing.ticket_price_dkk} onChange={e=>setEditing({...editing,ticket_price_dkk:Number(e.target.value)})} style={inp()}/></div>
+                <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>MAX SPOTS</label><input type="number" value={editing.max_participants} onChange={e=>setEditing({...editing,max_participants:Number(e.target.value)})} style={inp()}/></div>
               </div>
-              <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>STATUS</label>
-                <select value={editing.status} onChange={e => setEditing({...editing,status:e.target.value})} style={inp()}>{STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-              <button onClick={save} disabled={saving} style={{ background:'#DC2626', color:'#fff', border:'none', borderRadius:10, padding:'13px', ...F, fontWeight:900, fontSize:17, letterSpacing:2, cursor:'pointer', opacity:saving?0.6:1 }}>
-                {saving?'SAVING...':'SAVE TOURNAMENT'}
-              </button>
+              <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>STATUS</label><select value={editing.status} onChange={e=>setEditing({...editing,status:e.target.value})} style={inp()}>{STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+              <button onClick={save} disabled={saving} style={{background:'#DC2626',color:'#fff',border:'none',borderRadius:10,padding:'13px',...F,fontWeight:900,fontSize:17,letterSpacing:2,cursor:'pointer',opacity:saving?0.6:1}}>{saving?'SAVING...':'SAVE TOURNAMENT'}</button>
             </div>
           </div>
         </div>
