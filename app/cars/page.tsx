@@ -1,153 +1,85 @@
-"use client";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+'use client';
+
+import Navbar from '@/components/layout/Navbar';
+import Footer from '@/components/layout/Footer';
+
+const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
+const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
 const CHASSIS = [
   {
-    id: "ar",
-    name: "AR Chassis",
-    full: "Avante R",
-    speed: 4,
+    id: 'AR',
+    name: 'AR Chassis',
+    full: 'Aero Racing',
+    color: '#DC2626',
+    badge: 'MOST POPULAR',
+    badgeColor: '#22C55E',
+    summary: 'Wide, stable, and forgiving. The best all-rounder for beginners and competitive racers alike.',
+    pros: ['Wide body = great stability', 'Easy to tune', 'Lots of parts available', 'Great for box stock racing'],
+    cons: ['Slightly heavier than narrow chassis', 'Less cornering speed at high tune'],
+    ideal: 'Beginners, Box Stock racing, everyday racers',
     difficulty: 1,
-    for: "Beginners & Competitive",
-    price_boxed: 280,
-    price_built: 450,
-    badge: "RECOMMENDED",
-    badgeColor: "#16A34A",
-    desc: "The most popular chassis for box stock racing. Excellent stability, wide parts support, and forgiving on tight tracks. Best starting point for new racers.",
-    specs: ["Rear-wheel drive", "Wide stance", "Great cornering", "Easy to tune"],
   },
   {
-    id: "ma",
-    name: "MA Chassis",
-    full: "Mid-Motor All-Wheel",
-    speed: 4,
+    id: 'MA',
+    name: 'MA Chassis',
+    full: 'Mid All',
+    color: '#3B82F6',
+    badge: 'BALANCED',
+    badgeColor: '#3B82F6',
+    summary: 'Mid-motor layout with excellent balance. A favorite among intermediate racers for technical tracks.',
+    pros: ['Balanced weight distribution', 'Good for technical/winding tracks', 'Responsive handling'],
+    cons: ['Slightly harder to tune than AR', 'Narrower = more sensitive to rough tracks'],
+    ideal: 'Intermediate racers, Technical track layouts',
     difficulty: 2,
-    for: "Intermediate Racers",
-    price_boxed: 260,
-    price_built: 420,
-    badge: "POPULAR",
-    badgeColor: "#2563EB",
-    desc: "Mid-motor layout gives excellent weight balance and handling consistency. A favorite for competitive box stock events.",
-    specs: ["Mid-motor AWD", "Balanced weight", "Low center of gravity", "Race proven"],
   },
   {
-    id: "vs",
-    name: "VS Chassis",
-    full: "Victorysaurus",
-    speed: 5,
+    id: 'MS',
+    name: 'MS Chassis',
+    full: 'Mid Ship',
+    color: '#A855F7',
+    badge: 'HIGH SPEED',
+    badgeColor: '#A855F7',
+    summary: 'Mid-ship motor gives excellent weight balance and acceleration. Popular in competition.',
+    pros: ['Excellent acceleration', 'Good weight balance', 'Competition favorite'],
+    cons: ['More complex to maintain', 'Less beginner-friendly'],
+    ideal: 'Intermediate to advanced, Speed-focused racing',
     difficulty: 3,
-    for: "Experienced Racers",
-    price_boxed: 270,
-    price_built: 440,
-    badge: "FAST",
-    badgeColor: "#DC2626",
-    desc: "Lightweight and built for speed. The VS chassis excels on high-speed tracks with its slim, aerodynamic profile.",
-    specs: ["Lightweight body", "Speed focused", "Slim profile", "High top speed"],
   },
   {
-    id: "fma",
-    name: "FM-A Chassis",
-    full: "Front Motor A",
-    speed: 4,
-    difficulty: 3,
-    for: "Advanced Racers",
-    price_boxed: 265,
-    price_built: 435,
-    badge: "UNIQUE",
-    badgeColor: "#7C3AED",
-    desc: "Front-motor layout creates a unique handling characteristic unlike any other chassis. For racers who want to stand out.",
-    specs: ["Front-motor drive", "Unique handling", "Good acceleration", "Advanced tuning"],
+    id: 'FM-A',
+    name: 'FM-A Chassis',
+    full: 'Front Mid All',
+    color: '#F97316',
+    badge: 'UNIQUE',
+    badgeColor: '#F97316',
+    summary: 'Front-motor design creates unique handling. Cornering specialist with a distinct feel.',
+    pros: ['Great cornering characteristics', 'Low front-end weight', 'Unique tuning options'],
+    cons: ['Very different feel from other chassis', 'Not ideal for beginners'],
+    ideal: 'Experienced builders, Cornering-focused tracks',
+    difficulty: 4,
   },
   {
-    id: "s2",
-    name: "S2 Chassis",
-    full: "Super II",
-    speed: 3,
-    difficulty: 1,
-    for: "Beginners",
-    price_boxed: 240,
-    price_built: 400,
-    badge: "CLASSIC",
-    badgeColor: "#B45309",
-    desc: "The classic Super II. A timeless design that has been competitive for decades. Huge aftermarket support and beginner friendly.",
-    specs: ["Classic design", "Huge parts support", "Easy to build", "Great for learning"],
-  },
-  {
-    id: "ms",
-    name: "MS Chassis",
-    full: "Multi-Span",
-    speed: 4,
-    difficulty: 2,
-    for: "All Levels",
-    price_boxed: 275,
-    price_built: 445,
-    badge: "VERSATILE",
-    badgeColor: "#0891B2",
-    desc: "Modular design allows swapping between front, mid, and rear motor positions. Great for experimenting and learning tuning.",
-    specs: ["Modular layout", "3 motor positions", "Experimental", "Great learning tool"],
+    id: 'VS',
+    name: 'VS Chassis',
+    full: 'Vertical Side',
+    color: '#FACC15',
+    badge: 'SPECIALIST',
+    badgeColor: '#FACC15',
+    summary: 'Vertical motor layout gives extremely low center of gravity. Unique speed characteristics on smooth tracks.',
+    pros: ['Very low center of gravity', 'Excellent top speed potential', 'Distinctive design'],
+    cons: ['Niche tuning required', 'Not as versatile', 'Advanced only'],
+    ideal: 'Advanced racers, Smooth high-speed tracks',
+    difficulty: 5,
   },
 ];
 
-function SpeedDots({ value, max = 5 }: { value: number; max?: number }) {
+function DifficultyDots({ level }: { level: number }) {
   return (
-    <div style={{ display: "flex", gap: 4 }}>
-      {Array.from({ length: max }).map((_, i) => (
-        <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: i < value ? "#DC2626" : "rgba(255,255,255,0.12)" }} />
+    <div style={{ display: 'flex', gap: 4 }}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: i <= level ? '#DC2626' : 'rgba(255,255,255,0.1)' }} />
       ))}
-    </div>
-  );
-}
-
-function ChassisCard({ c }: { c: typeof CHASSIS[0] }) {
-  return (
-    <div style={{ background: "#071426", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-      {/* Image placeholder */}
-      <div style={{ background: "#0D1B2A", height: 160, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-        <div style={{ fontSize: 56 }}>🏎️</div>
-        <div style={{ position: "absolute", top: 12, left: 12, background: c.badgeColor + "22", border: `1px solid ${c.badgeColor}55`, borderRadius: 4, padding: "3px 10px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 3, color: c.badgeColor }}>
-          {c.badge}
-        </div>
-      </div>
-
-      <div style={{ padding: "20px 18px", flex: 1, display: "flex", flexDirection: "column" }}>
-        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: 4, color: "#DC2626", marginBottom: 4 }}>{c.full.toUpperCase()}</div>
-        <h3 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 24, color: "#F5F5F5", margin: "0 0 12px" }}>{c.name}</h3>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-          <div>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: 3, color: "#B8C1CC", marginBottom: 5 }}>SPEED</div>
-            <SpeedDots value={c.speed} />
-          </div>
-          <div>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: 3, color: "#B8C1CC", marginBottom: 5 }}>DIFFICULTY</div>
-            <SpeedDots value={c.difficulty} />
-          </div>
-        </div>
-
-        <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", lineHeight: 1.6, margin: "0 0 14px", flex: 1 }}>{c.desc}</p>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 16 }}>
-          {c.specs.map(s => (
-            <span key={s} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4, padding: "3px 8px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: 2, color: "#B8C1CC" }}>{s}</span>
-          ))}
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
-          <div style={{ background: "#050505", borderRadius: 6, padding: "10px", textAlign: "center" }}>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: 2, color: "#B8C1CC", marginBottom: 3 }}>BOXED KIT</div>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 18, color: "#F5F5F5" }}>DKK {c.price_boxed}</div>
-          </div>
-          <div style={{ background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)", borderRadius: 6, padding: "10px", textAlign: "center" }}>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: 2, color: "#B8C1CC", marginBottom: 3 }}>RACE READY</div>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 18, color: "#DC2626" }}>DKK {c.price_built}</div>
-          </div>
-        </div>
-
-        <a href="/shop" style={{ display: "block", width: "100%", background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "12px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: 2, cursor: "pointer", textAlign: "center", textDecoration: "none", boxSizing: "border-box" }}>
-          PREORDER →
-        </a>
-      </div>
     </div>
   );
 }
@@ -156,74 +88,155 @@ export default function CarsPage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "#050505", color: "#F5F5F5", paddingTop: 60 }}>
+      <main style={{ background: '#050505', color: '#F5F5F5', paddingTop: 60 }}>
 
         {/* Hero */}
-        <section style={{ background: "#071426", borderBottom: "1px solid rgba(220,38,38,0.2)", padding: "64px 24px 56px", textAlign: "center" }}>
-          <div style={{ maxWidth: 640, margin: "0 auto" }}>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 12 }}>CHASSIS GUIDE</div>
-            <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(42px, 9vw, 80px)", color: "#F5F5F5", lineHeight: 0.95, marginBottom: 16 }}>
-              TAMIYA<br /><span style={{ color: "#DC2626" }}>MINI 4WD</span><br />CARS
-            </h1>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "#B8C1CC", lineHeight: 1.7, maxWidth: 480, margin: "0 auto 28px" }}>
-              All chassis are box stock legal for our weekly tournaments. Choose your weapon.
+        <section style={{ background: '#071426', borderBottom: '1px solid rgba(220,38,38,0.2)', padding: '56px 24px 48px', textAlign: 'center' }}>
+          <div style={{ maxWidth: 700, margin: '0 auto' }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 12 }}>BEGINNER GUIDE</div>
+            <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(40px, 10vw, 80px)', color: '#F5F5F5', margin: '0 0 16px', lineHeight: 0.95 }}>MINI 4WD CARS & CHASSIS</h1>
+            <p style={{ ...FB, fontSize: 16, color: '#B8C1CC', lineHeight: 1.7, margin: '0 auto', maxWidth: 560 }}>
+              Everything you need to know about Tamiya Mini 4WD — what they are, how they work, and which chassis is right for you.
             </p>
-            <a href="/shop" style={{ display: "inline-block", background: "#DC2626", color: "#fff", padding: "13px 32px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 2, textDecoration: "none" }}>
-              PREORDER A CAR →
-            </a>
           </div>
         </section>
 
-        {/* Beginner tip */}
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px 0" }}>
-          <div style={{ background: "rgba(250,204,21,0.05)", border: "1px solid rgba(250,204,21,0.15)", borderRadius: 10, padding: "16px 20px", display: "flex", gap: 12, alignItems: "flex-start" }}>
-            <span style={{ fontSize: 20, flexShrink: 0 }}>💡</span>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#FACC15", margin: 0, lineHeight: 1.6 }}>
-              <strong>New to Mini 4WD?</strong> Start with the AR or S2 chassis. Both are beginner friendly, widely available, and fully legal for box stock tournaments. Race ready builds are assembled and tested — just add batteries and race.
-            </p>
-          </div>
-        </div>
+        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '56px 24px' }}>
 
-        {/* Chassis grid */}
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 24px 80px" }}>
-          <div style={{ textAlign: "center", marginBottom: 40 }}>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#DC2626", marginBottom: 8 }}>ALL CHASSIS</div>
-            <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(28px, 5vw, 48px)", color: "#F5F5F5", margin: 0 }}>CHOOSE YOUR CHASSIS</h2>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 }}>
-            {CHASSIS.map(c => <ChassisCard key={c.id} c={c} />)}
-          </div>
-        </div>
-
-        {/* Box stock rules section */}
-        <div style={{ background: "#071426", borderTop: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "56px 24px" }}>
-          <div style={{ maxWidth: 800, margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: 40 }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: 5, color: "#FACC15", marginBottom: 8 }}>TOURNAMENT RULES</div>
-              <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(28px, 5vw, 48px)", color: "#F5F5F5", margin: 0 }}>BOX STOCK RULES</h2>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+          {/* What is Mini 4WD */}
+          <div style={{ marginBottom: 64 }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 12 }}>THE BASICS</div>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 'clamp(28px, 6vw, 52px)', color: '#F5F5F5', margin: '0 0 24px' }}>WHAT IS TAMIYA MINI 4WD?</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
               {[
-                { icon: "📦", title: "Unmodified Kit", desc: "Car must be built straight from the box. No aftermarket parts." },
-                { icon: "🔋", title: "Alkaline AA Only", desc: "Standard alkaline AA batteries only. No rechargeables or lithium." },
-                { icon: "🏁", title: "Any Tamiya Chassis", desc: "All official Tamiya chassis are allowed. No third-party frames." },
-                { icon: "✅", title: "Members Only", desc: "Must be a registered club member to enter tournaments." },
-              ].map(r => (
-                <div key={r.title} style={{ background: "#050505", borderRadius: 10, padding: "22px 18px" }}>
-                  <div style={{ fontSize: 24, marginBottom: 10 }}>{r.icon}</div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, color: "#F5F5F5", marginBottom: 6 }}>{r.title}</div>
-                  <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", lineHeight: 1.6, margin: 0 }}>{r.desc}</p>
+                { icon: '🏎️', title: 'Self-Powered Race Cars', body: 'Mini 4WD cars are small motorized toy cars powered by standard AA batteries. They race on dedicated tracks at high speed with no remote control — just pure engineering.' },
+                { icon: '🔧', title: 'Build & Tune', body: 'You assemble them yourself from a kit. The fun is in building, tuning, and improving your car over time. No two cars are exactly the same.' },
+                { icon: '🏁', title: 'Competitive Racing', body: 'Tamiya Mini 4WD has a massive global racing scene with official tournaments, speed records, and dedicated communities worldwide.' },
+                { icon: '🌍', title: 'Now in Greenland', body: 'Greenland Mini 4WD Club is bringing this hobby to Nuuk — race events, community building, and a place for Filipinos and locals to connect.' },
+              ].map(c => (
+                <div key={c.title} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '24px 20px' }}>
+                  <div style={{ fontSize: 28, marginBottom: 12 }}>{c.icon}</div>
+                  <div style={{ ...F, fontWeight: 700, fontSize: 18, color: '#F5F5F5', marginBottom: 8 }}>{c.title}</div>
+                  <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.6, margin: 0 }}>{c.body}</p>
                 </div>
               ))}
             </div>
-            <div style={{ textAlign: "center", marginTop: 36 }}>
-              <a href="/tournament" style={{ display: "inline-block", background: "transparent", color: "#F5F5F5", padding: "13px 32px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 2, textDecoration: "none", border: "1px solid rgba(255,255,255,0.15)" }}>
-                VIEW TOURNAMENT INFO →
-              </a>
+          </div>
+
+          {/* What is Box Stock */}
+          <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 16, padding: '32px 28px', marginBottom: 64 }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>OUR RACE FORMAT</div>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 'clamp(24px, 5vw, 40px)', color: '#F5F5F5', margin: '0 0 16px' }}>WHAT IS BOX STOCK RACING?</h2>
+            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', lineHeight: 1.7, marginBottom: 20 }}>
+              Box Stock means your car must run exactly as it comes from the box — no modifications allowed. Same motor, same gears, same rollers. The only variable is your car choice and how well you assemble it.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+              {[
+                { icon: '✅', text: 'Any official Tamiya chassis' },
+                { icon: '✅', text: 'Stock motor (unmodified)' },
+                { icon: '✅', text: 'Stock gears' },
+                { icon: '✅', text: 'Stock rollers' },
+                { icon: '✅', text: 'Alkaline AA batteries only' },
+                { icon: '❌', text: 'No cutting or drilling' },
+                { icon: '❌', text: 'No motor modifications' },
+                { icon: '❌', text: 'No rechargeable batteries' },
+              ].map(r => (
+                <div key={r.text} style={{ ...FB, fontSize: 14, color: r.icon === '✅' ? '#B8C1CC' : '#6B7280', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>{r.icon}</span> {r.text}
+                </div>
+              ))}
             </div>
           </div>
-        </div>
 
+          {/* Chassis guide */}
+          <div style={{ marginBottom: 64 }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 12 }}>CHASSIS GUIDE</div>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 'clamp(28px, 6vw, 52px)', color: '#F5F5F5', margin: '0 0 8px' }}>CHOOSE YOUR CHASSIS</h2>
+            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 32 }}>The chassis is the backbone of your Mini 4WD. Each has unique characteristics. For Box Stock racing, any official Tamiya chassis is allowed.</p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {CHASSIS.map(c => (
+                <div key={c.id} style={{ background: '#071426', border: `1px solid ${c.color}22`, borderRadius: 16, padding: 24, borderLeft: `3px solid ${c.color}` }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                        <span style={{ ...F, fontWeight: 900, fontSize: 28, color: c.color }}>{c.id}</span>
+                        <span style={{ ...F, fontSize: 11, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: c.badgeColor + '22', color: c.badgeColor, border: `1px solid ${c.badgeColor}44` }}>{c.badge}</span>
+                      </div>
+                      <div style={{ ...F, fontWeight: 700, fontSize: 18, color: '#F5F5F5', marginBottom: 2 }}>{c.name} <span style={{ color: '#B8C1CC', fontSize: 14, fontWeight: 400 }}>({c.full})</span></div>
+                      <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', margin: '8px 0 0', lineHeight: 1.5, maxWidth: 500 }}>{c.summary}</p>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#B8C1CC', marginBottom: 6 }}>DIFFICULTY</div>
+                      <DifficultyDots level={c.difficulty} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                      <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#22C55E', marginBottom: 6 }}>PROS</div>
+                      {c.pros.map(p => <div key={p} style={{ ...FB, fontSize: 13, color: '#B8C1CC', display: 'flex', gap: 6, marginBottom: 3 }}><span style={{ color: '#22C55E' }}>+</span>{p}</div>)}
+                    </div>
+                    <div>
+                      <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#DC2626', marginBottom: 6 }}>CONS</div>
+                      {c.cons.map(p => <div key={p} style={{ ...FB, fontSize: 13, color: '#B8C1CC', display: 'flex', gap: 6, marginBottom: 3 }}><span style={{ color: '#DC2626' }}>−</span>{p}</div>)}
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12, ...F, fontSize: 12, letterSpacing: 2, color: c.color }}>IDEAL FOR: <span style={{ ...FB, fontSize: 13, color: '#B8C1CC', letterSpacing: 0 }}>{c.ideal}</span></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Boxed vs Built */}
+          <div style={{ marginBottom: 64 }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 12 }}>BUYING OPTIONS</div>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 'clamp(24px, 5vw, 44px)', color: '#F5F5F5', margin: '0 0 20px' }}>BOXED KIT vs BUILT/READY</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+              <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 28 }}>
+                <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#F5F5F5', marginBottom: 4 }}>🔧 BOXED KIT</div>
+                <div style={{ ...F, fontSize: 12, letterSpacing: 2, color: '#B8C1CC', marginBottom: 16 }}>BUILD IT YOURSELF</div>
+                <ul style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 2, margin: 0, paddingLeft: 0, listStyle: 'none' }}>
+                  <li>✅ You assemble the car from scratch</li>
+                  <li>✅ Learn how every part works</li>
+                  <li>✅ Lower price</li>
+                  <li>✅ Great hobby experience</li>
+                  <li>⏱️ Takes 1–3 hours to build</li>
+                  <li>🔧 Basic tools needed</li>
+                </ul>
+              </div>
+              <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 16, padding: 28, position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #DC2626, transparent)' }} />
+                <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#F5F5F5', marginBottom: 4 }}>⚡ BUILT / READY-TO-RACE</div>
+                <div style={{ ...F, fontSize: 12, letterSpacing: 2, color: '#DC2626', marginBottom: 16 }}>ASSEMBLED + TESTED</div>
+                <ul style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 2, margin: 0, paddingLeft: 0, listStyle: 'none' }}>
+                  <li>✅ Fully assembled by our team</li>
+                  <li>✅ Tested and race-ready</li>
+                  <li>✅ Race the same day you pick it up</li>
+                  <li>✅ Perfect if you're new to building</li>
+                  <li>💰 Higher price (assembly included)</li>
+                  <li>🏁 Best for first race day</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Beginner recommendation */}
+          <div style={{ background: 'linear-gradient(135deg, #071426, #0D1B2A)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 20, padding: '36px 32px', textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🤔</div>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 'clamp(24px, 5vw, 40px)', color: '#F5F5F5', margin: '0 0 16px' }}>NOT SURE WHAT TO BUY FIRST?</h2>
+            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', lineHeight: 1.7, maxWidth: 500, margin: '0 auto 28px' }}>
+              We recommend starting with an <strong style={{ color: '#F5F5F5' }}>AR Chassis</strong> — either the Ray Spear or Flame Astute. It's the most beginner-friendly, has great parts availability, and is competitive in Box Stock racing.
+            </p>
+            <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', margin: '0 auto 28px', maxWidth: 460 }}>
+              If you've never built a Mini 4WD before, consider the <strong style={{ color: '#DC2626' }}>Built/Ready version</strong> — we'll assemble and test it for you so you can race immediately.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <a href="/shop" style={{ background: '#DC2626', color: '#fff', padding: '14px 32px', borderRadius: 10, ...F, fontWeight: 900, fontSize: 17, letterSpacing: 2, textDecoration: 'none' }}>SHOP NOW →</a>
+              <a href="/tournament" style={{ background: 'transparent', color: '#F5F5F5', padding: '14px 32px', borderRadius: 10, ...F, fontWeight: 700, fontSize: 17, letterSpacing: 2, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.15)' }}>SEE RACE RULES</a>
+            </div>
+          </div>
+
+        </div>
       </main>
       <Footer />
     </>

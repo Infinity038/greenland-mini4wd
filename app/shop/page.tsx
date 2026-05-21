@@ -1,248 +1,248 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { getMemberData, isRegistered, generatePaymentRef } from '@/lib/member';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect } from 'react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-
-const PRODUCTS = [
-  { id: 'ar-boxed', name: 'Tamiya AR Chassis Kit', chassis: 'AR', type: 'boxed', price_dkk: 280, description: 'Build-your-own AR chassis. Great beginner kit with wide compatibility.', badge: 'POPULAR', badgeColor: '#22C55E' },
-  { id: 'ma-boxed', name: 'Tamiya MA Chassis Kit', chassis: 'MA', type: 'boxed', price_dkk: 290, description: 'Mid-range all-rounder. Ideal for technical tracks.', badge: null, badgeColor: null },
-  { id: 'vs-boxed', name: 'Tamiya VS Chassis Kit', chassis: 'VS', type: 'boxed', price_dkk: 295, description: 'Vertical layout for low center of gravity and speed.', badge: null, badgeColor: null },
-  { id: 'ar-built', name: 'AR Race-Ready (Built)', chassis: 'AR', type: 'built', price_dkk: 450, description: 'Assembled, tuned, and tested. Race the same day you pick it up.', badge: 'READY TO RACE', badgeColor: '#DC2626' },
-  { id: 'ms-boxed', name: 'Tamiya MS Chassis Kit', chassis: 'MS', type: 'boxed', price_dkk: 310, description: 'Mid-ship layout for balance and acceleration.', badge: 'PREORDER', badgeColor: '#FACC15' },
-  { id: 'fma-boxed', name: 'Tamiya FM-A Chassis Kit', chassis: 'FM-A', type: 'boxed', price_dkk: 300, description: 'Front motor for unique handling. Great for experienced builders.', badge: 'PREORDER', badgeColor: '#FACC15' },
-];
-
-type ModalStep = 'confirm' | 'payment' | 'upload' | 'done';
+import { isRegistered } from '@/lib/member';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
-export default function ShopPage() {
-  const [member, setMember] = useState<any>(null);
-  const [selected, setSelected] = useState<typeof PRODUCTS[0] | null>(null);
-  const [step, setStep] = useState<ModalStep>('confirm');
-  const [orderId, setOrderId] = useState('');
-  const [payRef, setPayRef] = useState('');
-  const [proofFile, setProofFile] = useState<File | null>(null);
-  const [proofPreview, setProofPreview] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
-  const fileRef = useRef<HTMLInputElement>(null);
+function PrizeCalculator() {
+  const [ticketPrice, setTicketPrice] = useState(60);
+  const [paidTickets, setPaidTickets] = useState(16);
+  const [bonusTickets, setBonusTickets] = useState(2);
 
-  useEffect(() => { setMember(getMemberData()); }, []);
+  const totalPaidSales = ticketPrice * paidTickets;
+  const organizer = Math.round(totalPaidSales * 0.30);
+  const prizePool = Math.round(totalPaidSales * 0.70);
+  const first = Math.round(prizePool * 0.65);
+  const second = Math.round(prizePool * 0.25);
+  const third = Math.round(prizePool * 0.10);
+  const totalRacers = paidTickets + bonusTickets;
 
-  const openModal = (product: typeof PRODUCTS[0]) => {
-    if (!isRegistered()) { window.location.href = '/register'; return; }
-    setSelected(product);
-    setStep('confirm');
-    setOrderId(''); setPayRef(''); setProofFile(null); setProofPreview(null); setError('');
+  const inp: React.CSSProperties = {
+    background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+    padding: '12px 16px', color: '#F5F5F5', fontSize: 20, fontWeight: 700, width: '100%',
+    outline: 'none', fontFamily: "'Barlow Condensed', sans-serif", boxSizing: 'border-box',
   };
 
-  const placeOrder = async () => {
-    if (!selected || !member) return;
-    setUploading(true); setError('');
-    try {
-      const { data, error: err } = await supabase.from('orders').insert({
-        member_email: member.email, member_name: member.name,
-        product_name: selected.name, chassis: selected.chassis, type: selected.type,
-        status: 'pending', payment_status: 'awaiting_payment',
-        notes: `Price: ${selected.price_dkk} DKK`,
-      }).select().single();
-      if (err || !data) throw new Error('Order failed');
-      const ref = generatePaymentRef(data.id);
-      await supabase.from('orders').update({ payment_reference: ref }).eq('id', data.id);
-      setOrderId(data.id); setPayRef(ref); setStep('payment');
-    } catch { setError('Something went wrong. Please try again.'); }
-    setUploading(false);
-  };
+  return (
+    <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 16, padding: '32px 24px' }}>
+      <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 6 }}>LIVE CALCULATOR</div>
+      <h3 style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', marginBottom: 28, marginTop: 0 }}>PRIZE POOL ESTIMATOR</h3>
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setProofFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => setProofPreview(reader.result as string);
-    reader.readAsDataURL(file);
-  };
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16, marginBottom: 24 }}>
+        <div>
+          <label style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', display: 'block', marginBottom: 8 }}>TICKET PRICE (DKK)</label>
+          <input type="number" value={ticketPrice} min={10} onChange={e => setTicketPrice(Number(e.target.value))} style={inp} />
+        </div>
+        <div>
+          <label style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', display: 'block', marginBottom: 8 }}>PAID TICKETS</label>
+          <input type="number" value={paidTickets} min={2} onChange={e => setPaidTickets(Number(e.target.value))} style={inp} />
+        </div>
+        <div>
+          <label style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', display: 'block', marginBottom: 8 }}>BONUS TICKETS</label>
+          <input type="number" value={bonusTickets} min={0} onChange={e => setBonusTickets(Number(e.target.value))} style={inp} />
+        </div>
+      </div>
 
-  const uploadProof = async () => {
-    if (!proofFile || !orderId) return;
-    setUploading(true); setError('');
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      try {
-        const base64 = reader.result as string;
-        await supabase.from('payment_proofs').insert({ order_id: orderId, member_email: member.email, proof_url: base64, status: 'pending' });
-        await supabase.from('orders').update({ payment_status: 'proof_uploaded' }).eq('id', orderId);
-        setStep('done');
-      } catch { setError('Upload failed. Try again.'); }
-      setUploading(false);
-    };
-    reader.readAsDataURL(proofFile);
-  };
+      <div style={{ background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.15)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, ...FB, fontSize: 13, color: '#FACC15' }}>
+        ⚠️ Bonus/free tickets do NOT add to the prize pool. Only paid tickets are counted.
+      </div>
 
-  const closeModal = () => setSelected(null);
+      <div style={{ display: 'grid', gap: 10 }}>
+        <div style={{ background: '#050505', borderRadius: 10, padding: '18px 20px' }}>
+          <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 4 }}>TOTAL PAID TICKET SALES</div>
+          <div style={{ ...F, fontWeight: 900, fontSize: 36, color: '#F5F5F5' }}>DKK {totalPaidSales.toLocaleString()}</div>
+          <div style={{ ...FB, fontSize: 12, color: '#6B7280', marginTop: 4 }}>Total racers including bonus: {totalRacers}</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ background: '#050505', borderRadius: 10, padding: '16px 18px' }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', marginBottom: 4 }}>ORGANIZER/RESERVE 30%</div>
+            <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>DKK {organizer.toLocaleString()}</div>
+          </div>
+          <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 10, padding: '16px 18px' }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', marginBottom: 4 }}>PRIZE POOL 70%</div>
+            <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#DC2626' }}>DKK {prizePool.toLocaleString()}</div>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+          {[
+            { place: '🥇 1ST', pct: '65%', amount: first, color: '#FACC15' },
+            { place: '🥈 2ND', pct: '25%', amount: second, color: '#B8C1CC' },
+            { place: '🥉 3RD', pct: '10%', amount: third, color: '#DC2626' },
+          ].map(p => (
+            <div key={p.place} style={{ background: '#050505', borderRadius: 10, padding: '14px 10px', textAlign: 'center' }}>
+              <div style={{ ...F, fontWeight: 900, fontSize: 14, color: p.color, marginBottom: 2 }}>{p.place}</div>
+              <div style={{ ...F, fontSize: 11, color: '#B8C1CC', letterSpacing: 1 }}>{p.pct}</div>
+              <div style={{ ...F, fontWeight: 700, fontSize: 16, color: '#F5F5F5', marginTop: 4 }}>DKK {p.amount.toLocaleString()}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const RULES = [
+  { icon: '🎟️', title: '1 Ticket = 1 Car Entry', desc: 'Each ticket enters one car. You get 2 lives during qualification rounds.' },
+  { icon: '🚗', title: 'One Car Per Ticket', desc: 'The same car cannot be entered twice under one ticket.' },
+  { icon: '⚡', title: 'Single Elimination Finals', desc: 'Top qualifiers advance to a single elimination final round.' },
+  { icon: '📦', title: 'Box Stock Only', desc: 'Any official Tamiya chassis. Stock motor, stock gears, stock rollers. No modifications.' },
+  { icon: '🔋', title: 'Alkaline AA Only', desc: 'Only standard alkaline AA batteries. No rechargeables or modified cells.' },
+  { icon: '✅', title: 'Official Members Only', desc: 'Must hold Official Club Member status before buying race tickets or entering tournaments.' },
+];
+
+const AWARDS = [
+  { icon: '⚡', title: 'Fastest Clean Run', desc: 'Best qualifying time with zero penalties.' },
+  { icon: '🎥', title: 'Crowd Favorite Moment', desc: 'Most exciting moment voted by the community.' },
+  { icon: '🏎️', title: 'Best Lap Time', desc: 'Fastest single lap recorded during the event.' },
+  { icon: '🔥', title: 'Fastest Car of the Week', desc: 'Top speed across all heat runs.' },
+];
+
+export default function TournamentsPage() {
+  const [registered, setRegistered] = useState(false);
+
+  useEffect(() => { setRegistered(isRegistered()); }, []);
 
   return (
     <>
       <Navbar />
       <main style={{ background: '#050505', color: '#F5F5F5', paddingTop: 60 }}>
 
-        {/* Header */}
-        <section style={{ background: '#071426', borderBottom: '1px solid rgba(220,38,38,0.2)', padding: '48px 24px 40px' }}>
-          <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>SHOP</div>
-            <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px, 8vw, 64px)', color: '#F5F5F5', margin: '0 0 12px', lineHeight: 0.95 }}>MINI 4WD CARS & KITS</h1>
-            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', margin: 0 }}>Preorder only — no online payment. Pay via MobilePay after reserving. Pickup in Nuuk.</p>
+        {/* Hero */}
+        <section style={{ background: '#071426', borderBottom: '1px solid rgba(220,38,38,0.2)', padding: '72px 24px 64px', textAlign: 'center' }}>
+          <div style={{ maxWidth: 700, margin: '0 auto' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 20, padding: '5px 14px', marginBottom: 20 }}>
+              <span style={{ width: 6, height: 6, background: '#DC2626', borderRadius: '50%', display: 'inline-block' }} />
+              <span style={{ ...F, fontWeight: 600, fontSize: 10, color: '#FACC15', letterSpacing: 4 }}>OFFICIAL MEMBERS ONLY — TICKETS & RACE ENTRY</span>
+            </div>
+            <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(48px, 10vw, 96px)', color: '#F5F5F5', lineHeight: 0.9, marginBottom: 20 }}>
+              WEEKLY<br /><span style={{ color: '#DC2626' }}>BOX STOCK</span><br />TOURNAMENT
+            </h1>
+            <p style={{ ...FB, fontSize: 16, color: '#B8C1CC', lineHeight: 1.7, marginBottom: 32, maxWidth: 520, margin: '0 auto 32px' }}>
+              Real prize pools funded by ticket sales. Box stock only. Any Tamiya chassis. Alkaline AA batteries.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {registered ? (
+                <a href="/profile" style={{ background: '#DC2626', color: '#fff', padding: '14px 32px', borderRadius: 8, ...F, fontWeight: 700, fontSize: 17, letterSpacing: 2, textDecoration: 'none' }}>
+                  MY PROFILE & TICKETS →
+                </a>
+              ) : (
+                <a href="/register" style={{ background: '#DC2626', color: '#fff', padding: '14px 32px', borderRadius: 8, ...F, fontWeight: 700, fontSize: 17, letterSpacing: 2, textDecoration: 'none' }}>
+                  REGISTER FREE FIRST →
+                </a>
+              )}
+              <a href="#calculator" style={{ background: 'transparent', color: '#F5F5F5', padding: '14px 32px', borderRadius: 8, ...F, fontWeight: 700, fontSize: 17, letterSpacing: 2, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.15)' }}>
+                PRIZE CALCULATOR
+              </a>
+            </div>
           </div>
         </section>
 
-        {/* Product grid */}
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '48px 24px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
-            {PRODUCTS.map(p => (
-              <div key={p.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-                {/* Badge */}
-                {p.badge && (
-                  <div style={{ position: 'absolute', top: 0, right: 0, background: (p.badgeColor || '#fff') + '22', color: p.badgeColor || '#fff', borderLeft: `2px solid ${p.badgeColor}`, borderBottom: `2px solid ${p.badgeColor}`, padding: '4px 12px', ...F, fontSize: 11, fontWeight: 700, letterSpacing: 2, borderBottomLeftRadius: 8 }}>
-                    {p.badge}
-                  </div>
-                )}
-                {/* Chassis display */}
-                <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-                  <span style={{ ...F, fontWeight: 900, fontSize: 48, color: 'rgba(255,255,255,0.08)', letterSpacing: 4 }}>{p.chassis}</span>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '72px 24px' }}>
+
+          {/* Rules */}
+          <div style={{ marginBottom: 80 }}>
+            <div style={{ textAlign: 'center', marginBottom: 40 }}>
+              <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>FORMAT & RULES</div>
+              <h2 style={{ ...F, fontWeight: 900, fontSize: 'clamp(30px, 5vw, 52px)', color: '#F5F5F5', margin: 0 }}>HOW IT WORKS</h2>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+              {RULES.map(r => (
+                <div key={r.title} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '28px 24px' }}>
+                  <div style={{ fontSize: 28, marginBottom: 12 }}>{r.icon}</div>
+                  <div style={{ ...F, fontWeight: 700, fontSize: 18, color: '#F5F5F5', marginBottom: 8, letterSpacing: 1 }}>{r.title}</div>
+                  <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.6, margin: 0 }}>{r.desc}</p>
                 </div>
-                <div style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', marginBottom: 6 }}>
-                  {p.type === 'built' ? '⚡ BUILT & READY' : '🔧 BUILD YOURSELF'}
+              ))}
+            </div>
+          </div>
+
+          {/* Prize structure */}
+          <div style={{ marginBottom: 80 }}>
+            <div style={{ textAlign: 'center', marginBottom: 40 }}>
+              <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>PRIZE STRUCTURE</div>
+              <h2 style={{ ...F, fontWeight: 900, fontSize: 'clamp(30px, 5vw, 52px)', color: '#F5F5F5', margin: 0 }}>HOW THE MONEY WORKS</h2>
+              <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginTop: 12 }}>70% of PAID ticket sales goes to winners. Bonus/free tickets do NOT add to the prize pool.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 32 }}>
+              {[
+                { label: 'Prize Pool', pct: '70%', sub: 'Of paid ticket sales', color: '#DC2626' },
+                { label: 'Organizer/Reserve', pct: '30%', sub: 'Operations & expansion', color: '#FACC15' },
+                { label: '1st Place', pct: '65%', sub: 'Of prize pool', color: '#FACC15' },
+                { label: '2nd Place', pct: '25%', sub: 'Of prize pool', color: '#B8C1CC' },
+                { label: '3rd Place', pct: '10%', sub: 'Of prize pool', color: '#DC2626' },
+              ].map(p => (
+                <div key={p.label} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '24px 16px', textAlign: 'center' }}>
+                  <div style={{ ...F, fontWeight: 900, fontSize: 44, color: p.color, lineHeight: 1 }}>{p.pct}</div>
+                  <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', marginTop: 6 }}>{p.label}</div>
+                  <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 3 }}>{p.sub}</div>
                 </div>
-                <h3 style={{ ...F, fontWeight: 900, fontSize: 22, color: '#F5F5F5', margin: '0 0 8px' }}>{p.name}</h3>
-                <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.6, flex: 1, margin: '0 0 20px' }}>{p.description}</p>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ ...F, fontWeight: 900, fontSize: 28, color: '#FACC15' }}>{p.price_dkk} kr</span>
-                  <button
-                    onClick={() => openModal(p)}
-                    style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', ...F, fontWeight: 700, fontSize: 15, letterSpacing: 2, cursor: 'pointer' }}
-                  >
-                    RESERVE
-                  </button>
+              ))}
+            </div>
+
+            <div id="calculator"><PrizeCalculator /></div>
+          </div>
+
+          {/* Side awards */}
+          <div style={{ marginBottom: 80 }}>
+            <div style={{ textAlign: 'center', marginBottom: 40 }}>
+              <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#FACC15', marginBottom: 8 }}>COMMUNITY RECOGNITION</div>
+              <h2 style={{ ...F, fontWeight: 900, fontSize: 'clamp(30px, 5vw, 52px)', color: '#F5F5F5', margin: 0 }}>SIDE AWARDS</h2>
+              <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginTop: 12 }}>Social media shoutouts and community recognition. No physical prizes until capital is recovered.</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 16 }}>
+              {AWARDS.map(a => (
+                <div key={a.title} style={{ background: '#071426', border: '1px solid rgba(250,204,21,0.1)', borderRadius: 12, padding: '24px 20px' }}>
+                  <div style={{ fontSize: 28, marginBottom: 12 }}>{a.icon}</div>
+                  <div style={{ ...F, fontWeight: 700, fontSize: 17, color: '#FACC15', marginBottom: 8 }}>{a.title}</div>
+                  <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.6, margin: '0 0 12px' }}>{a.desc}</p>
+                  <div style={{ display: 'inline-block', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.15)', borderRadius: 4, padding: '4px 10px', ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15' }}>SOCIAL SHOUTOUT</div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          {/* Track access */}
+          <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '40px 32px', marginBottom: 48 }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>TRACK ACCESS</div>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 32, color: '#F5F5F5', marginBottom: 24, marginTop: 0 }}>TRACK & RENTAL INFO</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+              {[
+                { badge: 'OFFICIAL MEMBERS', badgeColor: '#22C55E', title: 'Tournament Entry', desc: 'Must be an Official Club Member to buy race tickets and enter tournaments. Registration alone is not enough.' },
+                { badge: 'ALL REGISTERED', badgeColor: '#3B82F6', title: 'Track Sessions', desc: 'Registered members can join casual track sessions and practice. Bring your own car or rent a house car.' },
+                { badge: 'RENTAL AVAILABLE', badgeColor: '#B8C1CC', title: 'House Cars & Batteries', desc: 'House car rental: 25 kr/hour (batteries included). Battery rental only: 15 kr. Batteries must be returned after session.' },
+              ].map(t => (
+                <div key={t.title} style={{ background: '#050505', borderRadius: 10, padding: '22px 20px' }}>
+                  <div style={{ display: 'inline-block', border: `1px solid ${t.badgeColor}40`, borderRadius: 4, padding: '3px 10px', ...F, fontSize: 10, letterSpacing: 3, color: t.badgeColor, marginBottom: 12 }}>{t.badge}</div>
+                  <div style={{ ...F, fontWeight: 700, fontSize: 18, color: '#F5F5F5', marginBottom: 8 }}>{t.title}</div>
+                  <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.6, margin: 0 }}>{t.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* CTA */}
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <h3 style={{ ...F, fontWeight: 900, fontSize: 40, color: '#F5F5F5', marginBottom: 8 }}>READY TO RACE?</h3>
+            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 28 }}>
+              {registered ? 'Buy a starter kit to unlock Official Club Member status, then purchase race tickets.' : 'Register free first. Then purchase a qualifying kit to become an Official Club Member.'}
+            </p>
+            {registered ? (
+              <a href="/shop" style={{ display: 'inline-block', background: '#DC2626', color: '#fff', padding: '16px 48px', borderRadius: 8, ...F, fontWeight: 700, fontSize: 20, letterSpacing: 3, textDecoration: 'none' }}>
+                SHOP NOW →
+              </a>
+            ) : (
+              <a href="/register" style={{ display: 'inline-block', background: '#DC2626', color: '#fff', padding: '16px 48px', borderRadius: 8, ...F, fontWeight: 700, fontSize: 20, letterSpacing: 3, textDecoration: 'none' }}>
+                REGISTER FREE →
+              </a>
+            )}
           </div>
         </div>
       </main>
-
-      {/* Modal */}
-      {selected && (
-        <div onClick={closeModal} style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
-            {/* Modal header */}
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h2 style={{ ...F, fontWeight: 900, fontSize: 22, color: '#F5F5F5', margin: 0 }}>
-                {step === 'confirm' && 'CONFIRM ORDER'}
-                {step === 'payment' && 'PAY VIA MOBILEPAY'}
-                {step === 'upload' && 'UPLOAD PROOF'}
-                {step === 'done' && 'ORDER PLACED! 🎉'}
-              </h2>
-              <button onClick={closeModal} style={{ background: 'none', border: 'none', color: '#B8C1CC', fontSize: 22, cursor: 'pointer', padding: 4 }}>✕</button>
-            </div>
-
-            <div style={{ padding: 24 }}>
-              {/* CONFIRM */}
-              {step === 'confirm' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20 }}>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5' }}>{selected.name}</div>
-                    <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', marginTop: 4 }}>{selected.description}</div>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 32, color: '#FACC15', marginTop: 12 }}>{selected.price_dkk} DKK</div>
-                  </div>
-                  <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ ...FB, fontSize: 14, color: '#B8C1CC' }}>👤 <span style={{ color: '#F5F5F5' }}>{member?.name}</span></div>
-                    <div style={{ ...FB, fontSize: 14, color: '#B8C1CC' }}>📧 <span style={{ color: '#F5F5F5' }}>{member?.email}</span></div>
-                    <div style={{ ...FB, fontSize: 14, color: '#B8C1CC' }}>📍 Pickup: Nuuk, Greenland</div>
-                    <div style={{ ...FB, fontSize: 14, color: '#B8C1CC' }}>💳 Payment: MobilePay (after reservation)</div>
-                  </div>
-                  {error && <div style={{ ...FB, fontSize: 14, color: '#DC2626' }}>{error}</div>}
-                  <button onClick={placeOrder} disabled={uploading} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 12, padding: '16px 24px', ...F, fontWeight: 900, fontSize: 18, letterSpacing: 2, cursor: 'pointer', opacity: uploading ? 0.5 : 1 }}>
-                    {uploading ? 'PLACING ORDER...' : 'RESERVE NOW →'}
-                  </button>
-                </div>
-              )}
-
-              {/* PAYMENT */}
-              {step === 'payment' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 12, padding: 20 }}>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#FACC15', marginBottom: 12 }}>💳 MOBILEPAY INSTRUCTIONS</div>
-                    <ol style={{ ...FB, fontSize: 14, color: '#F5F5F5', lineHeight: 2, margin: 0, paddingLeft: 20 }}>
-                      <li>Open MobilePay on your phone</li>
-                      <li>Send <strong>{selected.price_dkk} DKK</strong> to <strong>+299 XXXX XXXX</strong></li>
-                      <li>Use reference: <strong style={{ color: '#FACC15', fontFamily: 'monospace' }}>{payRef}</strong></li>
-                      <li>Screenshot the confirmation</li>
-                      <li>Upload it on the next step</li>
-                    </ol>
-                  </div>
-                  <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
-                    <div style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', marginBottom: 4 }}>ORDER REFERENCE</div>
-                    <div style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 24, color: '#FACC15', letterSpacing: 4 }}>{payRef}</div>
-                  </div>
-                  <button onClick={() => setStep('upload')} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 12, padding: '16px 24px', ...F, fontWeight: 900, fontSize: 18, letterSpacing: 2, cursor: 'pointer' }}>
-                    I'VE PAID — UPLOAD PROOF →
-                  </button>
-                  <button onClick={closeModal} style={{ background: 'none', border: 'none', ...FB, fontSize: 14, color: '#B8C1CC', cursor: 'pointer', padding: 8 }}>
-                    I'll pay later (order is saved)
-                  </button>
-                </div>
-              )}
-
-              {/* UPLOAD */}
-              {step === 'upload' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', margin: 0 }}>Upload your MobilePay screenshot. Admin will verify and confirm your order.</p>
-                  <div
-                    onClick={() => fileRef.current?.click()}
-                    style={{ border: '2px dashed rgba(255,255,255,0.15)', borderRadius: 12, padding: '40px 24px', textAlign: 'center', cursor: 'pointer' }}
-                  >
-                    {proofPreview
-                      ? <img src={proofPreview} alt="proof" style={{ maxHeight: 160, borderRadius: 8, margin: '0 auto', display: 'block' }} />
-                      : <>
-                          <div style={{ fontSize: 40, marginBottom: 8 }}>📷</div>
-                          <div style={{ ...F, fontWeight: 700, fontSize: 16, color: '#F5F5F5' }}>Tap to select screenshot</div>
-                          <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 4 }}>JPG, PNG, or HEIC</div>
-                        </>
-                    }
-                  </div>
-                  <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
-                  {error && <div style={{ ...FB, fontSize: 14, color: '#DC2626' }}>{error}</div>}
-                  <button onClick={uploadProof} disabled={!proofFile || uploading} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 12, padding: '16px 24px', ...F, fontWeight: 900, fontSize: 18, letterSpacing: 2, cursor: 'pointer', opacity: !proofFile || uploading ? 0.4 : 1 }}>
-                    {uploading ? 'UPLOADING...' : 'SUBMIT PROOF →'}
-                  </button>
-                </div>
-              )}
-
-              {/* DONE */}
-              {step === 'done' && (
-                <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                  <div style={{ fontSize: 56, marginBottom: 16 }}>🏁</div>
-                  <h3 style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', margin: '0 0 12px' }}>PROOF SUBMITTED!</h3>
-                  <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', marginBottom: 20 }}>Admin will verify your payment and confirm your order.</p>
-                  <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
-                    <div style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', marginBottom: 4 }}>REFERENCE</div>
-                    <div style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 20, color: '#FACC15' }}>{payRef}</div>
-                  </div>
-                  <a href="/profile" style={{ display: 'block', background: '#DC2626', color: '#fff', borderRadius: 12, padding: '16px 24px', ...F, fontWeight: 900, fontSize: 18, letterSpacing: 2, textDecoration: 'none' }}>
-                    VIEW MY ORDERS →
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       <Footer />
     </>
   );
