@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { saveMemberData } from "@/lib/member";
@@ -25,12 +25,19 @@ export default function RegisterPage() {
   const [tab, setTab] = useState<"register" | "login">("register");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [refCode, setRefCode] = useState("");
 
   const [reg, setReg] = useState({
     name: "", phone: "", email: "", nationality: "", city: "", password: "",
   });
   const [pwScore, setPwScore] = useState(0);
   const [login, setLogin] = useState({ email: "", password: "" });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) setRefCode(ref.trim().toUpperCase());
+  }, []);
 
   const setSession = (data: any) => {
     saveMemberData(data);
@@ -58,16 +65,20 @@ export default function RegisterPage() {
         return;
       }
 
+      const insertPayload: any = {
+        name: reg.name.trim(),
+        email: reg.email.trim().toLowerCase(),
+        phone: reg.phone.trim() || null,
+        nationality: reg.nationality || null,
+        city: reg.city.trim() || null,
+        password_hash,
+      };
+
+      if (refCode) insertPayload.referred_by = refCode;
+
       const { data, error: insertError } = await supabase
         .from("members")
-        .insert([{
-          name: reg.name.trim(),
-          email: reg.email.trim().toLowerCase(),
-          phone: reg.phone.trim() || null,
-          nationality: reg.nationality || null,
-          city: reg.city.trim() || null,
-          password_hash,
-        }])
+        .insert([insertPayload])
         .select()
         .single();
 
@@ -136,7 +147,6 @@ export default function RegisterPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#080A0F", color: "#fff", fontFamily: "'Barlow', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 24px" }}>
 
-      {/* Top red bar */}
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 3, background: "#E8192C", zIndex: 100 }} />
 
       <div style={{ width: "100%", maxWidth: 520 }}>
@@ -153,6 +163,13 @@ export default function RegisterPage() {
           <div style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", marginTop: 10, fontWeight: 300, letterSpacing: "0.05em" }}>Race. Tune. Compete.</div>
         </div>
 
+        {/* Referral banner */}
+        {refCode && (
+          <div style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 8, padding: "10px 16px", fontSize: 13, color: "#22C55E", textAlign: "center", marginBottom: 20, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 1 }}>
+            🎟️ REFERRAL CODE APPLIED: <strong>{refCode}</strong>
+          </div>
+        )}
+
         {/* Card */}
         <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "36px 32px" }}>
 
@@ -166,7 +183,6 @@ export default function RegisterPage() {
             ))}
           </div>
 
-          {/* Error */}
           {error && (
             <div style={{ background: "rgba(232,25,44,0.1)", border: "1px solid rgba(232,25,44,0.3)", borderRadius: 6, padding: "10px 14px", fontSize: 13, color: "#E8192C", marginBottom: 20 }}>
               {error}
@@ -273,9 +289,6 @@ export default function RegisterPage() {
       <style>{`
         select option { background: #12161f; }
         input::placeholder { color: rgba(255,255,255,0.2); }
-        @media (max-width: 600px) {
-          .reg-grid { grid-template-columns: 1fr !important; }
-        }
       `}</style>
     </div>
   );
