@@ -73,10 +73,11 @@ export default function AdminLoyalty() {
   async function handleAdjust() {
     if (!selected || !adjustForm.amount) return;
     setSaving(true);
-    const amount = parseFloat(adjustForm.amount);
+    const inputAmount = parseFloat(adjustForm.amount);
     const rate = TIERS.find(t => t.key === selected.loyalty_tier)?.rate || 0;
+    // earn = calculate % of DKK. bonus/redeem/adjust = direct points value.
+    const amount = adjustForm.type === 'earn' ? Math.round(inputAmount * rate / 100 * 100) / 100 : inputAmount;
 
-    // Upsert loyalty_points
     const current = loyaltyData.find((x: any) => x.member_id === selected.id);
     const newBalance = (current?.points_balance || 0) + (adjustForm.type === 'redeem' ? -amount : amount);
     const newEarned = (current?.total_earned || 0) + (adjustForm.type === 'earn' || adjustForm.type === 'bonus' ? amount : 0);
@@ -102,7 +103,7 @@ export default function AdminLoyalty() {
       description: adjustForm.description || `Manual ${adjustForm.type} by admin`,
     });
 
-    setMsg(`✅ ${adjustForm.type === 'redeem' ? 'Redeemed' : 'Added'} ${amount} pts`);
+    setMsg(adjustForm.type === 'earn' ? `✅ Added ${amount} pts (${rate}% of ${inputAmount} DKK)` : `✅ ${adjustForm.type === 'redeem' ? 'Redeemed' : 'Added'} ${amount} pts`);
     setAdjustForm({ type: 'earn', amount: '', description: '' });
     loadData();
     setSaving(false);
