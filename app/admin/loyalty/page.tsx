@@ -44,14 +44,18 @@ export default function AdminLoyalty() {
   useEffect(() => { if (checkAuth()) { setAuthed(true); loadData(); } }, []);
 
   async function loadData() {
-    const [l, t, m] = await Promise.all([
-      supabase.from('loyalty_points').select('*').order('points_balance', { ascending: false }),
-      supabase.from('points_transactions').select('*').order('created_at', { ascending: false }).limit(30),
-      supabase.from('members').select('id, first_name, last_name, loyalty_tier, points_rate, is_active_member').order('first_name'),
-    ]);
-    setLoyaltyData(l.data || []);
-    setTransactions(t.data || []);
-    setMembers(m.data || []);
+    const { data: mData, error: mError } = await supabase
+      .from('members')
+      .select('id, first_name, last_name, loyalty_tier, points_rate, is_active_member')
+      .order('first_name');
+    console.log('Members loaded:', mData, 'Error:', mError);
+    setMembers(mData || []);
+
+    const { data: lData } = await supabase.from('loyalty_points').select('*').order('points_balance', { ascending: false });
+    setLoyaltyData(lData || []);
+
+    const { data: tData } = await supabase.from('points_transactions').select('*').order('created_at', { ascending: false }).limit(30);
+    setTransactions(tData || []);
   }
 
   function handleLogin() {
