@@ -1,160 +1,252 @@
 'use client';
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
-import { useState } from 'react';
-import { RANK_COLORS } from '@/lib/member';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
-const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
+const TIER_COLORS: Record<string, string> = {
+  hall_of_fame: '#FFD700',
+  season_1st: '#DC2626',
+  season_2nd: '#9CA3AF',
+  season_3rd: '#CD7C2F',
+  member: '#3B82F6',
+  non_member: '#4B5563',
+};
 
-type Cat = 'points' | 'wins' | 'fastest' | 'active' | 'referrals' | 'rookie';
+const TIER_LABELS: Record<string, string> = {
+  hall_of_fame: '🏛️ Hall of Fame',
+  season_1st: '🏆 Champion',
+  season_2nd: '🥈 2nd Place',
+  season_3rd: '🥉 3rd Place',
+  member: '👥 Member',
+  non_member: 'No Membership',
+};
 
-const PLAYERS = [
-  { name: 'Jovannie M.', rank: 'Legend',     points: 520, wins: 12, fastest_ms: 4820, races: 28, referrals: 5, rookie: false },
-  { name: 'Carlo R.',    rank: 'Champion',   points: 310, wins: 7,  fastest_ms: 4950, races: 21, referrals: 3, rookie: false },
-  { name: 'Mark A.',     rank: 'Contender',  points: 185, wins: 4,  fastest_ms: 5100, races: 16, referrals: 2, rookie: false },
-  { name: 'Renz D.',     rank: 'Tuner',      points: 90,  wins: 2,  fastest_ms: 5250, races: 11, referrals: 1, rookie: false },
-  { name: 'Jake P.',     rank: 'Racer',      points: 55,  wins: 1,  fastest_ms: 5380, races: 8,  referrals: 0, rookie: false },
-  { name: 'Luis G.',     rank: 'Builder',    points: 22,  wins: 0,  fastest_ms: 5600, races: 4,  referrals: 2, rookie: false },
-  { name: 'Erik N.',     rank: 'Rookie',     points: 8,   wins: 0,  fastest_ms: 5900, races: 2,  referrals: 1, rookie: true  },
-  { name: 'Nico B.',     rank: 'Rookie',     points: 5,   wins: 0,  fastest_ms: 6100, races: 1,  referrals: 0, rookie: true  },
-];
-
-const CATS: { key: Cat; label: string; icon: string }[] = [
-  { key: 'points',   label: 'Overall Points',  icon: '🏆' },
-  { key: 'wins',     label: 'Most Wins',        icon: '🥇' },
-  { key: 'fastest',  label: 'Fastest Lap',      icon: '⚡' },
-  { key: 'active',   label: 'Most Active',      icon: '🔥' },
-  { key: 'referrals',label: 'Referral Champs',  icon: '📣' },
-  { key: 'rookie',   label: 'Rookie Standings', icon: '🌟' },
-];
-
-function getSorted(cat: Cat) {
-  const base = cat === 'rookie' ? PLAYERS.filter(p => p.rookie) : PLAYERS;
-  if (cat === 'wins')      return [...base].sort((a, b) => b.wins - a.wins);
-  if (cat === 'fastest')   return [...base].sort((a, b) => a.fastest_ms - b.fastest_ms);
-  if (cat === 'active')    return [...base].sort((a, b) => b.races - a.races);
-  if (cat === 'referrals') return [...base].sort((a, b) => b.referrals - a.referrals);
-  return [...base].sort((a, b) => b.points - a.points);
-}
-
-function getStat(p: typeof PLAYERS[0], cat: Cat): string {
-  if (cat === 'wins')      return `${p.wins} wins`;
-  if (cat === 'fastest')   return `${(p.fastest_ms / 1000).toFixed(3)}s`;
-  if (cat === 'active')    return `${p.races} races`;
-  if (cat === 'referrals') return `${p.referrals} refs`;
-  return `${p.points} pts`;
-}
+const HOF_LABELS: Record<string, string> = {
+  fastest_lap: '⚡ Fastest Lap',
+  most_wins: '🏆 Most Race Wins',
+  most_championships: '👑 Most Championships',
+  most_points: '⭐ Most Points Earned',
+};
 
 export default function LeaderboardPage() {
-  const [cat, setCat] = useState<Cat>('points');
-  const sorted = getSorted(cat);
-  const top3 = sorted.slice(0, 3);
-  const rest = sorted.slice(3);
+  const [tab, setTab] = useState<'season' | 'hof'>('season');
+  const [standings, setStandings] = useState<any[]>([]);
+  const [hof, setHof] = useState<any[]>([]);
+  const [seasons, setSeasons] = useState<any[]>([]);
+  const [activeSeason, setActiveSeason] = useState<any>(null);
+  const [selectedSeason, setSelectedSeason] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(new Date());
 
-  // Podium order: 2nd, 1st, 3rd
-  const podium = [top3[1], top3[0], top3[2]].filter(Boolean);
-  const podiumPos = [2, 1, 3];
-  const podiumH = [88, 120, 72];
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    fetchSeasons();
+    fetchHof();
+  }, []);
+
+  useEffect(() => {
+    if (selectedSeason) fetchStandings(selectedSeason);
+  }, [selectedSeason]);
+
+  async function fetchSeasons() {
+    const { data } = await supabase.from('seasons').select('*').order('created_at', { ascending: false });
+    if (data) {
+      setSeasons(data);
+      const active = data.find((s: any) => s.is_active);
+      if (active) {
+        setActiveSeason(active);
+        setSelectedSeason(active.id);
+      } else if (data.length > 0) {
+        setSelectedSeason(data[0].id);
+      }
+    }
+  }
+
+  async function fetchStandings(seasonId: string) {
+    setLoading(true);
+    const { data } = await supabase
+      .from('season_standings')
+      .select('*')
+      .eq('season_id', seasonId)
+      .order('season_rank', { ascending: true });
+    setStandings(data || []);
+    setLoading(false);
+  }
+
+  async function fetchHof() {
+    const { data } = await supabase.from('hall_of_fame').select('*');
+    setHof(data || []);
+  }
+
+  function timeSince(date: string) {
+    const diff = now.getTime() - new Date(date).getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days < 1) return 'Today';
+    if (days === 1) return '1 day';
+    if (days < 30) return `${days} days`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months} month${months > 1 ? 's' : ''}`;
+    return `${Math.floor(months / 12)} year${Math.floor(months / 12) > 1 ? 's' : ''}`;
+  }
+
+  function getRankStyle(rank: number) {
+    if (rank === 1) return { color: '#DC2626', fontSize: '20px' };
+    if (rank === 2) return { color: '#9CA3AF', fontSize: '18px' };
+    if (rank === 3) return { color: '#CD7C2F', fontSize: '18px' };
+    return { color: '#6B7280', fontSize: '16px' };
+  }
+
+  const s: Record<string, any> = {
+    page: { background: '#050505', minHeight: '100vh', color: '#F5F5F5', fontFamily: "'DM Sans', sans-serif", paddingBottom: '60px' },
+    hero: { background: 'linear-gradient(135deg, #071426 0%, #0a0a0a 100%)', borderBottom: '1px solid rgba(220,38,38,0.3)', padding: '48px 24px 32px' },
+    heroInner: { maxWidth: '900px', margin: '0 auto' },
+    eyebrow: { fontSize: '11px', letterSpacing: '4px', color: '#DC2626', textTransform: 'uppercase' as const, marginBottom: '8px', fontFamily: "'Barlow Condensed', sans-serif" },
+    title: { fontSize: '42px', fontWeight: 900, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '2px', lineHeight: 1 },
+    sub: { color: '#B8C1CC', fontSize: '14px', marginTop: '8px' },
+    tabs: { display: 'flex', gap: '8px', marginTop: '28px' },
+    tab: (active: boolean) => ({
+      padding: '10px 24px', borderRadius: '6px', fontSize: '13px', fontWeight: 600,
+      letterSpacing: '1px', textTransform: 'uppercase' as const, cursor: 'pointer', border: 'none',
+      background: active ? '#DC2626' : 'rgba(255,255,255,0.05)',
+      color: active ? '#fff' : '#B8C1CC',
+    }),
+    body: { maxWidth: '900px', margin: '0 auto', padding: '32px 24px' },
+    seasonBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap' as const, gap: '12px' },
+    select: { background: '#071426', border: '1px solid rgba(255,255,255,0.1)', color: '#F5F5F5', padding: '8px 14px', borderRadius: '6px', fontSize: '13px' },
+    activeBadge: { background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', color: '#DC2626', padding: '4px 12px', borderRadius: '20px', fontSize: '11px', letterSpacing: '2px' },
+    table: { width: '100%', borderCollapse: 'collapse' as const },
+    th: { textAlign: 'left' as const, padding: '10px 14px', fontSize: '11px', letterSpacing: '2px', color: '#6B7280', borderBottom: '1px solid rgba(255,255,255,0.06)', textTransform: 'uppercase' as const },
+    tr: (i: number) => ({ background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }),
+    td: { padding: '14px', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '14px' },
+    hofGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' },
+    hofCard: { background: '#071426', border: '1px solid rgba(255,215,0,0.15)', borderRadius: '12px', padding: '24px' },
+    hofCategory: { fontSize: '11px', letterSpacing: '3px', color: '#FACC15', textTransform: 'uppercase' as const, marginBottom: '12px' },
+    hofName: { fontSize: '22px', fontWeight: 700, fontFamily: "'Barlow Condensed', sans-serif", marginBottom: '4px' },
+    hofRecord: { fontSize: '28px', fontWeight: 900, color: '#DC2626', fontFamily: "'Barlow Condensed', sans-serif" },
+    hofMeta: { fontSize: '12px', color: '#6B7280', marginTop: '8px' },
+    hofTimer: { fontSize: '11px', color: '#FACC15', marginTop: '4px' },
+    hofPrev: { marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '11px', color: '#4B5563' },
+    empty: { textAlign: 'center' as const, padding: '60px 20px', color: '#4B5563' },
+  };
 
   return (
-    <>
-      <Navbar />
-      <main style={{ background: '#050505', color: '#F5F5F5', minHeight: '100vh', paddingTop: 60 }}>
-
-        {/* Header */}
-        <section style={{ background: '#071426', borderBottom: '1px solid rgba(220,38,38,0.2)', padding: '48px 24px 32px' }}>
-          <div style={{ maxWidth: 800, margin: '0 auto' }}>
-            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>RANKINGS</div>
-            <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(40px, 10vw, 80px)', color: '#F5F5F5', margin: '0 0 8px', lineHeight: 0.95 }}>LEADERBOARD</h1>
-            <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', margin: 0 }}>Demo data — live rankings unlock after first official race event.</p>
+    <div style={s.page}>
+      <div style={s.hero}>
+        <div style={s.heroInner}>
+          <div style={s.eyebrow}>Greenland Mini 4WD Club</div>
+          <div style={s.title}>LEADERBOARD</div>
+          <div style={s.sub}>Season standings · Hall of Fame · Live rankings</div>
+          <div style={s.tabs}>
+            <button style={s.tab(tab === 'season')} onClick={() => setTab('season')}>🏁 Season Board</button>
+            <button style={s.tab(tab === 'hof')} onClick={() => setTab('hof')}>🏛️ Hall of Fame</button>
           </div>
-        </section>
+        </div>
+      </div>
 
-        <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 24px' }}>
+      <div style={s.body}>
 
-          {/* Category tabs — scrollable */}
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 32, WebkitOverflowScrolling: 'touch' as any }}>
-            {CATS.map(c => (
-              <button
-                key={c.key}
-                onClick={() => setCat(c.key)}
-                style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, padding: '10px 16px', border: cat === c.key ? 'none' : '1px solid rgba(255,255,255,0.1)', borderRadius: 10, background: cat === c.key ? '#DC2626' : '#071426', color: cat === c.key ? '#fff' : '#B8C1CC', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-              >
-                {c.icon} {c.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Podium */}
-          {sorted.length >= 2 && (
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 12, marginBottom: 40 }}>
-              {podium.map((player, i) => {
-                const pos = podiumPos[i];
-                const rc = RANK_COLORS[player.rank as keyof typeof RANK_COLORS] || '#6B7280';
-                return (
-                  <div key={player.name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, maxWidth: 160 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: rc + '22', border: `2px solid ${rc}`, display: 'flex', alignItems: 'center', justifyContent: 'center', ...F, fontWeight: 900, fontSize: 20, color: rc, marginBottom: 8 }}>
-                      {player.name[0]}
-                    </div>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#F5F5F5', textAlign: 'center', marginBottom: 2 }}>{player.name}</div>
-                    <div style={{ ...F, fontSize: 12, color: rc, marginBottom: 4 }}>{player.rank}</div>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#FACC15', marginBottom: 8 }}>{getStat(player, cat)}</div>
-                    <div style={{ width: '100%', height: podiumH[i], borderRadius: '8px 8px 0 0', background: pos === 1 ? 'rgba(250,204,21,0.15)' : '#071426', border: `1px solid ${pos === 1 ? '#FACC15' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
-                      {pos === 1 ? '🥇' : pos === 2 ? '🥈' : '🥉'}
-                    </div>
-                  </div>
-                );
-              })}
+        {/* SEASON TAB */}
+        {tab === 'season' && (
+          <>
+            <div style={s.seasonBar}>
+              <select style={s.select} value={selectedSeason} onChange={e => setSelectedSeason(e.target.value)}>
+                {seasons.map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              {activeSeason && selectedSeason === activeSeason.id && (
+                <span style={s.activeBadge}>● LIVE SEASON</span>
+              )}
             </div>
-          )}
 
-          {/* Full rankings */}
-          <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: 32 }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 3, color: '#F5F5F5' }}>FULL RANKINGS</span>
-              <span style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>{sorted.length} racers</span>
+            {loading ? (
+              <div style={s.empty}>Loading standings...</div>
+            ) : standings.length === 0 ? (
+              <div style={s.empty}>
+                <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏁</div>
+                <div>No race results yet for this season.</div>
+                <div style={{ fontSize: '12px', marginTop: '8px', color: '#374151' }}>Results will appear after the first race.</div>
+              </div>
+            ) : (
+              <table style={s.table}>
+                <thead>
+                  <tr>
+                    <th style={s.th}>Rank</th>
+                    <th style={s.th}>Racer</th>
+                    <th style={s.th}>Wins</th>
+                    <th style={s.th}>Best Lap</th>
+                    <th style={s.th}>Races</th>
+                    <th style={s.th}>Points Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {standings.map((r: any, i: number) => (
+                    <tr key={r.member_id} style={s.tr(i)}>
+                      <td style={{ ...s.td, ...getRankStyle(r.season_rank), fontWeight: 900, fontFamily: "'Barlow Condensed', sans-serif" }}>
+                        {r.season_rank === 1 ? '🏆' : r.season_rank === 2 ? '🥈' : r.season_rank === 3 ? '🥉' : `#${r.season_rank}`}
+                      </td>
+                      <td style={{ ...s.td, fontWeight: 600 }}>{r.member_name}</td>
+                      <td style={{ ...s.td, color: '#FACC15', fontWeight: 700 }}>{r.total_wins}</td>
+                      <td style={{ ...s.td, color: '#60A5FA' }}>{r.best_lap ? `${r.best_lap}s` : '—'}</td>
+                      <td style={{ ...s.td, color: '#B8C1CC' }}>{r.races_attended}</td>
+                      <td style={s.td}>
+                        <span style={{
+                          background: r.season_rank === 1 ? 'rgba(220,38,38,0.15)' : r.season_rank === 2 ? 'rgba(156,163,175,0.15)' : r.season_rank === 3 ? 'rgba(205,124,47,0.15)' : 'rgba(59,130,246,0.1)',
+                          color: r.season_rank === 1 ? '#DC2626' : r.season_rank === 2 ? '#9CA3AF' : r.season_rank === 3 ? '#CD7C2F' : '#3B82F6',
+                          padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700
+                        }}>
+                          {r.season_rank === 1 ? '5%' : r.season_rank === 2 ? '4%' : r.season_rank === 3 ? '3%' : '2%'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            <div style={{ marginTop: '24px', padding: '16px', background: '#071426', borderRadius: '8px', fontSize: '12px', color: '#6B7280', lineHeight: 1.8 }}>
+              <span style={{ color: '#FACC15' }}>Points rates are awarded to active members only.</span> Non-members earn 0%. Seasons reset every 2 months. Hall of Fame records never reset.
             </div>
-            {sorted.map((player, idx) => {
-              const rc = RANK_COLORS[player.rank as keyof typeof RANK_COLORS] || '#6B7280';
-              return (
-                <div key={player.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderBottom: idx < sorted.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                  <div style={{ ...F, fontWeight: 900, fontSize: 18, color: idx < 3 ? '#FACC15' : '#B8C1CC', width: 28, textAlign: 'center' }}>{idx + 1}</div>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: rc + '22', border: `1px solid ${rc}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', ...F, fontWeight: 900, fontSize: 16, color: rc, flexShrink: 0 }}>
-                    {player.name[0]}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ ...F, fontWeight: 700, fontSize: 17, color: '#F5F5F5' }}>{player.name}</div>
-                    <div style={{ ...F, fontSize: 12, color: rc }}>{player.rank}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5' }}>{getStat(player, cat)}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          </>
+        )}
 
-          {/* Rank legend */}
-          <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 24 }}>
-            <div style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 3, color: '#B8C1CC', marginBottom: 16 }}>MEMBER RANK SYSTEM</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
-              {Object.entries(RANK_COLORS).map(([rank, color]) => (
-                <div key={rank} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                  <span style={{ ...F, fontWeight: 700, fontSize: 15, color }}>{rank}</span>
+        {/* HALL OF FAME TAB */}
+        {tab === 'hof' && (
+          <>
+            <div style={{ marginBottom: '24px', fontSize: '13px', color: '#6B7280' }}>
+              Records are permanent. Updated instantly when broken. 🏛️ Hall of Fame holders earn <span style={{ color: '#FACC15', fontWeight: 700 }}>8% points rate</span>.
+            </div>
+            <div style={s.hofGrid}>
+              {hof.map((record: any) => (
+                <div key={record.id} style={s.hofCard}>
+                  <div style={s.hofCategory}>{HOF_LABELS[record.category] || record.category}</div>
+                  <div style={s.hofName}>{record.member_name === 'TBD' ? 'Unset' : record.member_name}</div>
+                  <div style={s.hofRecord}>{record.record_label}</div>
+                  {record.member_name !== 'TBD' && (
+                    <>
+                      <div style={s.hofMeta}>Set on {new Date(record.achieved_at).toLocaleDateString('en-GB')}</div>
+                      <div style={s.hofTimer}>Held for {timeSince(record.achieved_at)}</div>
+                    </>
+                  )}
+                  {record.previous_holder_name && (
+                    <div style={s.hofPrev}>
+                      Previous: {record.previous_holder_name} — {record.previous_record_value}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
-            <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', margin: 0 }}>
-              Ranks earned through race participation, wins, fastest laps, attendance, referrals, and improvement over time.
-            </p>
-          </div>
-
-        </div>
-      </main>
-      <Footer />
-    </>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
