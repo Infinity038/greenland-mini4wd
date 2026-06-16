@@ -55,6 +55,7 @@ export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [types, setTypes] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<Product | null>(null);
   const [step, setStep] = useState<ModalStep>('confirm');
   const [orderId, setOrderId] = useState('');
@@ -80,6 +81,9 @@ export default function ShopPage() {
     setLoading(false);
   }
 
+  const getType = (id: string) => types[id] || 'boxed';
+  const setType = (id: string, t: string) => setTypes(p => ({ ...p, [id]: t }));
+
   const filtered = products.filter(p => {
     if (filter === 'standard') return p.category === 'standard';
     if (filter === 'premium') return p.category === 'premium';
@@ -102,13 +106,13 @@ export default function ShopPage() {
     try {
       const { data, error: err } = await supabase.from('orders').insert({
         member_email: member.email, member_name: member.name,
-        product_name: selected.name,
+        product_name: `${selected.name} (${getType(selected.id) === 'built' ? 'Built/Ready' : 'Unbuilt/Boxed'})`,
         chassis: selected.chassis,
-        type: selected.product_type || 'boxed',
+        type: getType(selected.id),
         status: 'pending',
         payment_status: 'awaiting_payment',
-        notes: `Price: ${selected.price_dkk} DKK | Category: ${selected.category}`,
-        price: selected.price_dkk,
+        notes: `Price: ${getType(selected.id) === 'built' ? (selected.price_dkk + 200) : selected.price_dkk} DKK | Category: ${selected.category}`,
+        price: getType(selected.id) === 'built' ? (selected.price_dkk + 200) : selected.price_dkk,
       }).select().single();
       if (err || !data) throw new Error('failed');
       const ref = generatePaymentRef(data.id);
@@ -228,10 +232,19 @@ export default function ShopPage() {
                       <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
                       <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, flex: 1, margin: '0 0 14px' }}>{p.description}</p>
 
+                      <div style={{ display: 'flex', background: '#050505', borderRadius: 8, padding: 3, marginBottom: 14, border: '1px solid rgba(255,255,255,0.05)' }}>
+                        {(['boxed', 'built'] as const).map(t => (
+                          <button key={t} onClick={() => setType(p.id, t)}
+                            style={{ flex: 1, ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '8px 0', border: 'none', borderRadius: 6, background: getType(p.id) === t ? (t === 'built' ? '#DC2626' : 'rgba(255,255,255,0.1)') : 'transparent', color: getType(p.id) === t ? '#fff' : '#6B7280', cursor: 'pointer' }}>
+                            {t === 'boxed' ? '🔧 UNBUILT' : '⚡ BUILT'}
+                          </button>
+                        ))}
+                      </div>
+
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
-                          <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#B8C1CC' }}>KIT PRICE</div>
-                          <div style={{ ...F, fontWeight: 900, fontSize: 26, color: isCollector ? '#FACC15' : '#F5F5F5' }}>{p.price_dkk?.toLocaleString()} kr</div>
+                          <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#B8C1CC' }}>{getType(p.id) === 'built' ? 'BUILT PRICE' : 'KIT PRICE'}</div>
+                          <div style={{ ...F, fontWeight: 900, fontSize: 26, color: isCollector ? '#FACC15' : '#F5F5F5' }}>{getType(p.id) === 'built' ? (p.price_dkk + 200).toLocaleString() : p.price_dkk?.toLocaleString()} kr</div>
                         </div>
                         <button onClick={() => openModal(p)} disabled={p.status === 'sold out'}
                           style={{ background: p.status === 'sold out' ? '#1a1a1a' : '#DC2626', color: p.status === 'sold out' ? '#444' : '#fff', border: 'none', borderRadius: 10, padding: '11px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: p.status === 'sold out' ? 'not-allowed' : 'pointer' }}
@@ -272,8 +285,8 @@ export default function ShopPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 18 }}>
                     <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5' }}>{selected.name}</div>
-                    <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#B8C1CC', margin: '4px 0 12px' }}>{selected.chassis} CHASSIS</div>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 32, color: '#FACC15' }}>{selected.price_dkk?.toLocaleString()} DKK</div>
+                    <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#B8C1CC', margin: '4px 0 12px' }}>{getType(selected.id) === 'built' ? 'Built / Ready-to-Race' : 'Unbuilt / Boxed Kit'} · {selected.chassis}</div>
+                    <div style={{ ...F, fontWeight: 900, fontSize: 32, color: '#FACC15' }}>{getType(selected.id) === 'built' ? (selected.price_dkk + 200).toLocaleString() : selected.price_dkk?.toLocaleString()} DKK</div>
                   </div>
                   <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 7 }}>
                     <div style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>👤 <span style={{ color: '#F5F5F5' }}>{member?.name}</span></div>
@@ -295,7 +308,7 @@ export default function ShopPage() {
                     <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#FACC15', marginBottom: 12 }}>💳 MOBILEPAY INSTRUCTIONS</div>
                     <ol style={{ ...FB, fontSize: 14, color: '#F5F5F5', lineHeight: 2.2, margin: 0, paddingLeft: 20 }}>
                       <li>Open MobilePay on your phone</li>
-                      <li>Send <strong>{selected.price_dkk?.toLocaleString()} DKK</strong> to <strong>+299 XXXX XXXX</strong></li>
+                      <li>Send <strong>{getType(selected.id) === 'built' ? (selected.price_dkk + 200).toLocaleString() : selected.price_dkk?.toLocaleString()} DKK</strong> to <strong>+299 XXXX XXXX</strong></li>
                       <li>Reference: <strong style={{ color: '#FACC15', fontFamily: 'monospace' }}>{payRef}</strong></li>
                       <li>Screenshot the confirmation</li>
                       <li>Upload it on the next step</li>
