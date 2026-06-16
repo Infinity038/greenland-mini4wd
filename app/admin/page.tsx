@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 const ADMIN_PASSWORD = 'mini4wd2026';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
@@ -9,23 +14,27 @@ const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
 function checkAuth() {
   if (typeof window === 'undefined') return false;
-  const expiry = localStorage.getItem('gm4wd_admin_expiry');
-  if (!expiry || Date.now() > parseInt(expiry)) return false;
-  return localStorage.getItem('gm4wd_admin_authed') === '1';
+  const session = localStorage.getItem('adminSession');
+  if (!session) return false;
+  try { const { expires } = JSON.parse(session); return Date.now() < expires; }
+  catch { return false; }
 }
 function saveAuth() {
-  localStorage.setItem('gm4wd_admin_authed', '1');
-  localStorage.setItem('gm4wd_admin_expiry', String(Date.now() + 8 * 60 * 60 * 1000));
+  localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + 8 * 60 * 60 * 1000 }));
 }
 
 const NAV = [
-  { href: '/admin/orders',      icon: '📦', label: 'Orders',      desc: 'Payments & proofs' },
-  { href: '/admin/products',    icon: '🛒', label: 'Products',    desc: 'Shop catalog' },
-  { href: '/admin/members',     icon: '👥', label: 'Members',     desc: 'Accounts & status' },
-  { href: '/admin/tournaments', icon: '🏁', label: 'Tournaments', desc: 'Race events' },
-  { href: '/admin/tickets',     icon: '🎟️', label: 'Tickets',     desc: 'Loyalty & bonus' },
-  { href: '/admin/news',        icon: '📰', label: 'News',        desc: 'Posts & updates' },
-  { href: '/admin/gallery',     icon: '🖼️', label: 'Gallery',     desc: 'Photos & media' },
+  { href: '/admin/orders',       icon: '📦', label: 'Orders',        desc: 'Payments & proofs' },
+  { href: '/admin/products',     icon: '🛒', label: 'Products',      desc: 'Shop catalog' },
+  { href: '/admin/members',      icon: '👥', label: 'Members',       desc: 'Accounts & status' },
+  { href: '/admin/tournaments',  icon: '🏁', label: 'Tournaments',   desc: 'Race events' },
+  { href: '/admin/tickets',      icon: '🎟️', label: 'Tickets',       desc: 'Loyalty & bonus' },
+  { href: '/admin/news',         icon: '📰', label: 'News',          desc: 'Posts & updates' },
+  { href: '/admin/gallery',      icon: '🖼️', label: 'Gallery',       desc: 'Photos & media' },
+  { href: '/admin/race-results', icon: '🏎️', label: 'Race Results',  desc: 'Enter race data' },
+  { href: '/admin/seasons',      icon: '📅', label: 'Seasons',       desc: 'Manage seasons' },
+  { href: '/admin/hall-of-fame', icon: '🏛️', label: 'Hall of Fame',  desc: 'Records & history' },
+  { href: '/admin/loyalty',      icon: '⭐', label: 'Loyalty Points', desc: 'Points & tiers' },
 ];
 
 export default function AdminPage() {
@@ -39,6 +48,7 @@ export default function AdminPage() {
     pendingOrders: 0, pendingProofs: 0,
     activeTournaments: 0, productsInStock: 0,
     bonusTickets: 0, preordersWaiting: 0,
+    activeSeason: '', hofRecords: 0,
   });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,23 +67,28 @@ export default function AdminPage() {
 
   const fetchStats = async () => {
     setLoading(true);
-    const [{ data: m }, { data: o }, { data: t }, { data: p }, { data: tk }] = await Promise.all([
-      supabase.from('members').select('id, member_status, created_at, name, email'),
+    const [{ data: m }, { data: o }, { data: t }, { data: p }, { data: tk }, { data: s }, { data: hof }] = await Promise.all([
+      supabase.from('members').select('id, member_status'),
       supabase.from('orders').select('id, payment_status, status, created_at, member_name, product_name').order('created_at', { ascending: false }),
       supabase.from('tournaments').select('id, status'),
       supabase.from('products').select('id, status, stock_qty'),
       supabase.from('tickets').select('id, ticket_type, status'),
+      supabase.from('seasons').select('name, is_active').eq('is_active', true).limit(1),
+      supabase.from('hall_of_fame').select('id, member_name').neq('member_name', 'TBD'),
     ]);
-    const members = m || []; const orders = o || []; const tournaments = t || []; const products = p || []; const tickets = tk || [];
+    const members = m || []; const orders = o || []; const tournaments = t || [];
+    const products = p || []; const tickets = tk || [];
     setStats({
       totalMembers: members.length,
-      officialMembers: members.filter((x: any) => x.member_status === 'official').length,
+      officialMembers: members.filter((x: any) => x.member_status?.toLowerCase() === 'official').length,
       pendingOrders: orders.filter((x: any) => x.payment_status === 'awaiting_payment').length,
       pendingProofs: orders.filter((x: any) => x.payment_status === 'proof_uploaded').length,
       activeTournaments: tournaments.filter((x: any) => x.status === 'upcoming' || x.status === 'ongoing').length,
       productsInStock: products.filter((x: any) => x.status === 'in stock').length,
       bonusTickets: tickets.filter((x: any) => x.ticket_type === 'bonus' && x.status === 'available').length,
       preordersWaiting: orders.filter((x: any) => x.status === 'pending').length,
+      activeSeason: s?.[0]?.name || 'No active season',
+      hofRecords: hof?.length || 0,
     });
     setRecentOrders(orders.slice(0, 5));
     setLoading(false);
@@ -84,14 +99,13 @@ export default function AdminPage() {
   if (!authed) return (
     <div style={{ minHeight: '100vh', background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(220,38,38,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(220,38,38,0.03) 1px, transparent 1px)', backgroundSize: '40px 40px', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', width: 500, height: 300, background: 'radial-gradient(ellipse, rgba(220,38,38,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
       <div style={{ width: '100%', maxWidth: 400, position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, background: '#DC2626', borderRadius: 14, ...F, fontWeight: 900, fontSize: 22, color: '#fff', marginBottom: 16, boxShadow: '0 0 32px rgba(220,38,38,0.25)' }}>4W</div>
           <div style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', letterSpacing: 2, lineHeight: 1, marginBottom: 6 }}>ADMIN ACCESS</div>
           <div style={{ ...FB, fontSize: 13, color: '#6B7280' }}>Greenland Mini 4WD — Control Center</div>
         </div>
-        <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '32px 28px', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+        <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '32px 28px' }}>
           <label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 8 }}>PASSWORD</label>
           <div style={{ position: 'relative', marginBottom: loginError ? 8 : 20 }}>
             <input type={showPw ? 'text' : 'password'} value={pw}
@@ -104,9 +118,7 @@ export default function AdminPage() {
             </button>
           </div>
           {loginError && <div style={{ ...FB, fontSize: 13, color: '#DC2626', marginBottom: 16 }}>⚠ Incorrect password.</div>}
-          <button onClick={login} style={{ width: '100%', background: '#DC2626', color: '#fff', border: 'none', borderRadius: 10, padding: '14px', ...F, fontWeight: 900, fontSize: 18, letterSpacing: 3, cursor: 'pointer' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#B91C1C'}
-            onMouseLeave={e => e.currentTarget.style.background = '#DC2626'}>
+          <button onClick={login} style={{ width: '100%', background: '#DC2626', color: '#fff', border: 'none', borderRadius: 10, padding: '14px', ...F, fontWeight: 900, fontSize: 18, letterSpacing: 3, cursor: 'pointer' }}>
             ACCESS DASHBOARD →
           </button>
         </div>
@@ -124,19 +136,23 @@ export default function AdminPage() {
     { label: 'In Stock',         value: stats.productsInStock,   color: '#22C55E', icon: '📦', href: '/admin/products' },
     { label: 'Preorders',        value: stats.preordersWaiting,  color: '#A855F7', icon: '🛒', href: '/admin/orders' },
     { label: 'Bonus Tickets',    value: stats.bonusTickets,      color: '#FACC15', icon: '🎟️', href: '/admin/tickets' },
+    { label: 'HoF Records',      value: stats.hofRecords,        color: '#FACC15', icon: '🏛️', href: '/admin/hall-of-fame' },
   ];
 
   const QUICK_ACTIONS = [
-    { label: 'Confirm Payments', icon: '✅', href: '/admin/orders',      color: '#22C55E', badge: stats.pendingProofs > 0 ? stats.pendingProofs : null },
-    { label: 'Add Product',      icon: '➕', href: '/admin/products',    color: '#3B82F6', badge: null },
-    { label: 'Create Tournament',icon: '🏁', href: '/admin/tournaments', color: '#DC2626', badge: null },
-    { label: 'Manage Members',   icon: '👥', href: '/admin/members',     color: '#A855F7', badge: null },
-    { label: 'Post News',        icon: '📰', href: '/admin/news',        color: '#F97316', badge: null },
-    { label: 'Upload Gallery',   icon: '🖼️', href: '/admin/gallery',     color: '#FACC15', badge: null },
+    { label: 'Confirm Payments',  icon: '✅', href: '/admin/orders',       color: '#22C55E', badge: stats.pendingProofs > 0 ? stats.pendingProofs : null },
+    { label: 'Add Product',       icon: '➕', href: '/admin/products',     color: '#3B82F6', badge: null },
+    { label: 'Enter Race Result', icon: '🏎️', href: '/admin/race-results', color: '#DC2626', badge: null },
+    { label: 'Manage Members',    icon: '👥', href: '/admin/members',      color: '#A855F7', badge: null },
+    { label: 'Hall of Fame',      icon: '🏛️', href: '/admin/hall-of-fame', color: '#FACC15', badge: null },
+    { label: 'Loyalty Points',    icon: '⭐', href: '/admin/loyalty',      color: '#F97316', badge: null },
+    { label: 'Post News',         icon: '📰', href: '/admin/news',         color: '#6B7280', badge: null },
+    { label: 'Upload Gallery',    icon: '🖼️', href: '/admin/gallery',      color: '#6B7280', badge: null },
   ];
 
   return (
     <div style={{ minHeight: '100vh', background: '#050505', color: '#F5F5F5' }}>
+      {/* TOP NAV */}
       <div style={{ background: '#071426', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 30, height: 30, background: '#DC2626', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', ...F, fontWeight: 900, fontSize: 13, color: '#fff' }}>4W</div>
@@ -149,11 +165,21 @@ export default function AdminPage() {
       </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 20px' }}>
-        <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 20 }}>
           <div style={{ ...F, fontWeight: 900, fontSize: 'clamp(22px, 5vw, 32px)', color: '#F5F5F5', marginBottom: 4 }}>Welcome back 👋</div>
           <div style={{ ...FB, fontSize: 14, color: '#6B7280' }}>Greenland Mini 4WD Club — Admin Panel</div>
         </div>
 
+        {/* ACTIVE SEASON BANNER */}
+        <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 10, padding: '10px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 16 }}>🏁</span>
+            <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#DC2626' }}>Active Season: <span style={{ color: '#F5F5F5' }}>{stats.activeSeason}</span></div>
+          </div>
+          <a href="/admin/seasons" style={{ ...F, fontSize: 12, letterSpacing: 1, color: '#DC2626', textDecoration: 'none' }}>MANAGE →</a>
+        </div>
+
+        {/* PROOF ALERT */}
         {stats.pendingProofs > 0 && (
           <a href="/admin/orders" style={{ textDecoration: 'none', display: 'block', marginBottom: 20 }}>
             <div style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -169,32 +195,34 @@ export default function AdminPage() {
           </a>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, marginBottom: 28 }}>
+        {/* STAT CARDS */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, marginBottom: 28 }}>
           {STAT_CARDS.map(s => (
             <a key={s.label} href={s.href} style={{ textDecoration: 'none' }}>
-              <div style={{ background: '#071426', border: `1px solid ${(s as any).alert ? s.color + '44' : 'rgba(255,255,255,0.06)'}`, borderRadius: 14, padding: '16px 14px', position: 'relative', cursor: 'pointer', transition: 'transform 0.15s' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = s.color + '66'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = (s as any).alert ? s.color + '44' : 'rgba(255,255,255,0.06)'; }}>
-                {(s as any).alert && <div style={{ position: 'absolute', top: 10, right: 10, width: 8, height: 8, background: s.color, borderRadius: '50%', boxShadow: `0 0 6px ${s.color}` }} />}
-                <div style={{ fontSize: 20, marginBottom: 8 }}>{s.icon}</div>
-                <div style={{ ...F, fontWeight: 900, fontSize: 32, color: s.color, lineHeight: 1, marginBottom: 4 }}>{s.value}</div>
-                <div style={{ ...F, fontSize: 11, letterSpacing: 1, color: '#B8C1CC' }}>{s.label}</div>
+              <div style={{ background: '#071426', border: `1px solid ${(s as any).alert ? s.color + '44' : 'rgba(255,255,255,0.06)'}`, borderRadius: 12, padding: '14px 12px', position: 'relative', cursor: 'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = s.color + '55'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = (s as any).alert ? s.color + '44' : 'rgba(255,255,255,0.06)'; }}>
+                {(s as any).alert && <div style={{ position: 'absolute', top: 10, right: 10, width: 8, height: 8, background: s.color, borderRadius: '50%' }} />}
+                <div style={{ fontSize: 18, marginBottom: 6 }}>{s.icon}</div>
+                <div style={{ ...F, fontWeight: 900, fontSize: 28, color: s.color, lineHeight: 1, marginBottom: 4 }}>{s.value}</div>
+                <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#B8C1CC' }}>{s.label}</div>
               </div>
             </a>
           ))}
         </div>
 
+        {/* QUICK ACTIONS + RECENT ORDERS */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 28 }}>
           <div>
             <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>QUICK ACTIONS</div>
             <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden' }}>
               {QUICK_ACTIONS.map((a, i) => (
                 <a key={a.label} href={a.href} style={{ textDecoration: 'none' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderBottom: i < QUICK_ACTIONS.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer' }}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < QUICK_ACTIONS.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <div style={{ width: 36, height: 36, borderRadius: 8, background: a.color + '18', border: `1px solid ${a.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>{a.icon}</div>
-                    <span style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F5F5F5', letterSpacing: 1, flex: 1 }}>{a.label}</span>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: a.color + '18', border: `1px solid ${a.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{a.icon}</div>
+                    <span style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', letterSpacing: 1, flex: 1 }}>{a.label}</span>
                     {a.badge ? <span style={{ background: a.color, color: '#050505', ...F, fontWeight: 900, fontSize: 11, padding: '2px 8px', borderRadius: 10 }}>{a.badge}</span> : null}
                     <span style={{ color: '#6B7280', fontSize: 13 }}>→</span>
                   </div>
@@ -230,13 +258,14 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* ALL MODULES */}
         <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>ALL MODULES</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
           {NAV.map(m => (
             <a key={m.href} href={m.href} style={{ textDecoration: 'none' }}>
-              <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px 14px', cursor: 'pointer', transition: 'border-color 0.15s, transform 0.15s' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.35)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
+              <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px 14px', cursor: 'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.35)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; }}>
                 <div style={{ fontSize: 22, marginBottom: 8 }}>{m.icon}</div>
                 <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', letterSpacing: 1, marginBottom: 2 }}>{m.label}</div>
                 <div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{m.desc}</div>
