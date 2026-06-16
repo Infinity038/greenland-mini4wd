@@ -8,8 +8,8 @@ const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const TC: Record<string,string> = {paid:'#3B82F6',bonus:'#FACC15',referral:'#A855F7'};
 const SC: Record<string,string> = {available:'#22C55E',used:'#6B7280',cancelled:'#DC2626'};
 
-function checkAuth(){if(typeof window==='undefined')return false;const e=localStorage.getItem('gm4wd_admin_expiry');if(!e||Date.now()>parseInt(e))return false;return localStorage.getItem('gm4wd_admin_authed')==='1';}
-function saveAuth(){localStorage.setItem('gm4wd_admin_authed','1');localStorage.setItem('gm4wd_admin_expiry',String(Date.now()+8*60*60*1000));}
+function checkAuth(){if(typeof window==='undefined')return false;const s=localStorage.getItem('adminSession');if(!s)return false;try{const{expires}=JSON.parse(s);return Date.now()<expires;}catch{return false;}}
+function saveAuth(){localStorage.setItem('adminSession',JSON.stringify({expires:Date.now()+8*60*60*1000}));}
 
 function LoginScreen({title,onLogin}:{title:string;onLogin:()=>void}){
   const [pw,setPw]=useState('');const [error,setError]=useState(false);

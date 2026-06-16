@@ -23,14 +23,12 @@ const ALL_STATUSES = ['awaiting_payment','proof_uploaded','payment_confirmed','r
 
 function checkAuth() {
   if (typeof window === 'undefined') return false;
-  const expiry = localStorage.getItem('gm4wd_admin_expiry');
-  if (!expiry) return false;
-  if (Date.now() > parseInt(expiry)) { localStorage.removeItem('gm4wd_admin_authed'); localStorage.removeItem('gm4wd_admin_expiry'); return false; }
-  return localStorage.getItem('gm4wd_admin_authed') === '1';
+  const s = localStorage.getItem('adminSession');
+  if (!s) return false;
+  try { const { expires } = JSON.parse(s); return Date.now() < expires; } catch { return false; }
 }
 function saveAuth() {
-  localStorage.setItem('gm4wd_admin_authed', '1');
-  localStorage.setItem('gm4wd_admin_expiry', String(Date.now() + 8 * 60 * 60 * 1000));
+  localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + 8 * 60 * 60 * 1000 }));
 }
 
 function LoginScreen({ onLogin }: { onLogin: () => void }) {

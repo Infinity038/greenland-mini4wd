@@ -9,8 +9,8 @@ const CATS = ['announcement','race recap','community','tips & tricks','event'];
 const inp = (x?:any) => ({width:'100%',background:'#050505',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'11px 14px',color:'#F5F5F5',fontFamily:"'DM Sans',sans-serif",fontSize:14,outline:'none',boxSizing:'border-box' as const,...x});
 const DEMO = [{id:'1',title:'Welcome to Greenland Mini 4WD Club',summary:'The first Tamiya Mini 4WD community in Greenland is officially open!',body:'',image_url:'',category:'announcement',published:true,created_at:new Date().toISOString()},{id:'2',title:'What is Box Stock Racing?',summary:'Everything you need to know about box stock rules.',body:'',image_url:'',category:'tips & tricks',published:true,created_at:new Date().toISOString()}];
 
-function checkAuth(){if(typeof window==='undefined')return false;const e=localStorage.getItem('gm4wd_admin_expiry');if(!e||Date.now()>parseInt(e))return false;return localStorage.getItem('gm4wd_admin_authed')==='1';}
-function saveAuth(){localStorage.setItem('gm4wd_admin_authed','1');localStorage.setItem('gm4wd_admin_expiry',String(Date.now()+8*60*60*1000));}
+function checkAuth(){if(typeof window==='undefined')return false;const s=localStorage.getItem('adminSession');if(!s)return false;try{const{expires}=JSON.parse(s);return Date.now()<expires;}catch{return false;}}
+function saveAuth(){localStorage.setItem('adminSession',JSON.stringify({expires:Date.now()+8*60*60*1000}));}
 
 function LoginScreen({title,onLogin}:{title:string;onLogin:()=>void}){
   const [pw,setPw]=useState('');const [error,setError]=useState(false);

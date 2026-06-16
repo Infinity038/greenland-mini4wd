@@ -9,8 +9,8 @@ const CATS = ['race day','builds','community','AI promo','events'];
 const inp = (x?:any) => ({width:'100%',background:'#050505',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'11px 14px',color:'#F5F5F5',fontFamily:"'DM Sans',sans-serif",fontSize:14,outline:'none',boxSizing:'border-box' as const,...x});
 const DEMO = [{id:'1',title:'Arctic Sprint #1',caption:'Our first race event!',image_url:'/IMG_5374.png',category:'race day'},{id:'2',title:'AR Build',caption:'Member showcase',image_url:'/IMG_5375.png',category:'builds'},{id:'3',title:'Community Meetup',caption:'First gathering',image_url:'/IMG_5376.png',category:'community'}];
 
-function checkAuth(){if(typeof window==='undefined')return false;const e=localStorage.getItem('gm4wd_admin_expiry');if(!e||Date.now()>parseInt(e))return false;return localStorage.getItem('gm4wd_admin_authed')==='1';}
-function saveAuth(){localStorage.setItem('gm4wd_admin_authed','1');localStorage.setItem('gm4wd_admin_expiry',String(Date.now()+8*60*60*1000));}
+function checkAuth(){if(typeof window==='undefined')return false;const s=localStorage.getItem('adminSession');if(!s)return false;try{const{expires}=JSON.parse(s);return Date.now()<expires;}catch{return false;}}
+function saveAuth(){localStorage.setItem('adminSession',JSON.stringify({expires:Date.now()+8*60*60*1000}));}
 
 function LoginScreen({title,onLogin}:{title:string;onLogin:()=>void}){
   const [pw,setPw]=useState('');const [error,setError]=useState(false);
