@@ -183,7 +183,7 @@ export default function AdminLoyalty() {
                   const lp = loyaltyData.find((x: any) => x.member_id === m.id);
                   return (
                     <button key={m.id} style={s.memberBtn(selected?.id === m.id)} onClick={() => selectMember(m.id)}>
-                      <div style={{ fontWeight: 600, marginBottom: '2px' }}>{m.full_name}</div>
+                      <div style={{ fontWeight: 600, marginBottom: '2px' }}>{m.first_name} {m.last_name}</div>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                         <span style={s.tierBadge(m.loyalty_tier || 'non_member')}>{TIERS.find(t => t.key === (m.loyalty_tier || 'non_member'))?.rate || 0}%</span>
                         <span style={{ fontSize: '11px', color: '#6B7280' }}>{lp ? `${lp.points_balance} pts` : '0 pts'}</span>

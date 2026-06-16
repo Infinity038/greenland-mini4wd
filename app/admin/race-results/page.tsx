@@ -37,7 +37,7 @@ export default function AdminRaceResults() {
   async function loadData() {
     const [s, m, r] = await Promise.all([
       supabase.from('seasons').select('*').order('created_at', { ascending: false }),
-      supabase.from('members').select('id, full_name').order('full_name'),
+      supabase.from('members').select('id, first_name, last_name').order('first_name'),
       supabase.from('race_results').select('*').order('created_at', { ascending: false }).limit(50),
     ]);
     setSeasons(s.data || []);
@@ -54,7 +54,7 @@ export default function AdminRaceResults() {
 
   function handleMemberSelect(id: string) {
     const m = members.find((x: any) => x.id === id);
-    setForm(f => ({ ...f, member_id: id, member_name: m?.full_name || '' }));
+    setForm(f => ({ ...f, member_id: id, member_name: m ? `${m.first_name} ${m.last_name}` : '' }));
   }
 
   async function handleSubmit() {
@@ -131,7 +131,7 @@ export default function AdminRaceResults() {
           <label style={s.label}>Member</label>
           <select style={s.select} value={form.member_id} onChange={e => handleMemberSelect(e.target.value)}>
             <option value="">Select member...</option>
-            {members.map((m: any) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+            {members.map((m: any) => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
           </select>
 
           <label style={s.label}>Race Date</label>

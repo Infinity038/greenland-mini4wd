@@ -43,7 +43,7 @@ export default function AdminHallOfFame() {
     const [r, h, m] = await Promise.all([
       supabase.from('hall_of_fame').select('*'),
       supabase.from('hall_of_fame_history').select('*').order('held_until', { ascending: false }).limit(20),
-      supabase.from('members').select('id, full_name').order('full_name'),
+      supabase.from('members').select('id, first_name, last_name').order('first_name'),
     ]);
     setRecords(r.data || []);
     setHistory(h.data || []);
@@ -68,7 +68,7 @@ export default function AdminHallOfFame() {
 
   function handleMemberSelect(id: string) {
     const m = members.find((x: any) => x.id === id);
-    setForm(f => ({ ...f, member_id: id, member_name: m?.full_name || '' }));
+    setForm(f => ({ ...f, member_id: id, member_name: m ? `${m.first_name} ${m.last_name}` : '' }));
   }
 
   async function handleSave() {
@@ -158,7 +158,7 @@ export default function AdminHallOfFame() {
             <label style={s.label}>Member</label>
             <select style={s.select} value={form.member_id} onChange={e => handleMemberSelect(e.target.value)}>
               <option value="">Select member...</option>
-              {members.map((m: any) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+              {members.map((m: any) => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
             </select>
             <div style={s.row}>
               <div>
