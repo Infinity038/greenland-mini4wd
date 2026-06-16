@@ -161,7 +161,10 @@ export default function AdminPage() {
             <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#DC2626', lineHeight: 1 }}>CONTROL CENTER</div>
           </div>
         </div>
-        <a href="/" style={{ ...FB, fontSize: 12, color: '#B8C1CC', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '6px 12px' }}>← Back to Site</a>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <a href="/" style={{ ...FB, fontSize: 12, color: '#B8C1CC', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '6px 12px' }}>← Back to Site</a>
+          <button onClick={() => { localStorage.removeItem('adminSession'); setAuthed(false); }} style={{ ...FB, fontSize: 12, color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 6, padding: '6px 12px', cursor: 'pointer' }}>Logout</button>
+        </div>
       </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 20px' }}>
