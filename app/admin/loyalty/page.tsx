@@ -84,7 +84,7 @@ export default function AdminLoyalty() {
 
     await supabase.from('loyalty_points').upsert({
       member_id: selected.id,
-      member_name: ,
+      member_name: `${selected.first_name} ${selected.last_name}`,
       points_balance: Math.max(0, newBalance),
       total_earned: newEarned,
       total_redeemed: newRedeemed,
@@ -95,7 +95,7 @@ export default function AdminLoyalty() {
 
     await supabase.from('points_transactions').insert({
       member_id: selected.id,
-      member_name: ,
+      member_name: `${selected.first_name} ${selected.last_name}`,
       type: adjustForm.type,
       amount,
       rate_applied: rate,
@@ -120,7 +120,7 @@ export default function AdminLoyalty() {
     }).eq('id', selected.id);
     await supabase.from('loyalty_points').upsert({
       member_id: selected.id,
-      member_name: ,
+      member_name: `${selected.first_name} ${selected.last_name}`,
       tier: tierForm.tier,
       points_rate: tierData?.rate || 0,
       updated_at: new Date().toISOString(),
