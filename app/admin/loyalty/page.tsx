@@ -47,7 +47,7 @@ export default function AdminLoyalty() {
     const [l, t, m] = await Promise.all([
       supabase.from('loyalty_points').select('*').order('points_balance', { ascending: false }),
       supabase.from('points_transactions').select('*').order('created_at', { ascending: false }).limit(30),
-      supabase.from('members').select('id, full_name, loyalty_tier, points_rate, is_active_member').order('full_name'),
+      supabase.from('members').select('id, first_name, last_name, loyalty_tier, points_rate, is_active_member').order('first_name'),
     ]);
     setLoyaltyData(l.data || []);
     setTransactions(t.data || []);
@@ -80,7 +80,7 @@ export default function AdminLoyalty() {
 
     await supabase.from('loyalty_points').upsert({
       member_id: selected.id,
-      member_name: selected.full_name,
+      member_name: ,
       points_balance: Math.max(0, newBalance),
       total_earned: newEarned,
       total_redeemed: newRedeemed,
@@ -91,7 +91,7 @@ export default function AdminLoyalty() {
 
     await supabase.from('points_transactions').insert({
       member_id: selected.id,
-      member_name: selected.full_name,
+      member_name: ,
       type: adjustForm.type,
       amount,
       rate_applied: rate,
@@ -116,7 +116,7 @@ export default function AdminLoyalty() {
     }).eq('id', selected.id);
     await supabase.from('loyalty_points').upsert({
       member_id: selected.id,
-      member_name: selected.full_name,
+      member_name: ,
       tier: tierForm.tier,
       points_rate: tierData?.rate || 0,
       updated_at: new Date().toISOString(),
@@ -127,7 +127,7 @@ export default function AdminLoyalty() {
     setTimeout(() => setMsg(''), 3000);
   }
 
-  const filtered = members.filter((m: any) => m.full_name?.toLowerCase().includes(search.toLowerCase()));
+  const filtered = members.filter((m: any) => `${m.first_name} ${m.last_name}`.toLowerCase().includes(search.toLowerCase()));
 
   const s: Record<string, any> = {
     page: { background: '#050505', minHeight: '100vh', color: '#F5F5F5', fontFamily: "'DM Sans', sans-serif", padding: '32px 24px' },
@@ -205,7 +205,7 @@ export default function AdminLoyalty() {
               <>
                 {/* MEMBER STATS */}
                 <div style={s.card}>
-                  <div style={s.title}>{selected.full_name}</div>
+                  <div style={s.title}>{selected.first_name} {selected.last_name}</div>
                   <div style={s.statRow}>
                     <span style={{ color: '#6B7280' }}>Points Balance</span>
                     <span style={{ color: '#FACC15', fontWeight: 700, fontSize: '18px' }}>{selected.loyalty?.points_balance || 0} pts</span>
