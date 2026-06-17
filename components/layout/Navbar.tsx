@@ -5,6 +5,7 @@ import { isRegistered, getMemberData, logout } from "@/lib/member";
 const NAV_LINKS = [{ label: "Leaderboard", href: "/leaderboard" },
   { label: "Cars", href: "/cars" },
   { label: "Tournament", href: "/tournament" },
+  { label: "Tickets", href: "/tickets" },
   { label: "Events", href: "/events" },
   { label: "Gallery", href: "/gallery" },
   { label: "Shop", href: "/shop" },
@@ -48,8 +49,8 @@ export default function Navbar() {
         <div className="hidden md:flex" style={{ alignItems: "center", gap: 24 }}>
           {NAV_LINKS.map(link => (
             <a key={link.label} href={link.href}
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: 13, color: "#B8C1CC", letterSpacing: 3, textDecoration: "none" }}>
-              {link.label}
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: link.label === 'Tickets' ? 900 : 600, fontSize: 13, color: link.label === 'Tickets' ? '#FACC15' : '#B8C1CC', letterSpacing: 3, textDecoration: 'none', ...(link.label === 'Tickets' ? { border: '1px solid rgba(250,204,21,0.3)', padding: '4px 10px', borderRadius: 6 } : {}) }}>
+              {link.label === 'Tickets' ? '🎟️ ' + link.label : link.label}
             </a>
           ))}
 
