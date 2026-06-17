@@ -22,11 +22,13 @@ const LOCAL_IMAGES: GalleryItem[] = [
 
 const CATEGORIES = ['All', 'Race Day', 'Builds', 'Community'];
 
-const CAT_COLORS: Record<string, string> = {
-  'Race Day': '#DC2626',
-  'Builds': '#FACC15',
-  'Community': '#22C55E',
-};
+function getCatColor(category: string): string {
+  const c = (category || '').toLowerCase();
+  if (c === 'race day') return '#DC2626';
+  if (c === 'builds') return '#FACC15';
+  if (c === 'community') return '#22C55E';
+  return '#DC2626';
+}
 
 export default function GalleryPage() {
   const [items, setItems] = useState<GalleryItem[]>([]);
@@ -46,7 +48,10 @@ export default function GalleryPage() {
     load();
   }, []);
 
-  const filtered = filter === 'All' ? items : items.filter(i => i.category === filter);
+  // Case-insensitive filter match
+  const filtered = filter === 'All'
+    ? items
+    : items.filter(i => (i.category || '').toLowerCase() === filter.toLowerCase());
 
   return (
     <>
@@ -98,54 +103,18 @@ export default function GalleryPage() {
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 0', color: '#B8C1CC' }}>No photos yet in this category.</div>
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: 12,
-            }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
               {filtered.map(item => (
                 <div
                   key={item.id}
                   onClick={() => setLightbox(item)}
-                  style={{
-                    position: 'relative',
-                    aspectRatio: '4/3',
-                    borderRadius: 8,
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    background: '#071426',
-                  }}
+                  style={{ position: 'relative', aspectRatio: '4/3', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', background: '#071426' }}
                 >
-                  <img
-                    src={item.image_url}
-                    alt={item.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  />
-                  {/* Category badge */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 10,
-                    left: 10,
-                    background: CAT_COLORS[item.category] || '#DC2626',
-                    color: '#fff',
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: 2,
-                    padding: '3px 8px',
-                    borderRadius: 4,
-                    fontFamily: "'Barlow Condensed', sans-serif",
-                  }}>
-                    {item.category?.toUpperCase()}
+                  <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <div style={{ position: 'absolute', top: 10, left: 10, background: getCatColor(item.category), color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: 2, padding: '3px 8px', borderRadius: 4, fontFamily: "'Barlow Condensed', sans-serif" }}>
+                    {(item.category || '').toUpperCase()}
                   </div>
-                  {/* Hover overlay */}
-                  <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%)',
-                    display: 'flex',
-                    alignItems: 'flex-end',
-                    padding: 12,
-                  }}>
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%)', display: 'flex', alignItems: 'flex-end', padding: 12 }}>
                     <span style={{ color: '#fff', fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>{item.caption}</span>
                   </div>
                 </div>
@@ -156,54 +125,12 @@ export default function GalleryPage() {
 
         {/* Lightbox */}
         {lightbox && (
-          <div
-            onClick={() => setLightbox(null)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.92)',
-              zIndex: 1000,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 24,
-            }}
-          >
-            <button
-              onClick={() => setLightbox(null)}
-              style={{
-                position: 'absolute',
-                top: 20,
-                right: 20,
-                background: 'none',
-                border: 'none',
-                color: '#fff',
-                fontSize: 32,
-                cursor: 'pointer',
-                lineHeight: 1,
-              }}
-            >✕</button>
-            <img
-              src={lightbox.image_url}
-              alt={lightbox.title}
-              style={{ maxWidth: '100%', maxHeight: '75vh', borderRadius: 8, objectFit: 'contain' }}
-              onClick={e => e.stopPropagation()}
-            />
+          <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <button onClick={() => setLightbox(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', color: '#fff', fontSize: 32, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+            <img src={lightbox.image_url} alt={lightbox.title} style={{ maxWidth: '100%', maxHeight: '75vh', borderRadius: 8, objectFit: 'contain' }} onClick={e => e.stopPropagation()} />
             <div style={{ marginTop: 16, textAlign: 'center' }}>
-              <div style={{
-                display: 'inline-block',
-                background: CAT_COLORS[lightbox.category] || '#DC2626',
-                color: '#fff',
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: 2,
-                padding: '3px 10px',
-                borderRadius: 4,
-                fontFamily: "'Barlow Condensed', sans-serif",
-                marginBottom: 8,
-              }}>
-                {lightbox.category?.toUpperCase()}
+              <div style={{ display: 'inline-block', background: getCatColor(lightbox.category), color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: 2, padding: '3px 10px', borderRadius: 4, fontFamily: "'Barlow Condensed', sans-serif", marginBottom: 8 }}>
+                {(lightbox.category || '').toUpperCase()}
               </div>
               <p style={{ color: '#B8C1CC', fontSize: 14, margin: 0 }}>{lightbox.caption}</p>
             </div>
