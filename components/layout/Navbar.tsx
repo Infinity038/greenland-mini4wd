@@ -12,6 +12,12 @@ const NAV_LINKS = [{ label: "Leaderboard", href: "/leaderboard" },
   { label: "About", href: "/about" },
 ];
 
+const MEMBER_LINKS = [
+  { label: "👤 Profile", href: "/profile" },
+  { label: "📦 My Orders", href: "/profile?tab=orders" },
+  { label: "🎟️ Race Tickets", href: "/profile?tab=tickets" },
+];
+
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -59,11 +65,7 @@ export default function Navbar() {
               </button>
               {menuOpen && (
                 <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#071426", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, minWidth: 180, overflow: "hidden", zIndex: 100 }}>
-                  {[
-                    { label: "👤 Profile", href: "/profile" },
-                    { label: "📦 My Orders", href: "/orders" },
-                    { label: "🎟️ Race Tickets", href: "/tournament" },
-                  ].map(item => (
+                  {MEMBER_LINKS.map(item => (
                     <a key={item.label} href={item.href}
                       style={{ display: "block", padding: "12px 18px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: 14, color: "#F5F5F5", textDecoration: "none", borderBottom: "1px solid rgba(255,255,255,0.05)", letterSpacing: 1 }}>
                       {item.label}
@@ -104,11 +106,7 @@ export default function Navbar() {
           ))}
           {registered ? (
             <>
-              {[
-                { label: "👤 Profile", href: "/profile" },
-                { label: "📦 My Orders", href: "/orders" },
-                { label: "🎟️ Race Tickets", href: "/tournament" },
-              ].map(item => (
+              {MEMBER_LINKS.map(item => (
                 <a key={item.label} href={item.href} onClick={() => setOpen(false)}
                   style={{ display: "block", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 20, color: "#FACC15", letterSpacing: 3, textDecoration: "none" }}>
                   {item.label}

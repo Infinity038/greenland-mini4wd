@@ -19,7 +19,15 @@ export default function ProfilePage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [wallet, setWallet] = useState<TicketWallet>(DEMO_WALLET);
   const [referral, setReferral] = useState<ReferralStats>(DEMO_REFERRAL);
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>(
+    () => {
+      if (typeof window !== "undefined") {
+        const p = new URLSearchParams(window.location.search).get("tab");
+        if (p === "orders" || p === "tickets" || p === "referral") return p as Tab;
+      }
+      return "overview";
+    }
+  );
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
 
