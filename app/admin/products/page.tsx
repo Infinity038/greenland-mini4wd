@@ -13,13 +13,24 @@ const inp = (x?: any) => ({ width:'100%', background:'#050505', border:'1px soli
 
 function checkAuth() {
   if (typeof window === 'undefined') return false;
-  const expiry = localStorage.getItem('gm4wd_admin_expiry');
-  if (!expiry || Date.now() > parseInt(expiry)) return false;
-  return localStorage.getItem('gm4wd_admin_authed') === '1';
+  const session = localStorage.getItem('adminSession');
+  if (!session) return false;
+  try { const { expires } = JSON.parse(session); return Date.now() < expires; }
+  catch { return false; }
 }
 function saveAuth() {
-  localStorage.setItem('gm4wd_admin_authed', '1');
-  localStorage.setItem('gm4wd_admin_expiry', String(Date.now() + 8 * 60 * 60 * 1000));
+  localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + 8 * 60 * 60 * 1000 }));
+}
+
+function ProductThumb({ url, size = 56 }: { url: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  const first = url?.split(',')[0]?.trim();
+  if (!first || failed) return (
+    <div style={{ width: size, height: size, borderRadius: 8, background: '#050505', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <span style={{ ...F, fontSize: 10, color: 'rgba(255,255,255,0.15)' }}>NO IMG</span>
+    </div>
+  );
+  return <img src={first} alt="" onError={() => setFailed(true)} style={{ width: size, height: size, objectFit: 'contain', borderRadius: 8, background: '#050505', border: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }} />;
 }
 
 function LoginScreen({ title, onLogin }: { title: string; onLogin: () => void }) {
@@ -51,6 +62,7 @@ export default function AdminProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [editing, setEditing] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [imgPreviewFailed, setImgPreviewFailed] = useState(false);
   const EMPTY = { name:'', chassis:'AR', category:'kit', type:'boxed', price_dkk:0, stock_qty:0, status:'in stock', description:'', image_url:'', available:true };
 
   useEffect(() => { const ok = checkAuth(); setAuthed(ok); setChecked(true); if (ok) fetchProducts(); }, []);
@@ -67,6 +79,8 @@ export default function AdminProductsPage() {
   if (!checked) return null;
   if (!authed) return <LoginScreen title="Manage Products" onLogin={() => { setAuthed(true); fetchProducts(); }} />;
 
+  const editPreviewUrl = editing?.image_url?.split(',')[0]?.trim();
+
   return (
     <div style={{ minHeight:'100vh', background:'#050505', color:'#F5F5F5' }}>
       <div style={{ background:'#071426', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:56, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
@@ -77,23 +91,26 @@ export default function AdminProductsPage() {
         <a href="/admin" style={{ ...FB, fontSize:12, color:'#B8C1CC', textDecoration:'none', border:'1px solid rgba(255,255,255,0.08)', borderRadius:6, padding:'6px 12px' }}>← Dashboard</a>
       </div>
       <div style={{ maxWidth:1000, margin:'0 auto', padding:'24px 20px' }}>
-        <button onClick={() => setEditing({...EMPTY})} style={{ background:'#DC2626', color:'#fff', border:'none', borderRadius:8, padding:'10px 20px', ...F, fontWeight:700, fontSize:15, letterSpacing:1, cursor:'pointer', marginBottom:20 }}>+ ADD PRODUCT</button>
+        <button onClick={() => { setEditing({...EMPTY}); setImgPreviewFailed(false); }} style={{ background:'#DC2626', color:'#fff', border:'none', borderRadius:8, padding:'10px 20px', ...F, fontWeight:700, fontSize:15, letterSpacing:1, cursor:'pointer', marginBottom:20 }}>+ ADD PRODUCT</button>
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {products.map(p => {
             const sc = STATUS_COLORS[p.status]||'#6B7280';
             return (
               <div key={p.id} style={{ background:'#071426', border:'1px solid rgba(255,255,255,0.07)', borderRadius:12, padding:'16px 20px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
-                      <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:4, background:'rgba(255,255,255,0.06)', color:'#B8C1CC' }}>{p.chassis}</span>
-                      <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:4, background:sc+'18', color:sc }}>● {(p.status||'').toUpperCase()}</span>
-                    </div>
-                    <div style={{ ...F, fontWeight:900, fontSize:18, color:'#F5F5F5', marginBottom:2 }}>{p.name}</div>
-                    <div style={{ ...FB, fontSize:13, color:'#B8C1CC', marginBottom:6 }}>{p.description}</div>
-                    <div style={{ display:'flex', gap:16 }}>
-                      <div><span style={{ ...F, fontSize:10, letterSpacing:2, color:'#B8C1CC' }}>PRICE </span><span style={{ ...F, fontWeight:900, fontSize:16, color:'#FACC15' }}>{p.price_dkk} kr</span></div>
-                      <div><span style={{ ...F, fontSize:10, letterSpacing:2, color:'#B8C1CC' }}>STOCK </span><span style={{ ...F, fontWeight:700, fontSize:16, color:p.stock_qty>0?'#22C55E':'#DC2626' }}>{p.stock_qty}</span></div>
+                  <div style={{ display:'flex', gap:14, flex:1, alignItems:'flex-start' }}>
+                    <ProductThumb url={p.image_url} size={64} />
+                    <div style={{ flex:1 }}>
+                      <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
+                        <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:4, background:'rgba(255,255,255,0.06)', color:'#B8C1CC' }}>{p.chassis}</span>
+                        <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:4, background:sc+'18', color:sc }}>● {(p.status||'').toUpperCase()}</span>
+                      </div>
+                      <div style={{ ...F, fontWeight:900, fontSize:18, color:'#F5F5F5', marginBottom:2 }}>{p.name}</div>
+                      <div style={{ ...FB, fontSize:12, color:'#B8C1CC', marginBottom:6, lineHeight:1.4 }}>{p.description?.slice(0,80)}{p.description?.length > 80 ? '...' : ''}</div>
+                      <div style={{ display:'flex', gap:16 }}>
+                        <div><span style={{ ...F, fontSize:10, letterSpacing:2, color:'#B8C1CC' }}>PRICE </span><span style={{ ...F, fontWeight:900, fontSize:16, color:'#FACC15' }}>{p.price_dkk} kr</span></div>
+                        <div><span style={{ ...F, fontSize:10, letterSpacing:2, color:'#B8C1CC' }}>STOCK </span><span style={{ ...F, fontWeight:700, fontSize:16, color:p.stock_qty>0?'#22C55E':'#DC2626' }}>{p.stock_qty}</span></div>
+                      </div>
                     </div>
                   </div>
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -101,7 +118,7 @@ export default function AdminProductsPage() {
                       {STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
                     </select>
                     <div style={{ display:'flex', gap:6 }}>
-                      <button onClick={()=>setEditing(p)} style={{ flex:1, ...F, fontSize:12, letterSpacing:1, padding:'7px 12px', borderRadius:6, background:'transparent', border:'1px solid rgba(255,255,255,0.15)', color:'#F5F5F5', cursor:'pointer' }}>EDIT</button>
+                      <button onClick={()=>{ setEditing(p); setImgPreviewFailed(false); }} style={{ flex:1, ...F, fontSize:12, letterSpacing:1, padding:'7px 12px', borderRadius:6, background:'transparent', border:'1px solid rgba(255,255,255,0.15)', color:'#F5F5F5', cursor:'pointer' }}>EDIT</button>
                       <button onClick={()=>del(p.id)} style={{ flex:1, ...F, fontSize:12, letterSpacing:1, padding:'7px 12px', borderRadius:6, background:'transparent', border:'1px solid rgba(220,38,38,0.3)', color:'#DC2626', cursor:'pointer' }}>DEL</button>
                     </div>
                   </div>
@@ -112,6 +129,8 @@ export default function AdminProductsPage() {
           {products.length===0&&<div style={{ textAlign:'center', padding:60, ...FB, color:'#B8C1CC' }}>No products yet.</div>}
         </div>
       </div>
+
+      {/* EDIT MODAL */}
       {editing && (
         <div onClick={()=>setEditing(null)} style={{ position:'fixed', inset:0, zIndex:50, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'20px 16px', overflowY:'auto' }}>
           <div onClick={e=>e.stopPropagation()} style={{ background:'#071426', border:'1px solid rgba(255,255,255,0.1)', borderRadius:18, width:'100%', maxWidth:520, marginBottom:24 }}>
@@ -129,7 +148,23 @@ export default function AdminProductsPage() {
               </div>
               <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>STATUS</label><select value={editing.status} onChange={e=>setEditing({...editing,status:e.target.value})} style={inp()}>{STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
               <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>DESCRIPTION</label><textarea value={editing.description} onChange={e=>setEditing({...editing,description:e.target.value})} rows={3} style={inp({resize:'vertical'})} /></div>
-              <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>IMAGE URL</label><input value={editing.image_url} onChange={e=>setEditing({...editing,image_url:e.target.value})} placeholder="https://..." style={inp()} /></div>
+              <div>
+                <label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>IMAGE URL(S)</label>
+                <input value={editing.image_url} onChange={e=>{ setEditing({...editing,image_url:e.target.value}); setImgPreviewFailed(false); }} placeholder="https://... (separate multiple with commas)" style={inp()} />
+                <div style={{ ...FB, fontSize:11, color:'#6B7280', marginTop:4 }}>Tip: paste multiple URLs separated by commas for slideshow</div>
+                {/* Live preview */}
+                {editPreviewUrl && !imgPreviewFailed && (
+                  <div style={{ marginTop:12, background:'#050505', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10, padding:12, display:'flex', alignItems:'center', justifyContent:'center', minHeight:120 }}>
+                    <img src={editPreviewUrl} alt="preview" onError={()=>setImgPreviewFailed(true)}
+                      style={{ maxHeight:120, maxWidth:'100%', objectFit:'contain', borderRadius:6 }} />
+                  </div>
+                )}
+                {editPreviewUrl && imgPreviewFailed && (
+                  <div style={{ marginTop:12, background:'rgba(220,38,38,0.08)', border:'1px solid rgba(220,38,38,0.2)', borderRadius:10, padding:10, ...FB, fontSize:12, color:'#FCA5A5' }}>
+                    ⚠ Image URL failed to load. Check the URL is a direct image link (not a page URL).
+                  </div>
+                )}
+              </div>
               <button onClick={save} disabled={saving} style={{ background:'#DC2626', color:'#fff', border:'none', borderRadius:10, padding:'13px', ...F, fontWeight:900, fontSize:17, letterSpacing:2, cursor:'pointer', opacity:saving?0.6:1 }}>{saving?'SAVING...':'SAVE PRODUCT'}</button>
             </div>
           </div>

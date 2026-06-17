@@ -42,12 +42,24 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: '#DC2626',
 };
 
+function ProductThumb({ url }: { url?: string }) {
+  const [failed, setFailed] = useState(false);
+  const first = url?.split(',')[0]?.trim();
+  if (!first || failed) return (
+    <div style={{ width: 56, height: 56, borderRadius: 8, background: '#050505', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 9, color: 'rgba(255,255,255,0.15)', letterSpacing: 1 }}>NO IMG</span>
+    </div>
+  );
+  return <img src={first} alt="" onError={() => setFailed(true)} style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 8, background: '#050505', border: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }} />;
+}
+
 export default function AdminOrders() {
   const [authed, setAuthed] = useState(false);
   const [pw, setPw] = useState('');
   const [pwError, setPwError] = useState('');
   const [orders, setOrders] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [tab, setTab] = useState<'orders' | 'members'>('orders');
   const [filter, setFilter] = useState('all');
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -58,13 +70,15 @@ export default function AdminOrders() {
   useEffect(() => { if (checkAuth()) { setAuthed(true); loadData(); } }, []);
 
   async function loadData() {
-    const [{ data: o }, { data: m }] = await Promise.all([
+    const [{ data: o }, { data: m }, { data: p }] = await Promise.all([
       supabase.from('orders').select('*').order('created_at', { ascending: false }),
       supabase.from('members').select('id, first_name, last_name, email, member_status, created_at').order('created_at', { ascending: false }),
+      supabase.from('products').select('id, name, image_url'),
     ]);
     const ordersData = o || [];
     setOrders(ordersData);
     setMembers(m || []);
+    setProducts(p || []);
     setStats({
       total: ordersData.length,
       proofs: ordersData.filter((x: any) => x.payment_status === 'proof_uploaded').length,
@@ -72,6 +86,17 @@ export default function AdminOrders() {
       confirmed: ordersData.filter((x: any) => x.payment_status === 'payment_confirmed').length,
       memberCount: (m || []).length,
     });
+  }
+
+  // Match order to product image by name similarity
+  function getProductImage(orderProductName: string): string | undefined {
+    if (!orderProductName) return undefined;
+    const clean = orderProductName.toLowerCase().replace(/\(.*?\)/g, '').trim();
+    const match = products.find(p => {
+      const pName = (p.name || '').toLowerCase();
+      return clean.includes(pName) || pName.includes(clean) || clean.split(' ').some((w: string) => w.length > 3 && pName.includes(w));
+    });
+    return match?.image_url;
   }
 
   function handleLogin() {
@@ -110,8 +135,6 @@ export default function AdminOrders() {
     filters: { display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '20px' },
     filterBtn: (active: boolean) => ({ padding: '5px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '11px', letterSpacing: '1px', fontFamily: "'Barlow Condensed', sans-serif", background: active ? '#DC2626' : 'rgba(255,255,255,0.06)', color: active ? '#fff' : '#B8C1CC' }),
     card: { background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '18px', marginBottom: '12px' },
-    cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap' as const, gap: '8px' },
-    productName: { fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '18px' },
     badge: (status: string) => ({ background: `${STATUS_COLORS[status] || '#6B7280'}22`, color: STATUS_COLORS[status] || '#6B7280', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', fontFamily: "'Barlow Condensed', sans-serif" }),
     meta: { fontSize: '13px', color: '#6B7280', marginBottom: '4px' },
     proof: { marginTop: '10px', padding: '10px', background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: '6px' },
@@ -152,7 +175,6 @@ export default function AdminOrders() {
       </div>
 
       <div style={s.body}>
-        {/* STATS */}
         <div style={s.statsRow}>
           <div style={s.stat('#3B82F6')}><div style={s.statVal('#3B82F6')}>{stats.total}</div><div style={s.statLabel}>Total Orders</div></div>
           <div style={s.stat('#F97316')}><div style={s.statVal('#F97316')}>{stats.proofs}</div><div style={s.statLabel}>Proof Uploaded</div></div>
@@ -163,7 +185,6 @@ export default function AdminOrders() {
 
         {msg && <div style={{ ...s.msg, marginBottom: '16px', display: 'block' }}>{msg}</div>}
 
-        {/* TABS */}
         <div style={s.tabs}>
           <button style={s.tab(tab === 'orders')} onClick={() => setTab('orders')}>Orders ({orders.length})</button>
           <button style={s.tab(tab === 'members')} onClick={() => setTab('members')}>Members ({members.length})</button>
@@ -181,45 +202,48 @@ export default function AdminOrders() {
 
             {filtered.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: '#4B5563' }}>No orders found.</div>
-            ) : filtered.map((order: any) => (
-              <div key={order.id} style={s.card}>
-                <div style={s.cardTop}>
-                  <div>
-                    <div style={s.productName}>{order.product_name}</div>
-                    <div style={s.meta}>{order.member_name} · {order.email || order.member_email}</div>
-                    <div style={s.meta}>Ref: <span style={{ color: '#FACC15', fontFamily: 'monospace' }}>{order.reference_code || order.id?.slice(0, 8)}</span> · {new Date(order.created_at).toLocaleDateString('en-GB')}</div>
-                    {order.price && <div style={s.meta}>Price: <strong>{order.price} DKK</strong></div>}
+            ) : filtered.map((order: any) => {
+              const imgUrl = getProductImage(order.product_name);
+              return (
+                <div key={order.id} style={s.card}>
+                  <div style={s.cardTop || { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: 14, flex: 1, alignItems: 'flex-start' }}>
+                      <ProductThumb url={imgUrl} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '18px' }}>{order.product_name}</div>
+                        <div style={s.meta}>{order.member_name} · {order.email || order.member_email}</div>
+                        <div style={s.meta}>Ref: <span style={{ color: '#FACC15', fontFamily: 'monospace' }}>{order.payment_reference || order.reference_code || order.id?.slice(0, 8)}</span> · {new Date(order.created_at).toLocaleDateString('en-GB')}</div>
+                        {order.price && <div style={s.meta}>Price: <strong>{order.price} DKK</strong></div>}
+                      </div>
+                    </div>
+                    <span style={s.badge(order.payment_status)}>{STATUS_LABELS[order.payment_status] || order.payment_status}</span>
                   </div>
-                  <span style={s.badge(order.payment_status)}>{STATUS_LABELS[order.payment_status] || order.payment_status}</span>
-                </div>
 
-                {order.proof_url && (
-                  <div style={s.proof}>
-                    <a href={order.proof_url} target="_blank" rel="noreferrer" style={s.proofLink}>📸 View Payment Proof</a>
+                  {order.proof_url && (
+                    <div style={s.proof}>
+                      <a href={order.proof_url} target="_blank" rel="noreferrer" style={s.proofLink}>📸 View Payment Proof</a>
+                    </div>
+                  )}
+
+                  {order.admin_notes && (
+                    <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '8px' }}>Note: {order.admin_notes}</div>
+                  )}
+
+                  <div style={s.actions}>
+                    <select style={s.select} defaultValue={order.payment_status}
+                      onChange={e => setNotes(n => ({ ...n, [`${order.id}_status`]: e.target.value }))}>
+                      {STATUSES.map(st => <option key={st} value={st}>{STATUS_LABELS[st]}</option>)}
+                    </select>
+                    <input style={s.noteInput} placeholder="Admin notes..." value={notes[order.id] || ''} onChange={e => setNotes(n => ({ ...n, [order.id]: e.target.value }))} />
+                    <button style={s.saveBtn} disabled={saving === order.id}
+                      onClick={() => updateStatus(order.id, notes[`${order.id}_status`] || order.payment_status)}>
+                      {saving === order.id ? '...' : 'SAVE'}
+                    </button>
+                    <button style={s.delBtn} onClick={() => deleteOrder(order.id)}>Delete</button>
                   </div>
-                )}
-
-                {order.admin_notes && (
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '8px' }}>Note: {order.admin_notes}</div>
-                )}
-
-                <div style={s.actions}>
-                  <select style={s.select} defaultValue={order.payment_status}
-                    onChange={e => setNotes(n => ({ ...n, [`${order.id}_status`]: e.target.value }))}>
-                    {STATUSES.map(st => <option key={st} value={st}>{STATUS_LABELS[st]}</option>)}
-                  </select>
-                  <input style={s.noteInput} placeholder="Admin notes..." value={notes[order.id] || ''} onChange={e => setNotes(n => ({ ...n, [order.id]: e.target.value }))} />
-                  <button style={s.saveBtn} disabled={saving === order.id}
-                    onClick={() => {
-                      const sel = document.querySelector(`[data-order="${order.id}"]`) as HTMLSelectElement;
-                      updateStatus(order.id, notes[`${order.id}_status`] || order.payment_status);
-                    }}>
-                    {saving === order.id ? '...' : 'SAVE'}
-                  </button>
-                  <button style={s.delBtn} onClick={() => deleteOrder(order.id)}>Delete</button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </>
         )}
 

@@ -38,15 +38,105 @@ const FILTER_TABS = [
   { key: 'limited', label: 'Limited / Rare' },
 ];
 
-function ProductImage({ product }: { product: Product }) {
-  const [failed, setFailed] = useState(false);
-  if (!product.image_url || failed) return (
+// Parse comma-separated image URLs
+function parseImages(url: string): string[] {
+  if (!url) return [];
+  return url.split(',').map(u => u.trim()).filter(Boolean);
+}
+
+function ProductImage({ product, onClick }: { product: Product; onClick?: () => void }) {
+  const images = parseImages(product.image_url);
+  const [idx, setIdx] = useState(0);
+  const [failed, setFailed] = useState<Record<number, boolean>>({});
+
+  const current = images[idx];
+  const isFailed = failed[idx];
+
+  if (!current || isFailed) return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
       <span style={{ ...F, fontWeight: 900, fontSize: 40, color: 'rgba(255,255,255,0.06)', letterSpacing: 2 }}>{product.chassis}</span>
       <span style={{ ...FB, fontSize: 10, color: 'rgba(255,255,255,0.15)' }}>Image coming soon</span>
     </div>
   );
-  return <img src={product.image_url} alt={product.name} onError={() => setFailed(true)} style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />;
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <img
+        src={current}
+        alt={product.name}
+        onError={() => setFailed(f => ({ ...f, [idx]: true }))}
+        onClick={onClick}
+        style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', cursor: onClick ? 'zoom-in' : 'default' }}
+      />
+      {images.length > 1 && (
+        <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 4 }}>
+          {images.map((_, i) => (
+            <button key={i} onClick={e => { e.stopPropagation(); setIdx(i); }}
+              style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 3, border: 'none', background: i === idx ? '#DC2626' : 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, transition: 'all 0.2s' }} />
+          ))}
+        </div>
+      )}
+      {images.length > 1 && idx > 0 && (
+        <button onClick={e => { e.stopPropagation(); setIdx(i => i - 1); }}
+          style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+      )}
+      {images.length > 1 && idx < images.length - 1 && (
+        <button onClick={e => { e.stopPropagation(); setIdx(i => i + 1); }}
+          style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+      )}
+    </div>
+  );
+}
+
+// Fullscreen lightbox
+function Lightbox({ product, onClose }: { product: Product; onClose: () => void }) {
+  const images = parseImages(product.image_url);
+  const [idx, setIdx] = useState(0);
+  const [failed, setFailed] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowRight') setIdx(i => Math.min(i + 1, images.length - 1));
+      if (e.key === 'ArrowLeft') setIdx(i => Math.max(i - 1, 0));
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [images.length, onClose]);
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <button onClick={onClose} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', width: 40, height: 40, fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+
+      <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {!failed[idx] && images[idx] ? (
+          <img src={images[idx]} alt={product.name} onError={() => setFailed(f => ({ ...f, [idx]: true }))}
+            style={{ maxWidth: '90vw', maxHeight: '80vh', objectFit: 'contain', borderRadius: 12 }} />
+        ) : (
+          <div style={{ ...F, color: '#B8C1CC', fontSize: 18 }}>Image not available</div>
+        )}
+        {images.length > 1 && idx > 0 && (
+          <button onClick={() => setIdx(i => i - 1)} style={{ position: 'absolute', left: -50, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', width: 40, height: 40, fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+        )}
+        {images.length > 1 && idx < images.length - 1 && (
+          <button onClick={() => setIdx(i => i + 1)} style={{ position: 'absolute', right: -50, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', width: 40, height: 40, fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+        )}
+      </div>
+
+      <div style={{ marginTop: 16, ...F, fontSize: 16, color: '#F5F5F5', fontWeight: 700 }}>{product.name}</div>
+      {images.length > 1 && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          {images.map((_, i) => (
+            <button key={i} onClick={e => { e.stopPropagation(); setIdx(i); }}
+              style={{ width: i === idx ? 20 : 8, height: 8, borderRadius: 4, border: 'none', background: i === idx ? '#DC2626' : 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, transition: 'all 0.2s' }} />
+          ))}
+        </div>
+      )}
+      <div style={{ marginTop: 8, ...FB, fontSize: 12, color: '#6B7280' }}>
+        {images.length > 1 ? `${idx + 1} / ${images.length} · ` : ''}Press ESC or click outside to close
+      </div>
+    </div>
+  );
 }
 
 export default function ShopPage() {
@@ -63,6 +153,7 @@ export default function ShopPage() {
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [lightbox, setLightbox] = useState<Product | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -167,7 +258,7 @@ export default function ShopPage() {
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
                     <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15', marginBottom: 4 }}>✦ COLLECTOR · LIMITED</div>
                     <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                      <ProductImage product={p} />
+                      <ProductImage product={p} onClick={() => setLightbox(p)} />
                     </div>
                     <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 4, lineHeight: 1.1 }}>{p.name}</div>
                     <div style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC', marginBottom: 12 }}>{p.chassis} CHASSIS</div>
@@ -219,8 +310,8 @@ export default function ShopPage() {
                     {p.status === 'preorder only' && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>PREORDER</div>}
                     {isCollector && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#FACC1522', color: '#FACC15', border: '1px solid #FACC1544' }}>COLLECTOR</div>}
 
-                    <div style={{ height: 180, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }} onClick={() => openModal(p)}>
-                      <ProductImage product={p} />
+                    <div style={{ height: 180, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', position: 'relative' }}>
+                      <ProductImage product={p} onClick={() => parseImages(p.image_url).length > 0 && setLightbox(p)} />
                     </div>
 
                     <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -231,7 +322,6 @@ export default function ShopPage() {
                       <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
                       <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, flex: 1, margin: '0 0 14px' }}>{p.description}</p>
 
-                      {/* Built/Unbuilt toggle */}
                       <div style={{ display: 'flex', background: '#050505', borderRadius: 8, padding: 3, marginBottom: 10, border: '1px solid rgba(255,255,255,0.05)' }}>
                         {(['boxed', 'built'] as const).map(t => (
                           <button key={t} onClick={() => setType(p.id, t)}
@@ -241,7 +331,6 @@ export default function ShopPage() {
                         ))}
                       </div>
 
-                      {/* Built warning */}
                       {type === 'built' && (
                         <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, ...FB, fontSize: 12, color: '#FCA5A5', lineHeight: 1.5 }}>
                           ⚡ <strong>Race-Ready:</strong> This car is fully assembled, tuned, and ready to race right out of the box. No building required.
@@ -274,7 +363,10 @@ export default function ShopPage() {
         </div>
       </main>
 
-      {/* MODAL */}
+      {/* LIGHTBOX */}
+      {lightbox && <Lightbox product={lightbox} onClose={() => setLightbox(null)} />}
+
+      {/* RESERVE MODAL */}
       {selected && (
         <div onClick={closeModal} style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, maxHeight: '92vh', overflowY: 'auto' }}>
@@ -298,10 +390,9 @@ export default function ShopPage() {
                     <div style={{ ...F, fontWeight: 900, fontSize: 32, color: '#FACC15' }}>{getPrice(selected).toLocaleString()} DKK</div>
                   </div>
 
-                  {/* Built warning in modal */}
                   {getType(selected.id) === 'built' && (
                     <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#FCA5A5', lineHeight: 1.6 }}>
-                      ⚡ <strong style={{ color: '#fff' }}>Race-Ready Car:</strong> This is a fully assembled and tuned Mini 4WD — no building required. Open the box and race immediately. Perfect if you want to compete right away.
+                      ⚡ <strong style={{ color: '#fff' }}>Race-Ready Car:</strong> This is a fully assembled and tuned Mini 4WD — no building required. Open the box and race immediately.
                     </div>
                   )}
 
@@ -368,7 +459,7 @@ export default function ShopPage() {
                     <div style={{ ...F, fontSize: 10, letterSpacing: 4, color: '#B8C1CC', marginBottom: 4 }}>REFERENCE</div>
                     <div style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 18, color: '#FACC15' }}>{payRef}</div>
                   </div>
-                  <a href="/orders" style={{ display: 'block', background: '#DC2626', color: '#fff', borderRadius: 12, padding: '15px', ...F, fontWeight: 900, fontSize: 17, letterSpacing: 2, textDecoration: 'none' }}>VIEW MY ORDERS →</a>
+                  <a href="/profile?tab=orders" style={{ display: 'block', background: '#DC2626', color: '#fff', borderRadius: 12, padding: '15px', ...F, fontWeight: 900, fontSize: 17, letterSpacing: 2, textDecoration: 'none' }}>VIEW MY ORDERS →</a>
                 </div>
               )}
             </div>
