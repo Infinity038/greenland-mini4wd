@@ -106,7 +106,7 @@ export default function AdminOrders() {
 
   async function updateStatus(id: string, status: string) {
     setSaving(id);
-    await supabase.from('orders').update({ payment_status: status, status, admin_notes: notes[id] || '' }).eq('id', id);
+    await supabase.from('orders').update({ payment_status: status, admin_notes: notes[id] || '' }).eq('id', id);
     setMsg('✅ Updated');
     loadData();
     setSaving(null);
