@@ -188,7 +188,7 @@ export default function ProfilePage() {
                     </div>
                     {st === 'awaiting_payment' && (
                       <div style={{ marginTop: 12, background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 8, padding: 12, ...FB, fontSize: 13, color: '#FACC15' }}>
-                        💳 Send MobilePay to +299 XXXX XXXX with ref: <strong>{order.payment_reference}</strong>
+                        💳 Send MobilePay to <strong>+45 54 32 79 41</strong> (Jovannie Ducay) with ref: <strong>{order.payment_reference}</strong>
                       </div>
                     )}
                     {st === 'proof_uploaded' && (

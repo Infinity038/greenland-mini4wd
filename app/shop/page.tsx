@@ -417,7 +417,7 @@ export default function ShopPage() {
                     <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#FACC15', marginBottom: 12 }}>💳 MOBILEPAY INSTRUCTIONS</div>
                     <ol style={{ ...FB, fontSize: 14, color: '#F5F5F5', lineHeight: 2.2, margin: 0, paddingLeft: 20 }}>
                       <li>Open MobilePay on your phone</li>
-                      <li>Send <strong>{getPrice(selected).toLocaleString()} DKK</strong> to <strong>+299 XXXX XXXX</strong></li>
+                      <li>Send <strong>{getPrice(selected).toLocaleString()} DKK</strong> to <strong>+45 54 32 79 41</strong> (Jovannie Ducay)</li>
                       <li>Reference: <strong style={{ color: '#FACC15', fontFamily: 'monospace' }}>{payRef}</strong></li>
                       <li>Screenshot the confirmation</li>
                       <li>Upload it on the next step</li>
