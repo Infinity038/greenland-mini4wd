@@ -51,6 +51,10 @@ export default function TicketsPage() {
     setMember(getMemberData());
     fetchEarlyBirdSlots();
     fetchEntrants();
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('tab');
+      if (p === 'rules' || p === 'entrants' || p === 'pass') setActiveTab(p as any);
+    }
   }, []);
 
   useEffect(() => {
@@ -362,7 +366,14 @@ export default function TicketsPage() {
           {/* RACE PASS TAB */}
           {activeTab === 'pass' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Weekly Pass */}
+              {!member ? (
+                <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 40, textAlign: 'center' }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+                  <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#F5F5F5', marginBottom: 8 }}>MEMBERS ONLY</div>
+                  <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', marginBottom: 20 }}>Log in to view your Race Pass progress.</div>
+                  <a href="/register" style={{ background: '#DC2626', color: '#fff', borderRadius: 10, padding: '12px 28px', ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, textDecoration: 'none' }}>REGISTER FREE →</a>
+                </div>
+              ) : (
               <div style={{ background: '#071426', border: '1px solid rgba(250,204,21,0.15)', borderRadius: 14, padding: 24 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5' }}>WEEKLY RACE PASS</div>
@@ -412,6 +423,8 @@ export default function TicketsPage() {
                 </p>
               </div>
             </div>
+              )}
+            </div>
           )}
 
           {/* RULES TAB */}
@@ -423,7 +436,8 @@ export default function TicketsPage() {
                 <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#DC2626', marginBottom: 16, letterSpacing: 1 }}>🏁 GREENLAND MINI 4WD CLUB — RACE RULES</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
-                    ['🎟️', 'Ticket System', '1 ticket = 1 car entry. Each ticket gives 2 qualification lives. If a car loses both lives, it is eliminated and the ticket is consumed.'],
+                    ['🐦', 'Early Bird Tickets', 'Same rules as weekly tickets — 1 car entry, 2 qualification lives. The only difference is the discounted price (130 DKK vs 150 DKK). Limited slots per event.'],
+                    ['🎟️', 'Ticket System', '1 ticket = 1 car entry · 2 qualification lives per ticket · If a car loses both lives, it is eliminated and the ticket is consumed.'],
                     ['🚗', 'Car Entry', 'The same car cannot enter the same race category twice on the same race day. However, 1 car can enter multiple categories (e.g. Box Stock and B-Max in the same day).'],
                     ['🎁', 'Loyalty Rewards', 'Every 10 paid tickets = 1 FREE ticket. Weekly and Season passes are tracked separately. Free tickets do NOT count toward the loyalty 10.'],
                     ['🔧', 'Car Registration', 'All cars must be registered in your Garage before entering. Cars bought outside the shop are allowed as long as you are a registered member.'],
