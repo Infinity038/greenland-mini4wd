@@ -213,7 +213,7 @@ export default function AdminOrders() {
                         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '18px' }}>{order.product_name}</div>
                         <div style={s.meta}>{order.member_name} · {order.email || order.member_email}</div>
                         <div style={s.meta}>Ref: <span style={{ color: '#FACC15', fontFamily: 'monospace' }}>{order.payment_reference || order.reference_code || order.id?.slice(0, 8)}</span> · {new Date(order.created_at).toLocaleDateString('en-GB')}</div>
-                        {order.price && <div style={s.meta}>Price: <strong>{order.price} DKK</strong></div>}
+                        {order.notes && <div style={s.meta}>{order.notes}</div>}
                       </div>
                     </div>
                     <span style={s.badge(order.payment_status)}>{STATUS_LABELS[order.payment_status] || order.payment_status}</span>

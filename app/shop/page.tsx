@@ -195,9 +195,10 @@ export default function ShopPage() {
         product_name: `${selected.name} (${type === 'built' ? 'Built/Ready-to-Race' : 'Unbuilt/Boxed'})`,
         chassis: selected.chassis,
         type,
+        quantity: 1,
         status: 'pending',
         payment_status: 'awaiting_payment',
-        price,
+        notes: `Price: ${price} DKK`,
       }).select().single();
       if (err || !data) throw new Error('failed');
       const ref = generatePaymentRef(data.id);

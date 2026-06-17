@@ -180,8 +180,8 @@ export default function ProfilePage() {
                           {order.chassis && <span style={{ marginRight: 12 }}>Chassis: {order.chassis}</span>}
                           {new Date(order.created_at).toLocaleDateString()}
                         </div>
-                        {order.payment_reference && (
-                          <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#FACC15', marginTop: 4 }}>Ref: {order.payment_reference}</div>
+                        {order.notes && (
+                          <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#FACC15', marginTop: 4 }}>{order.notes}</div>
                         )}
                       </div>
                       <span style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 2, padding: '4px 12px', borderRadius: 20, background: statusColor + '22', color: statusColor, flexShrink: 0 }}>{statusLabel}</span>
