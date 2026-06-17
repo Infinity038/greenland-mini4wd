@@ -218,48 +218,52 @@ export default function ProfilePage() {
                 ))}
               </div>
 
-              {/* Race Pass Punch Card */}
-              <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5' }}>RACE PASS</div>
-                  <div style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 2, color: '#FACC15' }}>{wallet.loyalty_progress}/10 STAMPED</div>
-                </div>
-                <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginBottom: 16 }}>Buy 10 race tickets · Get 1 FREE</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gap: 5, marginBottom: 14 }}>
-                  {Array.from({ length: 10 }).map((_, i) => {
-                    const stamped = i < wallet.loyalty_progress;
-                    return (
-                      <div key={i} style={{
-                        aspectRatio: '1',
-                        borderRadius: '50%',
-                        border: stamped ? '2px solid #FACC15' : '1.5px solid rgba(250,204,21,0.25)',
-                        background: stamped ? '#FACC15' : 'transparent',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 9, fontWeight: 700,
-                        color: stamped ? '#111' : 'rgba(255,255,255,0.2)',
-                      }}>
-                        {stamped ? '✓' : i + 1}
-                      </div>
-                    );
-                  })}
-                  {/* FREE slot */}
-                  <div style={{
-                    aspectRatio: '1',
-                    borderRadius: '50%',
-                    border: wallet.loyalty_progress >= 10 ? '2px solid #DC2626' : '1.5px solid rgba(220,38,38,0.4)',
-                    background: wallet.loyalty_progress >= 10 ? '#DC2626' : 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 7, fontWeight: 900, letterSpacing: 0.5,
-                    color: wallet.loyalty_progress >= 10 ? '#fff' : 'rgba(220,38,38,0.5)',
-                  }}>
-                    FREE
+              {/* Race Pass Punch Card - Dual */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Weekly */}
+                <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5' }}>WEEKLY RACE PASS</div>
+                    <div style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#FACC15' }}>{(member as any)?.weekly_loyalty_progress || 0}/10</div>
                   </div>
+                  <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginBottom: 14 }}>10 weekly tickets → 1 FREE weekly ticket</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gap: 5, marginBottom: 12 }}>
+                    {Array.from({ length: 10 }).map((_, i) => {
+                      const stamped = i < ((member as any)?.weekly_loyalty_progress || 0);
+                      return (
+                        <div key={i} style={{ aspectRatio: '1', borderRadius: '50%', border: stamped ? '2px solid #FACC15' : '1.5px solid rgba(250,204,21,0.25)', background: stamped ? '#FACC15' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: stamped ? '#111' : 'rgba(255,255,255,0.2)' }}>
+                          {stamped ? '✓' : i + 1}
+                        </div>
+                      );
+                    })}
+                    <div style={{ aspectRatio: '1', borderRadius: '50%', border: ((member as any)?.weekly_loyalty_progress || 0) >= 10 ? '2px solid #DC2626' : '1.5px solid rgba(220,38,38,0.4)', background: ((member as any)?.weekly_loyalty_progress || 0) >= 10 ? '#DC2626' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 900, color: ((member as any)?.weekly_loyalty_progress || 0) >= 10 ? '#fff' : 'rgba(220,38,38,0.5)' }}>FREE</div>
+                  </div>
+                  <p style={{ ...FB, fontSize: 12, color: '#B8C1CC', margin: 0 }}>
+                    {((member as any)?.weekly_loyalty_progress || 0) >= 10 ? '🎉 Free ticket earned! Contact admin.' : `${10 - ((member as any)?.weekly_loyalty_progress || 0)} more to earn 1 FREE`}
+                  </p>
                 </div>
-                <p style={{ ...FB, fontSize: 13, color: wallet.loyalty_progress >= 10 ? '#22C55E' : '#B8C1CC', margin: 0 }}>
-                  {wallet.loyalty_progress >= 10
-                    ? '🎉 You earned a free bonus ticket! Contact admin to claim.'
-                    : `${wallet.loyalty_needed} more paid ticket${wallet.loyalty_needed !== 1 ? 's' : ''} to earn 1 FREE bonus ticket`}
-                </p>
+                {/* Season */}
+                <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5' }}>SEASON RACE PASS</div>
+                    <div style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#DC2626' }}>{(member as any)?.season_loyalty_progress || 0}/10</div>
+                  </div>
+                  <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginBottom: 14 }}>10 season tickets → 1 FREE season ticket</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gap: 5, marginBottom: 12 }}>
+                    {Array.from({ length: 10 }).map((_, i) => {
+                      const stamped = i < ((member as any)?.season_loyalty_progress || 0);
+                      return (
+                        <div key={i} style={{ aspectRatio: '1', borderRadius: '50%', border: stamped ? '2px solid #DC2626' : '1.5px solid rgba(220,38,38,0.25)', background: stamped ? '#DC2626' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: stamped ? '#fff' : 'rgba(255,255,255,0.2)' }}>
+                          {stamped ? '✓' : i + 1}
+                        </div>
+                      );
+                    })}
+                    <div style={{ aspectRatio: '1', borderRadius: '50%', border: ((member as any)?.season_loyalty_progress || 0) >= 10 ? '2px solid #FACC15' : '1.5px solid rgba(250,204,21,0.4)', background: ((member as any)?.season_loyalty_progress || 0) >= 10 ? '#FACC15' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 900, color: ((member as any)?.season_loyalty_progress || 0) >= 10 ? '#111' : 'rgba(250,204,21,0.5)' }}>FREE</div>
+                  </div>
+                  <p style={{ ...FB, fontSize: 12, color: '#B8C1CC', margin: 0 }}>
+                    {((member as any)?.season_loyalty_progress || 0) >= 10 ? '🎉 Free season ticket earned! Contact admin.' : `${10 - ((member as any)?.season_loyalty_progress || 0)} more to earn 1 FREE`}
+                  </p>
+                </div>
               </div>
 
               <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
