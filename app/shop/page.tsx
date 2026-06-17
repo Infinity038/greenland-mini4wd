@@ -188,16 +188,16 @@ export default function ShopPage() {
     const type = getType(selected.id);
     const price = getPrice(selected);
     try {
+      const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
       const { data, error: err } = await supabase.from('orders').insert({
         member_email: member.email,
-        member_name: member.name,
+        member_name: memberName,
         product_name: `${selected.name} (${type === 'built' ? 'Built/Ready-to-Race' : 'Unbuilt/Boxed'})`,
         chassis: selected.chassis,
         type,
         status: 'pending',
         payment_status: 'awaiting_payment',
         price,
-        notes: `Price: ${price} DKK`,
       }).select().single();
       if (err || !data) throw new Error('failed');
       const ref = generatePaymentRef(data.id);
