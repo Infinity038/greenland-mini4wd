@@ -106,11 +106,12 @@ export default function AdminOrders() {
 
   async function updateStatus(id: string, status: string) {
     setSaving(id);
-    await supabase.from('orders').update({ payment_status: status, admin_notes: notes[id] || '' }).eq('id', id);
-    setMsg('✅ Updated');
+    const { error } = await supabase.from('orders').update({ payment_status: status }).eq('id', id);
+    if (error) { setMsg('❌ Error: ' + error.message); }
+    else { setMsg('✅ Updated'); }
     loadData();
     setSaving(null);
-    setTimeout(() => setMsg(''), 2000);
+    setTimeout(() => setMsg(''), 3000);
   }
 
   async function deleteOrder(id: string) {
