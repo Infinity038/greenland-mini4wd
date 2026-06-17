@@ -88,7 +88,8 @@ export default function AdminTicketsPage() {
       const qty = ticket?.quantity || 1;
       const { data: member } = await supabase.from('members').select(col).eq('email', ticket.member_email).single();
       if (member) {
-        const current = member[col] || 0;
+        const m = member as any;
+        const current = m[col] || 0;
         const newVal = (current + qty) % 10; // resets at 10
         const grantFree = (current + qty) >= 10;
         await supabase.from('members').update({ [col]: newVal }).eq('email', ticket.member_email);
