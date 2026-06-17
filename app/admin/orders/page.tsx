@@ -230,7 +230,8 @@ export default function AdminOrders() {
                   )}
 
                   <div style={s.actions}>
-                    <select style={s.select} defaultValue={order.payment_status}
+                    <select style={s.select}
+                      value={notes[`${order.id}_status`] || order.payment_status}
                       onChange={e => setNotes(n => ({ ...n, [`${order.id}_status`]: e.target.value }))}>
                       {STATUSES.map(st => <option key={st} value={st}>{STATUS_LABELS[st]}</option>)}
                     </select>
