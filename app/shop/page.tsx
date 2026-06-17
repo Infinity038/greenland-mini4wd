@@ -21,7 +21,6 @@ interface Product {
   status: string;
   description: string;
   image_url: string;
-  product_type: string;
 }
 
 const STOCK_COLORS: Record<string, string> = {
@@ -34,8 +33,8 @@ const STOCK_COLORS: Record<string, string> = {
 
 const FILTER_TABS = [
   { key: 'all', label: 'All Products' },
-  { key: 'standard', label: 'Standard' },
-  { key: 'premium', label: 'Premium' },
+  { key: 'in stock', label: 'In Stock' },
+  { key: 'preorder only', label: 'Preorder' },
   { key: 'limited', label: 'Limited / Rare' },
 ];
 
@@ -73,25 +72,17 @@ export default function ShopPage() {
 
   async function fetchProducts() {
     setLoading(true);
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: true });
+    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: true });
     setProducts(data || []);
     setLoading(false);
   }
 
   const getType = (id: string) => types[id] || 'boxed';
   const setType = (id: string, t: string) => setTypes(p => ({ ...p, [id]: t }));
+  const getPrice = (p: Product) => getType(p.id) === 'built' ? p.price_dkk + 200 : p.price_dkk;
 
-  const filtered = products.filter(p => {
-    if (filter === 'standard') return p.category === 'standard';
-    if (filter === 'premium') return p.category === 'premium';
-    if (filter === 'limited') return p.category === 'limited' || p.status === 'limited';
-    return true;
-  });
-
-  const collectors = products.filter(p => p.category === 'limited' || p.status === 'limited');
+  const filtered = filter === 'all' ? products : products.filter(p => p.status === filter);
+  const collectors = products.filter(p => p.status === 'limited');
 
   const openModal = (p: Product) => {
     if (!isRegistered()) { window.location.href = '/register'; return; }
@@ -103,16 +94,19 @@ export default function ShopPage() {
   const placeOrder = async () => {
     if (!selected || !member) return;
     setUploading(true); setError('');
+    const type = getType(selected.id);
+    const price = getPrice(selected);
     try {
       const { data, error: err } = await supabase.from('orders').insert({
-        member_email: member.email, member_name: member.name,
-        product_name: `${selected.name} (${getType(selected.id) === 'built' ? 'Built/Ready' : 'Unbuilt/Boxed'})`,
+        member_email: member.email,
+        member_name: member.name,
+        product_name: `${selected.name} (${type === 'built' ? 'Built/Ready-to-Race' : 'Unbuilt/Boxed'})`,
         chassis: selected.chassis,
-        type: getType(selected.id),
+        type,
         status: 'pending',
         payment_status: 'awaiting_payment',
-        notes: `Price: ${getType(selected.id) === 'built' ? (selected.price_dkk + 200) : selected.price_dkk} DKK | Category: ${selected.category}`,
-        price: getType(selected.id) === 'built' ? (selected.price_dkk + 200) : selected.price_dkk,
+        price,
+        notes: `Price: ${price} DKK`,
       }).select().single();
       if (err || !data) throw new Error('failed');
       const ref = generatePaymentRef(data.id);
@@ -171,7 +165,7 @@ export default function ShopPage() {
                 {collectors.map(p => (
                   <div key={p.id} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
-                    <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15', marginBottom: 4 }}>✦ COLLECTOR</div>
+                    <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15', marginBottom: 4 }}>✦ COLLECTOR · LIMITED</div>
                     <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
                       <ProductImage product={p} />
                     </div>
@@ -205,20 +199,25 @@ export default function ShopPage() {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280', ...FB, fontSize: 14 }}>Loading products...</div>
           ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280', ...FB, fontSize: 14 }}>No products available yet.</div>
+            <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🏎️</div>
+              <div style={{ ...FB, fontSize: 14 }}>No products in this category yet.</div>
+            </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
               {filtered.map(p => {
                 const sc = STOCK_COLORS[p.status] || '#6B7280';
-                const isCollector = p.category === 'limited' || p.status === 'limited';
+                const isCollector = p.status === 'limited';
+                const type = getType(p.id);
+                const price = getPrice(p);
                 return (
                   <div key={p.id}
-                    style={{ background: isCollector ? 'linear-gradient(135deg, #0a0f1a, #071426)' : '#071426', border: `1px solid ${isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', transition: 'transform 0.15s' }}
+                    style={{ background: isCollector ? 'linear-gradient(135deg, #0a0f1a, #071426)' : '#071426', border: `1px solid ${isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', transition: 'transform 0.15s, border-color 0.15s' }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.5)' : 'rgba(220,38,38,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'translateY(0)'; }}
-                  >
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
                     {isCollector && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)', zIndex: 1 }} />}
                     {p.status === 'preorder only' && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>PREORDER</div>}
+                    {isCollector && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#FACC1522', color: '#FACC15', border: '1px solid #FACC1544' }}>COLLECTOR</div>}
 
                     <div style={{ height: 180, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }} onClick={() => openModal(p)}>
                       <ProductImage product={p} />
@@ -232,19 +231,27 @@ export default function ShopPage() {
                       <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
                       <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, flex: 1, margin: '0 0 14px' }}>{p.description}</p>
 
-                      <div style={{ display: 'flex', background: '#050505', borderRadius: 8, padding: 3, marginBottom: 14, border: '1px solid rgba(255,255,255,0.05)' }}>
+                      {/* Built/Unbuilt toggle */}
+                      <div style={{ display: 'flex', background: '#050505', borderRadius: 8, padding: 3, marginBottom: 10, border: '1px solid rgba(255,255,255,0.05)' }}>
                         {(['boxed', 'built'] as const).map(t => (
                           <button key={t} onClick={() => setType(p.id, t)}
-                            style={{ flex: 1, ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '8px 0', border: 'none', borderRadius: 6, background: getType(p.id) === t ? (t === 'built' ? '#DC2626' : 'rgba(255,255,255,0.1)') : 'transparent', color: getType(p.id) === t ? '#fff' : '#6B7280', cursor: 'pointer' }}>
+                            style={{ flex: 1, ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '8px 0', border: 'none', borderRadius: 6, background: type === t ? (t === 'built' ? '#DC2626' : 'rgba(255,255,255,0.1)') : 'transparent', color: type === t ? '#fff' : '#6B7280', cursor: 'pointer' }}>
                             {t === 'boxed' ? '🔧 UNBUILT' : '⚡ BUILT'}
                           </button>
                         ))}
                       </div>
 
+                      {/* Built warning */}
+                      {type === 'built' && (
+                        <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, ...FB, fontSize: 12, color: '#FCA5A5', lineHeight: 1.5 }}>
+                          ⚡ <strong>Race-Ready:</strong> This car is fully assembled, tuned, and ready to race right out of the box. No building required.
+                        </div>
+                      )}
+
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
-                          <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#B8C1CC' }}>{getType(p.id) === 'built' ? 'BUILT PRICE' : 'KIT PRICE'}</div>
-                          <div style={{ ...F, fontWeight: 900, fontSize: 26, color: isCollector ? '#FACC15' : '#F5F5F5' }}>{getType(p.id) === 'built' ? (p.price_dkk + 200).toLocaleString() : p.price_dkk?.toLocaleString()} kr</div>
+                          <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#B8C1CC' }}>{type === 'built' ? 'BUILT PRICE' : 'KIT PRICE'}</div>
+                          <div style={{ ...F, fontWeight: 900, fontSize: 26, color: isCollector ? '#FACC15' : '#F5F5F5' }}>{price.toLocaleString()} kr</div>
                         </div>
                         <button onClick={() => openModal(p)} disabled={p.status === 'sold out'}
                           style={{ background: p.status === 'sold out' ? '#1a1a1a' : '#DC2626', color: p.status === 'sold out' ? '#444' : '#fff', border: 'none', borderRadius: 10, padding: '11px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: p.status === 'sold out' ? 'not-allowed' : 'pointer' }}
@@ -285,9 +292,19 @@ export default function ShopPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 18 }}>
                     <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5' }}>{selected.name}</div>
-                    <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#B8C1CC', margin: '4px 0 12px' }}>{getType(selected.id) === 'built' ? 'Built / Ready-to-Race' : 'Unbuilt / Boxed Kit'} · {selected.chassis}</div>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 32, color: '#FACC15' }}>{getType(selected.id) === 'built' ? (selected.price_dkk + 200).toLocaleString() : selected.price_dkk?.toLocaleString()} DKK</div>
+                    <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#B8C1CC', margin: '4px 0 12px' }}>
+                      {getType(selected.id) === 'built' ? '⚡ Built / Ready-to-Race' : '🔧 Unbuilt / Boxed Kit'} · {selected.chassis}
+                    </div>
+                    <div style={{ ...F, fontWeight: 900, fontSize: 32, color: '#FACC15' }}>{getPrice(selected).toLocaleString()} DKK</div>
                   </div>
+
+                  {/* Built warning in modal */}
+                  {getType(selected.id) === 'built' && (
+                    <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#FCA5A5', lineHeight: 1.6 }}>
+                      ⚡ <strong style={{ color: '#fff' }}>Race-Ready Car:</strong> This is a fully assembled and tuned Mini 4WD — no building required. Open the box and race immediately. Perfect if you want to compete right away.
+                    </div>
+                  )}
+
                   <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 7 }}>
                     <div style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>👤 <span style={{ color: '#F5F5F5' }}>{member?.name}</span></div>
                     <div style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>📧 <span style={{ color: '#F5F5F5' }}>{member?.email}</span></div>
@@ -308,7 +325,7 @@ export default function ShopPage() {
                     <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#FACC15', marginBottom: 12 }}>💳 MOBILEPAY INSTRUCTIONS</div>
                     <ol style={{ ...FB, fontSize: 14, color: '#F5F5F5', lineHeight: 2.2, margin: 0, paddingLeft: 20 }}>
                       <li>Open MobilePay on your phone</li>
-                      <li>Send <strong>{getType(selected.id) === 'built' ? (selected.price_dkk + 200).toLocaleString() : selected.price_dkk?.toLocaleString()} DKK</strong> to <strong>+299 XXXX XXXX</strong></li>
+                      <li>Send <strong>{getPrice(selected).toLocaleString()} DKK</strong> to <strong>+299 XXXX XXXX</strong></li>
                       <li>Reference: <strong style={{ color: '#FACC15', fontFamily: 'monospace' }}>{payRef}</strong></li>
                       <li>Screenshot the confirmation</li>
                       <li>Upload it on the next step</li>
