@@ -2,35 +2,38 @@
 import { useState, useEffect } from "react";
 import { isRegistered, getMemberData, logout } from "@/lib/member";
 
-const NAV_LINKS = [{ label: "Leaderboard", href: "/leaderboard" },
-  { label: "Cars", href: "/cars" },
-  { label: "Tournament", href: "/tournament" },
-  { label: "Tickets", href: "/tickets" },
-  { label: "Events", href: "/events" },
-  { label: "Gallery", href: "/gallery" },
-  { label: "Shop", href: "/shop" },
-  { label: "Blog", href: "/blog" },
-  { label: "About", href: "/about" },
+const NAV_LINKS = [
+  { label: "Leaderboard", href: "/leaderboard" },
+  { label: "Cars",        href: "/cars" },
+  { label: "Tournament",  href: "/tournament" },
+  { label: "Race Rules",  href: "/rules" },
+  { label: "Tickets",     href: "/tickets" },
+  { label: "Events",      href: "/events" },
+  { label: "Gallery",     href: "/gallery" },
+  { label: "Shop",        href: "/shop" },
+  { label: "Blog",        href: "/blog" },
+  { label: "About",       href: "/about" },
 ];
 
 const MEMBER_LINKS = [
-  { label: "👤 Profile", href: "/profile" },
-  { label: "📦 My Orders", href: "/profile?tab=orders" },
+  { label: "👤 Profile",      href: "/profile" },
+  { label: "📦 My Orders",    href: "/profile?tab=orders" },
   { label: "🎟️ Race Tickets", href: "/profile?tab=tickets" },
+  { label: "🏎️ My Garage",   href: "/profile?tab=garage" },
 ];
 
 export default function Navbar() {
-  const [open, setOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [open, setOpen]           = useState(false);
+  const [menuOpen, setMenuOpen]   = useState(false);
   const [registered, setRegistered] = useState(false);
-  const [member, setMember] = useState<any>(null);
+  const [member, setMember]       = useState<any>(null);
 
   useEffect(() => {
     setRegistered(isRegistered());
     setMember(getMemberData());
   }, []);
 
-  const firstName = member?.first_name || "Member";
+  const firstName = member?.name?.split(' ')[0] || member?.first_name || "Member";
 
   return (
     <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, background: "rgba(5,5,5,0.97)", borderBottom: "1px solid rgba(220,38,38,0.3)" }}>
@@ -46,11 +49,20 @@ export default function Navbar() {
         </a>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex" style={{ alignItems: "center", gap: 24 }}>
+        <div className="hidden md:flex" style={{ alignItems: "center", gap: 20 }}>
           {NAV_LINKS.map(link => (
             <a key={link.label} href={link.href}
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: link.label === 'Tickets' ? 900 : 600, fontSize: 13, color: link.label === 'Tickets' ? '#FACC15' : '#B8C1CC', letterSpacing: 3, textDecoration: 'none', ...(link.label === 'Tickets' ? { border: '1px solid rgba(250,204,21,0.3)', padding: '4px 10px', borderRadius: 6 } : {}) }}>
-              {link.label === 'Tickets' ? '🎟️ ' + link.label : link.label}
+              style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontWeight: link.label === 'Tickets' ? 900 : 600,
+                fontSize: 13,
+                color: link.label === 'Tickets' ? '#FACC15' : link.label === 'Race Rules' ? '#22C55E' : '#B8C1CC',
+                letterSpacing: 3,
+                textDecoration: 'none',
+                ...(link.label === 'Tickets' ? { border: '1px solid rgba(250,204,21,0.3)', padding: '4px 10px', borderRadius: 6 } : {}),
+                ...(link.label === 'Race Rules' ? { border: '1px solid rgba(34,197,94,0.3)', padding: '4px 10px', borderRadius: 6 } : {}),
+              }}>
+              {link.label === 'Tickets' ? '🎟️ ' + link.label : link.label === 'Race Rules' ? '📋 ' + link.label : link.label}
             </a>
           ))}
 
@@ -65,7 +77,7 @@ export default function Navbar() {
                 <span style={{ fontSize: 10, color: "#B8C1CC" }}>▼</span>
               </button>
               {menuOpen && (
-                <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#071426", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, minWidth: 180, overflow: "hidden", zIndex: 100 }}>
+                <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#071426", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, minWidth: 200, overflow: "hidden", zIndex: 100 }}>
                   {MEMBER_LINKS.map(item => (
                     <a key={item.label} href={item.href}
                       style={{ display: "block", padding: "12px 18px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: 14, color: "#F5F5F5", textDecoration: "none", borderBottom: "1px solid rgba(255,255,255,0.05)", letterSpacing: 1 }}>
@@ -101,8 +113,8 @@ export default function Navbar() {
         <div style={{ background: "#050505", borderTop: "1px solid rgba(255,255,255,0.05)", padding: "8px 16px 24px" }}>
           {NAV_LINKS.map(link => (
             <a key={link.label} href={link.href} onClick={() => setOpen(false)}
-              style={{ display: "block", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 22, color: "#F5F5F5", letterSpacing: 3, textDecoration: "none" }}>
-              {link.label}
+              style={{ display: "block", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 22, color: link.label === 'Race Rules' ? '#22C55E' : "#F5F5F5", letterSpacing: 3, textDecoration: "none" }}>
+              {link.label === 'Race Rules' ? '📋 ' + link.label : link.label}
             </a>
           ))}
           {registered ? (

@@ -28,6 +28,7 @@ const NAV = [
   { href: '/admin/products',     icon: '🛒', label: 'Products',      desc: 'Shop catalog' },
   { href: '/admin/members',      icon: '👥', label: 'Members',       desc: 'Accounts & status' },
   { href: '/admin/tournaments',  icon: '🏁', label: 'Tournaments',   desc: 'Race events' },
+  { href: '/admin/cars',         icon: '🚗', label: 'Garage',        desc: 'Car approvals' },
   { href: '/admin/tickets',      icon: '🎟️', label: 'Tickets',       desc: 'Loyalty & bonus' },
   { href: '/admin/news',         icon: '📰', label: 'News',          desc: 'Posts & updates' },
   { href: '/admin/gallery',      icon: '🖼️', label: 'Gallery',       desc: 'Photos & media' },
