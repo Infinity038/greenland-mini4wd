@@ -1,12 +1,12 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { isRegistered } from '@/lib/member';
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 
-export const metadata = {
-  title: "About — Greenland Mini 4WD Club",
-  description: "Learn about Greenland's first Tamiya Mini 4WD racing community.",
-};
-
 export default function AboutPage() {
+  const [loggedIn, setLoggedIn] = useState(false);
+  useEffect(() => { setLoggedIn(isRegistered()); }, []);
   return (
     <>
       <Navbar />
@@ -93,9 +93,15 @@ export default function AboutPage() {
           <p style={{ color: "rgba(255,255,255,0.8)", marginBottom: 32, fontSize: 18 }}>
             Become a founding member of Greenland's first Mini 4WD racing community.
           </p>
-          <a href="/register" style={{ background: "#fff", color: "#D01B1B", padding: "16px 40px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, textDecoration: "none", letterSpacing: 2 }}>
-            JOIN NOW
-          </a>
+          {loggedIn ? (
+            <a href="/profile" style={{ background: "#fff", color: "#D01B1B", padding: "16px 40px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, textDecoration: "none", letterSpacing: 2 }}>
+              MY PROFILE →
+            </a>
+          ) : (
+            <a href="/register" style={{ background: "#fff", color: "#D01B1B", padding: "16px 40px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, textDecoration: "none", letterSpacing: 2 }}>
+              JOIN NOW
+            </a>
+          )}
         </section>
 
       </main>

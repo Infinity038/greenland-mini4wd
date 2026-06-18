@@ -1,6 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import Navbar from '@/components/layout/Navbar';
+import Footer from '@/components/layout/Footer';
+import { isRegistered } from '@/lib/member';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -138,7 +141,9 @@ export default function LeaderboardPage() {
   };
 
   return (
-    <div style={s.page}>
+    <>
+      <Navbar />
+      <div style={{...s.page, paddingTop: 60}}>
       <div style={s.hero}>
         <div style={s.heroInner}>
           <div style={s.eyebrow}>Greenland Mini 4WD Club</div>
@@ -248,5 +253,7 @@ export default function LeaderboardPage() {
         )}
       </div>
     </div>
+    <Footer />
+    </>
   );
 }
