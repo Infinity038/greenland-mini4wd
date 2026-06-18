@@ -91,10 +91,9 @@ export async function getMemberOrdersFromSupabase(email: string) {
 
 // ─── Ticket wallet ───────────────────────────────────────────
 // Table: race_tickets
-// ticket_type values: 'weekly' | 'weekly_earlybird' | 'season'
+// ticket_type: 'weekly' | 'weekly_earlybird' | 'season' | 'bonus'
 // payment_status: 'awaiting_payment' | 'proof_uploaded' | 'payment_confirmed' | 'cancelled'
-// Paid = confirmed weekly or earlybird tickets
-// Bonus = tickets with ticket_type 'bonus' or granted free tickets
+// quantity field stores how many tickets per order row — must SUM not COUNT rows
 export async function getTicketWallet(email: string): Promise<TicketWallet> {
   const { data: tickets } = await supabase
     .from('race_tickets')
@@ -103,22 +102,28 @@ export async function getTicketWallet(email: string): Promise<TicketWallet> {
 
   const all: any[] = tickets || [];
 
-  // Confirmed paid tickets (weekly + earlybird, payment confirmed, not cancelled)
-  const paid = all.filter((t: any) =>
+  // Confirmed paid ticket rows (weekly + earlybird + season, payment confirmed)
+  const confirmedRows = all.filter((t: any) =>
     (t.ticket_type === 'weekly' || t.ticket_type === 'weekly_earlybird' || t.ticket_type === 'season') &&
     t.payment_status === 'payment_confirmed'
   );
 
-  const paidUsed = paid.filter((t: any) => t.used === true || t.status === 'used').length;
-  const paidAvailable = paid.filter((t: any) => t.used !== true && t.status !== 'used' && t.payment_status !== 'cancelled').length;
-  const paidTotal = paid.length;
+  // Sum quantity field — each row may represent multiple tickets
+  const paidTotal = confirmedRows.reduce((sum: number, t: any) => sum + (Number(t.quantity) || 1), 0);
 
-  // Bonus tickets (free/granted)
-  const bonusAvailable = all.filter((t: any) =>
-    t.ticket_type === 'bonus' && t.payment_status !== 'cancelled'
-  ).length;
+  // Used = rows marked used, sum their quantities
+  const paidUsed = confirmedRows
+    .filter((t: any) => t.used === true || t.status === 'used')
+    .reduce((sum: number, t: any) => sum + (Number(t.quantity) || 1), 0);
 
-  // Loyalty: count all confirmed paid tickets (all time) for punch card
+  const paidAvailable = paidTotal - paidUsed;
+
+  // Bonus tickets
+  const bonusAvailable = all
+    .filter((t: any) => t.ticket_type === 'bonus' && t.payment_status !== 'cancelled')
+    .reduce((sum: number, t: any) => sum + (Number(t.quantity) || 1), 0);
+
+  // Loyalty punch card: every 10 confirmed paid tickets = 1 free
   const loyaltyProgress = paidTotal % 10;
 
   return {
