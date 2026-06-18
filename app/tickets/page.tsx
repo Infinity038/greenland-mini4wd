@@ -10,12 +10,10 @@ const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
 const CLASSES = [
-  { name: 'Box Stock', color: '#22C55E', desc: 'Kit parts only. No upgrades. Stock gear and motor.' },
-  { name: 'PRO-Stock', color: '#3B82F6', desc: 'Limited rollers (6 plastic), specific motors only.' },
-  { name: 'Basic', color: '#A855F7', desc: 'All Tamiya plastic parts. No carbon stays.' },
-  { name: 'Advanced', color: '#F97316', desc: 'Carbon allowed. No-cut gimmicks permitted.' },
-  { name: 'BMAX', color: '#FACC15', desc: 'Like Advanced + slide damper gimmicks allowed.' },
-  { name: 'Open', color: '#DC2626', desc: 'Full Tamiya mods. Everything goes.' },
+  { name: 'Box Stock',      color: '#22C55E', desc: 'Contents inside the box are fixed. What comes in the box is what you use — no modifications allowed.' },
+  { name: 'Open Box Stock', color: '#3B82F6', desc: 'Same as Box Stock but with limited cosmetic replacements. Allowed: mag color, cowl color, chassis color only. Cannot change type — only color.' },
+  { name: 'B-Max',          color: '#F97316', desc: 'Carbon allowed, gimmicks allowed. Slide damper systems permitted. For experienced builders.' },
+  { name: 'Open Class',     color: '#DC2626', desc: 'No restrictions on modifications, motors, or parts. Full performance tuning allowed. Most competitive class.' },
 ];
 
 const TICKET_TYPES = [
