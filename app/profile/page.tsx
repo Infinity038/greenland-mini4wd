@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getMemberData, getMemberDataFromSupabase, getTicketWallet, getReferralStats, RANK_COLORS, RANK_NEXT_POINTS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, getMemberOrdersFromSupabase, logout } from '@/lib/member';
 import type { Member, TicketWallet, ReferralStats } from '@/lib/member';
+import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 
@@ -12,18 +13,22 @@ const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const DEMO_WALLET: TicketWallet = { paid_total: 3, paid_used: 2, paid_available: 1, bonus_available: 0, loyalty_progress: 3, loyalty_needed: 7 };
 const DEMO_REFERRAL: ReferralStats = { referral_code: 'DEMO1234', referral_link: 'https://greenland-mini4wd.vercel.app/register?ref=DEMO1234', confirmed_referrals: 1, pending_referrals: 2, bonus_tickets_earned: 1 };
 
-type Tab = 'overview' | 'orders' | 'tickets' | 'referral';
+type Tab = 'overview' | 'orders' | 'tickets' | 'garage' | 'referral';
 
 export default function ProfilePage() {
   const [member, setMember] = useState<Member | null>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [wallet, setWallet] = useState<TicketWallet>(DEMO_WALLET);
   const [referral, setReferral] = useState<ReferralStats>(DEMO_REFERRAL);
+  const [cars, setCars] = useState<any[]>([]);
+  const [addingCar, setAddingCar] = useState(false);
+  const [carForm, setCarForm] = useState({ name: '', chassis: 'AR', series: '', color: '', image_url: '', bought_from: 'outside', notes: '' });
+  const [carSaving, setCarSaving] = useState(false);
   const [tab, setTab] = useState<Tab>(
     () => {
       if (typeof window !== "undefined") {
         const p = new URLSearchParams(window.location.search).get("tab");
-        if (p === "orders" || p === "tickets" || p === "referral") return p as Tab;
+        if (p === "orders" || p === "tickets" || p === "referral" || p === "garage") return p as Tab;
       }
       return "overview";
     }
@@ -44,6 +49,9 @@ export default function ProfilePage() {
       setOrders(o);
       setWallet(w);
       setReferral(r);
+      // Fetch garage cars
+      const { data: carsData } = await supabase.from('cars').select('*').eq('member_email', local.email).order('created_at', { ascending: false });
+      setCars(carsData || []);
       setLoading(false);
     }).catch(() => { setMember(local); setLoading(false); });
   }, []);
@@ -66,7 +74,7 @@ export default function ProfilePage() {
     </div>
   );
 
-  const TABS: Tab[] = ['overview', 'orders', 'tickets', 'referral'];
+  const TABS: Tab[] = ['overview', 'orders', 'tickets', 'garage', 'referral'];
 
   return (
     <>
@@ -281,6 +289,115 @@ export default function ProfilePage() {
               <a href="/tournament" style={{ display: 'block', textAlign: 'center', background: '#DC2626', color: '#fff', borderRadius: 12, padding: '16px 24px', ...F, fontWeight: 900, fontSize: 18, letterSpacing: 2, textDecoration: 'none' }}>
                 VIEW UPCOMING TOURNAMENTS →
               </a>
+            </div>
+          )}
+
+          {/* GARAGE */}
+          {tab === 'garage' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#F5F5F5' }}>MY GARAGE</div>
+                  <div style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>Your registered race cars</div>
+                </div>
+                <button onClick={() => setAddingCar(true)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', ...F, fontWeight: 900, fontSize: 14, letterSpacing: 1, cursor: 'pointer' }}>+ ADD CAR</button>
+              </div>
+
+              {cars.length === 0 && !addingCar ? (
+                <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 40, textAlign: 'center' }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>🏎️</div>
+                  <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5', marginBottom: 8 }}>NO CARS YET</div>
+                  <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', marginBottom: 20 }}>Register your Mini 4WD cars to enter tournaments. Cars bought outside the shop are welcome!</div>
+                  <button onClick={() => setAddingCar(true)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 24px', ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, cursor: 'pointer' }}>REGISTER YOUR FIRST CAR</button>
+                </div>
+              ) : null}
+
+              {/* Add car form */}
+              {addingCar && (
+                <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 12, padding: 24 }}>
+                  <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 16 }}>REGISTER A CAR</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {[
+                      { label: 'CAR NAME / NICKNAME', key: 'name', placeholder: 'e.g. Shadow Shark, Flame Astute...' },
+                      { label: 'SERIES / MODEL', key: 'series', placeholder: 'e.g. Flame Astute, Geo Glider...' },
+                      { label: 'COLOR / BODY', key: 'color', placeholder: 'e.g. Blue/Silver, Stock body...' },
+                      { label: 'IMAGE URL (optional)', key: 'image_url', placeholder: 'https://...' },
+                      { label: 'NOTES (optional)', key: 'notes', placeholder: 'Any modifications, tuning notes...' },
+                    ].map(f => (
+                      <div key={f.key}>
+                        <label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 5 }}>{f.label}</label>
+                        <input value={(carForm as any)[f.key]} onChange={e => setCarForm(p => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder}
+                          style={{ width: '100%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 14px', color: '#F5F5F5', ...FB, fontSize: 14, outline: 'none', boxSizing: 'border-box' as const }} />
+                      </div>
+                    ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div>
+                        <label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 5 }}>CHASSIS</label>
+                        <select value={carForm.chassis} onChange={e => setCarForm(p => ({ ...p, chassis: e.target.value }))}
+                          style={{ width: '100%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 14px', color: '#F5F5F5', ...FB, fontSize: 14, outline: 'none' }}>
+                          {['AR', 'MA', 'VS', 'MS', 'FM-A', 'S2', 'Other'].map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 5 }}>BOUGHT FROM</label>
+                        <select value={carForm.bought_from} onChange={e => setCarForm(p => ({ ...p, bought_from: e.target.value }))}
+                          style={{ width: '100%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 14px', color: '#F5F5F5', ...FB, fontSize: 14, outline: 'none' }}>
+                          <option value="club_shop">Club Shop</option>
+                          <option value="outside">Outside (Personal)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button onClick={async () => {
+                        if (!carForm.name || !member?.email) return;
+                        setCarSaving(true);
+                        const memberName = (member as any)?.name || member?.email;
+                        await supabase.from('cars').insert({ ...carForm, member_email: member.email, member_name: memberName, status: 'pending' });
+                        const { data } = await supabase.from('cars').select('*').eq('member_email', member.email).order('created_at', { ascending: false });
+                        setCars(data || []);
+                        setCarForm({ name: '', chassis: 'AR', series: '', color: '', image_url: '', bought_from: 'outside', notes: '' });
+                        setAddingCar(false);
+                        setCarSaving(false);
+                      }} disabled={carSaving || !carForm.name}
+                        style={{ flex: 1, background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '12px', ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, cursor: 'pointer', opacity: carSaving || !carForm.name ? 0.5 : 1 }}>
+                        {carSaving ? 'SAVING...' : 'REGISTER CAR'}
+                      </button>
+                      <button onClick={() => setAddingCar(false)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#B8C1CC', borderRadius: 8, padding: '12px 20px', ...FB, fontSize: 14, cursor: 'pointer' }}>Cancel</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Car list */}
+              {cars.map(car => (
+                <div key={car.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                  {car.image_url ? (
+                    <img src={car.image_url} alt={car.name} style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 8, background: '#050505', border: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  ) : (
+                    <div style={{ width: 72, height: 72, borderRadius: 8, background: '#050505', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, flexShrink: 0 }}>🏎️</div>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                      <span style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5' }}>{car.name}</span>
+                      <span style={{ ...F, fontSize: 9, letterSpacing: 1, padding: '2px 8px', borderRadius: 20, background: car.status === 'approved' ? 'rgba(34,197,94,0.15)' : car.status === 'rejected' ? 'rgba(220,38,38,0.15)' : 'rgba(250,204,21,0.15)', color: car.status === 'approved' ? '#22C55E' : car.status === 'rejected' ? '#DC2626' : '#FACC15' }}>
+                        {car.status === 'approved' ? '✓ APPROVED' : car.status === 'rejected' ? '✕ REJECTED' : '⏳ PENDING'}
+                      </span>
+                    </div>
+                    <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {car.chassis && <span>Chassis: <strong style={{ color: '#F5F5F5' }}>{car.chassis}</strong></span>}
+                      {car.series && <span>Series: <strong style={{ color: '#F5F5F5' }}>{car.series}</strong></span>}
+                      {car.color && <span>Color: <strong style={{ color: '#F5F5F5' }}>{car.color}</strong></span>}
+                      <span>{car.bought_from === 'club_shop' ? '🏪 Club Shop' : '🛒 Outside Purchase'}</span>
+                    </div>
+                    {car.notes && <div style={{ ...FB, fontSize: 12, color: '#6B7280', marginTop: 4 }}>{car.notes}</div>}
+                    {car.status === 'pending' && <div style={{ ...FB, fontSize: 11, color: '#FACC15', marginTop: 6 }}>⏳ Awaiting admin approval before you can race with this car.</div>}
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#93C5FD', lineHeight: 1.7 }}>
+                ℹ️ All cars require admin approval before race entry. Cars are verified to ensure fair competition. Approval usually takes less than 24 hours.
+              </div>
             </div>
           )}
 
