@@ -24,7 +24,7 @@ export default function AdminLoginPage() {
     await new Promise(r => setTimeout(r, 800)); // simulate auth
     if (password === ADMIN_PASSWORD) {
       if (remember && typeof window !== 'undefined') {
-        localStorage.setItem('gm4wd_admin', '1');
+        localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + 8 * 60 * 60 * 1000 }));
       }
       router.push('/admin');
     } else {

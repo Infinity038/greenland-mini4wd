@@ -73,7 +73,7 @@ export default function AdminPage() {
       supabase.from('orders').select('id, payment_status, status, created_at, member_name, product_name').order('created_at', { ascending: false }),
       supabase.from('tournaments').select('id, status'),
       supabase.from('products').select('id, status, stock_qty'),
-      supabase.from('tickets').select('id, ticket_type, status'),
+      supabase.from('race_tickets').select('id, ticket_type, payment_status'),
       supabase.from('seasons').select('name, is_active').eq('is_active', true).limit(1),
       supabase.from('hall_of_fame').select('id, member_name').neq('member_name', 'TBD'),
     ]);

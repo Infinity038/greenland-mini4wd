@@ -1,143 +1,51 @@
-'use client';
-import { useEffect, useState } from 'react';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
-import { supabase } from '@/lib/supabase';
+"use client";
+import { useState } from "react";
 
-interface GalleryItem {
-  id: string;
-  title: string;
-  caption: string;
-  image_url: string;
-  category: string;
-}
-
-const LOCAL_IMAGES: GalleryItem[] = [
-  { id: 'l1', title: 'Race Day', caption: 'First race session in Nuuk', image_url: '/IMG_5374.png', category: 'Race Day' },
-  { id: 'l2', title: 'Race Day', caption: 'Cars lined up at the start', image_url: '/IMG_5375.png', category: 'Race Day' },
-  { id: 'l3', title: 'Community', caption: 'Club members gathering', image_url: '/IMG_5376.png', category: 'Community' },
-  { id: 'l4', title: 'Builds', caption: 'Custom chassis build', image_url: '/IMG_5377.png', category: 'Builds' },
-  { id: 'l5', title: 'Community', caption: 'Arctic Hustle crew', image_url: '/IMG_5378.png', category: 'Community' },
+const ITEMS = [
+  { id: 1, label: "Race Day",      emoji: "🏎️", bg: "linear-gradient(135deg,#3b0000,#1a0000)" },
+  { id: 2, label: "Custom Builds", emoji: "🔧", bg: "linear-gradient(135deg,#001a3b,#00082b)" },
+  { id: 3, label: "Team Photo",    emoji: "📸", bg: "linear-gradient(135deg,#003b1a,#001a0a)" },
+  { id: 4, label: "Workshop",      emoji: "🛠️", bg: "linear-gradient(135deg,#3b2e00,#1a1500)" },
+  { id: 5, label: "Track Setup",   emoji: "🏁", bg: "linear-gradient(135deg,#1a003b,#0a001a)" },
+  { id: 6, label: "Awards Night",  emoji: "🏆", bg: "linear-gradient(135deg,#003b3b,#001a1a)" },
 ];
 
-const CATEGORIES = ['All', 'Race Day', 'Builds', 'Community'];
-
-function getCatColor(category: string): string {
-  const c = (category || '').toLowerCase();
-  if (c === 'race day') return '#DC2626';
-  if (c === 'builds') return '#FACC15';
-  if (c === 'community') return '#22C55E';
-  return '#DC2626';
-}
-
-export default function GalleryPage() {
-  const [items, setItems] = useState<GalleryItem[]>([]);
-  const [filter, setFilter] = useState('All');
-  const [lightbox, setLightbox] = useState<GalleryItem | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from('gallery_items')
-        .select('*')
-        .order('created_at', { ascending: false });
-      setItems(data && data.length > 0 ? data : LOCAL_IMAGES);
-      setLoading(false);
-    }
-    load();
-  }, []);
-
-  // Case-insensitive filter match
-  const filtered = filter === 'All'
-    ? items
-    : items.filter(i => (i.category || '').toLowerCase() === filter.toLowerCase());
+export default function Gallery() {
+  const [hovered, setHovered] = useState<number | null>(null);
 
   return (
-    <>
-      <Navbar />
-      <main style={{ background: '#050505', color: '#F5F5F5', minHeight: '100vh' }}>
+    <section id="gallery" style={{ background: "#F3F4F6", padding: "80px 20px" }}>
+      <div style={{ maxWidth: 1152, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 48 }}>
+          <p style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 600, color: "#D01B1B", letterSpacing: "0.3em", marginBottom: 8 }}>COMMUNITY</p>
+          <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, color: "#111827", lineHeight: 1, margin: 0, fontSize: "clamp(38px, 6vw, 58px)" }}>PHOTO GALLERY</h2>
+        </div>
 
-        {/* Header */}
-        <section style={{ padding: '80px 24px 40px', textAlign: 'center' }}>
-          <div style={{ fontSize: 12, letterSpacing: 4, color: '#DC2626', fontFamily: "'Barlow Condensed', sans-serif", marginBottom: 12 }}>
-            GREENLAND MINI 4WD CLUB
-          </div>
-          <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 'clamp(48px, 10vw, 80px)', fontWeight: 900, lineHeight: 1, margin: '0 0 16px' }}>
-            PHOTO <span style={{ color: '#DC2626' }}>GALLERY</span>
-          </h1>
-          <p style={{ color: '#B8C1CC', fontSize: 16, maxWidth: 480, margin: '0 auto' }}>
-            Race days, builds, and community moments from Nuuk, Greenland.
-          </p>
-        </section>
-
-        {/* Filter Tabs */}
-        <section style={{ padding: '0 24px 32px', display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setFilter(cat)}
-              style={{
-                padding: '8px 20px',
-                borderRadius: 999,
-                border: filter === cat ? 'none' : '1px solid #333',
-                background: filter === cat ? '#DC2626' : 'transparent',
-                color: filter === cat ? '#fff' : '#B8C1CC',
-                fontFamily: "'Barlow Condensed', sans-serif",
-                fontSize: 14,
-                fontWeight: 700,
-                letterSpacing: 2,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-            >
-              {cat.toUpperCase()}
-            </button>
-          ))}
-        </section>
-
-        {/* Grid */}
-        <section style={{ padding: '0 16px 80px', maxWidth: 1100, margin: '0 auto' }}>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', color: '#B8C1CC' }}>Loading...</div>
-          ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', color: '#B8C1CC' }}>No photos yet in this category.</div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-              {filtered.map(item => (
-                <div
-                  key={item.id}
-                  onClick={() => setLightbox(item)}
-                  style={{ position: 'relative', aspectRatio: '4/3', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', background: '#071426' }}
-                >
-                  <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  <div style={{ position: 'absolute', top: 10, left: 10, background: getCatColor(item.category), color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: 2, padding: '3px 8px', borderRadius: 4, fontFamily: "'Barlow Condensed', sans-serif" }}>
-                    {(item.category || '').toUpperCase()}
-                  </div>
-                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%)', display: 'flex', alignItems: 'flex-end', padding: 12 }}>
-                    <span style={{ color: '#fff', fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>{item.caption}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Lightbox */}
-        {lightbox && (
-          <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-            <button onClick={() => setLightbox(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', color: '#fff', fontSize: 32, cursor: 'pointer', lineHeight: 1 }}>✕</button>
-            <img src={lightbox.image_url} alt={lightbox.title} style={{ maxWidth: '100%', maxHeight: '75vh', borderRadius: 8, objectFit: 'contain' }} onClick={e => e.stopPropagation()} />
-            <div style={{ marginTop: 16, textAlign: 'center' }}>
-              <div style={{ display: 'inline-block', background: getCatColor(lightbox.category), color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: 2, padding: '3px 10px', borderRadius: 4, fontFamily: "'Barlow Condensed', sans-serif", marginBottom: 8 }}>
-                {(lightbox.category || '').toUpperCase()}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+          {ITEMS.map((item, i) => (
+            <div key={item.id}
+              style={{ position: "relative", borderRadius: 8, overflow: "hidden", border: "1px solid rgba(255,255,255,0.05)", cursor: "pointer", aspectRatio: "1/1", minHeight: i === 0 ? 220 : 100, gridColumn: i === 0 ? "span 2" : "span 1", gridRow: i === 0 ? "span 2" : "span 1", transform: hovered === item.id ? "translateY(-2px)" : "none", transition: "transform 0.2s" }}
+              onMouseEnter={() => setHovered(item.id)}
+              onMouseLeave={() => setHovered(null)}>
+              <div style={{ width: "100%", height: "100%", background: item.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <span style={{ fontSize: i === 0 ? 40 : 20 }}>{item.emoji}</span>
+                <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: "rgba(255,255,255,0.9)", letterSpacing: "0.2em", fontSize: i === 0 ? 14 : 9 }}>
+                  {item.label.toUpperCase()}
+                </span>
               </div>
-              <p style={{ color: '#B8C1CC', fontSize: 14, margin: 0 }}>{lightbox.caption}</p>
+              {hovered === item.id && (
+                <div style={{ position: "absolute", inset: 0, background: "rgba(176,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 30 }}>🔍</span>
+                </div>
+              )}
             </div>
-          </div>
-        )}
-      </main>
-      <Footer />
-    </>
+          ))}
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: 32 }}>
+          <a href="/gallery" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 14, color: "#D01B1B", letterSpacing: "0.2em", textDecoration: "none" }}>VIEW FULL GALLERY →</a>
+        </div>
+      </div>
+    </section>
   );
 }
