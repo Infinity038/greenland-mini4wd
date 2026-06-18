@@ -419,6 +419,7 @@ export default function ShopPage() {
                       </div>
                     </div>
                   </div>
+                  {getType(selected.id) === 'built' && (
                     <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#FCA5A5', lineHeight: 1.6 }}>
                       ⚡ <strong style={{ color: '#fff' }}>Race-Ready Car:</strong> This is a fully assembled and tuned Mini 4WD — no building required. Open the box and race immediately.
                     </div>

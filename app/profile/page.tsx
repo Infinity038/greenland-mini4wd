@@ -39,21 +39,28 @@ export default function ProfilePage() {
   useEffect(() => {
     const local = getMemberData();
     if (!local?.email) { setLoading(false); return; }
-    Promise.all([
-      getMemberDataFromSupabase(local.email),
-      getMemberOrdersFromSupabase(local.email),
-      getTicketWallet(local.email),
-      getReferralStats(local),
-    ]).then(([m, o, w, r]) => {
-      setMember(m || local);
-      setOrders(o);
-      setWallet(w);
-      setReferral(r);
-      // Fetch garage cars
-      const { data: carsData } = await supabase.from('cars').select('*').eq('member_email', local.email).order('created_at', { ascending: false });
-      setCars(carsData || []);
-      setLoading(false);
-    }).catch(() => { setMember(local); setLoading(false); });
+
+    async function loadAll() {
+      try {
+        const [m, o, w, r] = await Promise.all([
+          getMemberDataFromSupabase(local.email),
+          getMemberOrdersFromSupabase(local.email),
+          getTicketWallet(local.email),
+          getReferralStats(local),
+        ]);
+        setMember(m || local);
+        setOrders(o);
+        setWallet(w);
+        setReferral(r);
+        const { data: carsData } = await supabase.from('cars').select('*').eq('member_email', local.email).order('created_at', { ascending: false });
+        setCars(carsData || []);
+      } catch {
+        setMember(local);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadAll();
   }, []);
 
   const copyReferral = () => {
