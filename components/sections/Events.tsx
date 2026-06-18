@@ -1,66 +1,84 @@
-import type { Event } from "@/types";
+'use client';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
-const EVENTS = [
-  { id: 1, date: "7", month: "JUN", title: "Nuuk Summer Sprint Race", location: "Nuuk Community Center, Nuuk", type: "Race" as const, spots: 14 },
-  { id: 2, date: "21", month: "JUN", title: "Beginner Build Workshop", location: "Hans Egede Skole, Nuuk", type: "Workshop" as const, spots: 18 },
-  { id: 3, date: "5", month: "JUL", title: "Open Track Friday Night", location: "Nuuk Community Center, Nuuk", type: "Open Track" as const, spots: null },
-];
+const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
+const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
-const TYPE_STYLES: Record<Event["type"], string> = {
-  Race: "text-red-500 bg-red-500/10",
-  Workshop: "text-blue-400 bg-blue-400/10",
-  "Open Track": "text-emerald-400 bg-emerald-400/10",
+const TYPE_COLORS: Record<string,{text:string;bg:string}> = {
+  Race:         { text:'#DC2626', bg:'rgba(220,38,38,0.12)' },
+  Workshop:     { text:'#60A5FA', bg:'rgba(96,165,250,0.12)' },
+  'Open Track': { text:'#34D399', bg:'rgba(52,211,153,0.12)' },
+  ongoing:      { text:'#22C55E', bg:'rgba(34,197,94,0.12)' },
+  upcoming:     { text:'#3B82F6', bg:'rgba(59,130,246,0.12)' },
 };
 
 export default function Events() {
+  const [events, setEvents] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase.from('tournaments')
+      .select('*')
+      .in('status', ['upcoming', 'ongoing'])
+      .order('date', { ascending: true })
+      .limit(3)
+      .then(({ data }) => setEvents(data || []));
+  }, []);
+
   return (
-    <section id="events" className="bg-[#F3F4F6] px-5 py-20">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
+    <section id="events" style={{ background: '#071426', borderTop: '1px solid rgba(255,255,255,0.05)', padding: '80px 20px' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 48 }}>
           <div>
-            <p className="text-xs font-semibold text-[#D01B1B] tracking-[0.3em] mb-2"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>UPCOMING</p>
-            <h2 className="font-black text-[#111827] leading-none"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(38px, 6vw, 58px)" }}>
-              EVENTS &<br />RACES
+            <p style={{ ...F, fontSize: 12, fontWeight: 600, color: '#DC2626', letterSpacing: '0.3em', marginBottom: 8 }}>UPCOMING</p>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 'clamp(38px,6vw,58px)', color: '#F5F5F5', lineHeight: 1, margin: 0 }}>
+              EVENTS &amp;<br />RACES
             </h2>
           </div>
-          <a href="/events" className="font-bold text-sm text-[#D01B1B] tracking-widest no-underline hover:text-red-400"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>VIEW ALL →</a>
+          <a href="/events" style={{ ...F, fontWeight: 700, fontSize: 14, color: '#DC2626', letterSpacing: '0.2em', textDecoration: 'none' }}>VIEW ALL →</a>
         </div>
 
-        <div className="flex flex-col gap-4">
-          {EVENTS.map((ev) => (
-            <div key={ev.id}
-              className="bg-white border border-[#E5E7EB] hover:border-[#DC2626] rounded-lg p-5 md:p-6 grid grid-cols-[72px_1fr] md:grid-cols-[80px_1fr_auto] gap-4 md:gap-6 items-center transition-all duration-200 hover:-translate-y-0.5 cursor-pointer">
-              <div className="text-center bg-red-900/10 border border-red-900/20 rounded-md py-3 px-2">
-                <div className="font-black text-xl text-[#D01B1B] leading-none"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.date}</div>
-                <div className="text-[10px] text-slate-300 tracking-widest mt-0.5"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.month}</div>
-              </div>
-              <div className="min-w-0">
-                <div className="mb-2">
-                  <span className={`text-[10px] font-bold tracking-widest px-2.5 py-0.5 rounded-full ${TYPE_STYLES[ev.type]}`}
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.type.toUpperCase()}</span>
+        {events.length === 0 ? (
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '48px 24px', textAlign: 'center' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🏁</div>
+            <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#F5F5F5', marginBottom: 8 }}>NEXT RACE BEING SCHEDULED</div>
+            <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', marginBottom: 20 }}>Follow us on social media to get notified first.</div>
+            <a href="/tournament" style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: '0.2em', color: '#DC2626', textDecoration: 'none', border: '1px solid rgba(220,38,38,0.3)', padding: '10px 20px', borderRadius: 6 }}>VIEW TOURNAMENTS →</a>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {events.map(ev => {
+              const isLive = ev.status === 'ongoing';
+              const date = ev.date ? new Date(ev.date) : null;
+              const tc = isLive ? TYPE_COLORS.ongoing : TYPE_COLORS.upcoming;
+              return (
+                <div key={ev.id} style={{ background: isLive ? 'linear-gradient(135deg,#071426,#0a1f0a)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isLive ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 12, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+                  {date && (
+                    <div style={{ textAlign: 'center', background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '12px 14px', flexShrink: 0 }}>
+                      <div style={{ ...F, fontWeight: 900, fontSize: 26, color: '#DC2626', lineHeight: 1 }}>{date.getDate()}</div>
+                      <div style={{ ...F, fontSize: 10, color: '#9CA3AF', letterSpacing: '0.2em', marginTop: 2 }}>{date.toLocaleString('en', { month: 'short' }).toUpperCase()}</div>
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ marginBottom: 6 }}>
+                      <span style={{ ...F, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', color: tc.text, background: tc.bg, borderRadius: 20, padding: '3px 10px' }}>
+                        {isLive ? '🔴 LIVE NOW' : '🗓️ UPCOMING'}
+                      </span>
+                    </div>
+                    <div style={{ ...F, fontWeight: 700, fontSize: 22, color: '#F5F5F5', lineHeight: 1.2, marginBottom: 4 }}>{ev.name}</div>
+                    {ev.location && <div style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>📍 {ev.location}</div>}
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    {ev.ticket_price_dkk && <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#FACC15', marginBottom: 6 }}>{ev.ticket_price_dkk} DKK</div>}
+                    <a href="/tickets" style={{ display: 'inline-block', background: '#DC2626', color: '#fff', padding: '10px 20px', borderRadius: 6, ...F, fontWeight: 700, fontSize: 13, letterSpacing: '0.2em', textDecoration: 'none' }}>
+                      BUY TICKET
+                    </a>
+                  </div>
                 </div>
-                <div className="font-bold text-xl md:text-2xl text-[#111827] leading-tight mb-1"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{ev.title}</div>
-                <div className="text-sm text-slate-300" style={{ fontFamily: "'DM Sans', sans-serif" }}>📍 {ev.location}</div>
-              </div>
-              <div className="hidden md:block text-right flex-shrink-0">
-                {ev.spots && <p className="text-xs text-slate-300 mb-2">{ev.spots} spots left</p>}
-                <button className="bg-[#D01B1B] hover:bg-red-700 text-white px-5 py-2.5 rounded font-bold text-sm tracking-widest border-none cursor-pointer"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>RSVP</button>
-              </div>
-              <div className="col-span-2 flex items-center justify-between md:hidden pt-2 border-t border-white/5">
-                <span className="text-xs text-slate-300">{ev.spots ? `${ev.spots} spots left` : "Open to all"}</span>
-                <button className="bg-[#D01B1B] text-white px-5 py-2 rounded font-bold text-sm tracking-widest border-none cursor-pointer"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>RSVP</button>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );
