@@ -41,7 +41,9 @@ export interface ReferralStats {
 // ─── Session ─────────────────────────────────────────────────
 export function isRegistered(): boolean {
   if (typeof window === 'undefined') return false;
-  return document.cookie.includes('gm4wd_registered=1');
+  const hasCookie = document.cookie.includes('gm4wd_registered=1');
+  const hasMember = !!localStorage.getItem('gm4wd_member');
+  return hasCookie || hasMember;
 }
 
 export function getMemberData(): Member | null {
@@ -88,21 +90,36 @@ export async function getMemberOrdersFromSupabase(email: string) {
 }
 
 // ─── Ticket wallet ───────────────────────────────────────────
+// Table: race_tickets
+// ticket_type values: 'weekly' | 'weekly_earlybird' | 'season'
+// payment_status: 'awaiting_payment' | 'proof_uploaded' | 'payment_confirmed' | 'cancelled'
+// Paid = confirmed weekly or earlybird tickets
+// Bonus = tickets with ticket_type 'bonus' or granted free tickets
 export async function getTicketWallet(email: string): Promise<TicketWallet> {
   const { data: tickets } = await supabase
-    .from('tickets')
+    .from('race_tickets')
     .select('*')
     .eq('member_email', email);
 
   const all: any[] = tickets || [];
-  const paid: any[] = all.filter((t: any) => t.ticket_type === 'paid' && t.status !== 'cancelled');
-  const paidUsed: number = paid.filter((t: any) => t.status === 'used').length;
-  const paidAvailable: number = paid.filter((t: any) => t.status === 'available').length;
-  const paidTotal: number = paid.length;
-  const bonusAvailable: number = all.filter((t: any) => t.ticket_type !== 'paid' && t.status === 'available').length;
 
-  const confirmedPaid: number = paid.filter((t: any) => t.status !== 'cancelled').length;
-  const loyaltyProgress: number = confirmedPaid % 10;
+  // Confirmed paid tickets (weekly + earlybird, payment confirmed, not cancelled)
+  const paid = all.filter((t: any) =>
+    (t.ticket_type === 'weekly' || t.ticket_type === 'weekly_earlybird' || t.ticket_type === 'season') &&
+    t.payment_status === 'payment_confirmed'
+  );
+
+  const paidUsed = paid.filter((t: any) => t.used === true || t.status === 'used').length;
+  const paidAvailable = paid.filter((t: any) => t.used !== true && t.status !== 'used' && t.payment_status !== 'cancelled').length;
+  const paidTotal = paid.length;
+
+  // Bonus tickets (free/granted)
+  const bonusAvailable = all.filter((t: any) =>
+    t.ticket_type === 'bonus' && t.payment_status !== 'cancelled'
+  ).length;
+
+  // Loyalty: count all confirmed paid tickets (all time) for punch card
+  const loyaltyProgress = paidTotal % 10;
 
   return {
     paid_total: paidTotal,
