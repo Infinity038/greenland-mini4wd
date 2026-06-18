@@ -17,7 +17,7 @@ export default function ShopPreview() {
 
   useEffect(() => {
     supabase.from('products').select('*').eq('status', 'available').order('created_at', { ascending: false }).limit(4)
-      .then(({ data }) => setItems(data && data.length > 0 ? data : FALLBACK));
+      .then(({ data }: { data: any[] | null }) => setItems(data && data.length > 0 ? data : FALLBACK));
   }, []);
 
   const display = items.length > 0 ? items : FALLBACK;

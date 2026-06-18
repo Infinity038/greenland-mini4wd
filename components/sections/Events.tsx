@@ -22,7 +22,7 @@ export default function Events() {
       .in('status', ['upcoming', 'ongoing'])
       .order('date', { ascending: true })
       .limit(3)
-      .then(({ data }) => setEvents(data || []));
+      .then(({ data }: { data: any[] | null }) => setEvents(data || []));
   }, []);
 
   return (

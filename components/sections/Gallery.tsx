@@ -20,7 +20,7 @@ export default function Gallery() {
 
   useEffect(() => {
     supabase.from('gallery_items').select('*').eq('published', true).order('created_at', { ascending: false }).limit(6)
-      .then(({ data }) => setItems(data || []));
+      .then(({ data }: { data: any[] | null }) => setItems(data || []));
   }, []);
 
   const display = items.length > 0 ? items : PLACEHOLDERS.map((p,i) => ({ id: i, image_url: null, ...p }));
