@@ -191,7 +191,6 @@ export default function ShopPage() {
     const price = getPrice(selected);
     try {
       const depositAmount = Math.ceil(price / 2);
-      const payNow = paymentOption === 'deposit' ? depositAmount : price;
       const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
       const { data, error: err } = await supabase.from('orders').insert({
         member_email: member.email,

@@ -12,7 +12,6 @@ function checkAuth() {
 }
 function saveAuth() { localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + 8 * 60 * 60 * 1000 })); }
 
-const CHASSIS = ['AR', 'MA', 'VS', 'MS', 'FM-A', 'S2', 'Other'];
 const STATUS_COLORS: Record<string, string> = { pending: '#FACC15', approved: '#22C55E', rejected: '#DC2626' };
 
 export default function AdminCarsPage() {
