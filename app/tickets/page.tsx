@@ -68,7 +68,7 @@ export default function TicketsPage() {
   }
 
   async function fetchEntrants() {
-    const { data } = await supabase.from('race_tickets').select('*').eq('payment_status', 'payment_confirmed').order('created_at', { ascending: true });
+    const { data } = await supabase.from('race_entries').select('*').order('created_at', { ascending: true });
     setEntrants(data || []);
   }
 
@@ -124,8 +124,9 @@ export default function TicketsPage() {
 
   const resetFlow = () => { setStep('select'); setTicketId(''); setPayRef(''); setProofFile(null); setProofPreview(null); setError(''); };
 
-  const weeklyEntrants = entrants.filter(e => e.ticket_type === 'weekly' || e.ticket_type === 'weekly_earlybird');
-  const seasonEntrants = entrants.filter(e => e.ticket_type === 'season');
+  // race_entries grouped - weekly = entries linked to weekly tickets, season = season tickets
+  const weeklyEntrants = entrants.filter(e => !e.race_category?.includes('season'));
+  const seasonEntrants = entrants.filter(e => e.race_category?.includes('season'));
 
   return (
     <>
@@ -201,8 +202,9 @@ export default function TicketsPage() {
                       <button onClick={() => setQuantity(q => Math.max(1, q - 1))}
                         style={{ width: 40, height: 40, borderRadius: '50%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', color: '#F5F5F5', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                       <span style={{ ...F, fontWeight: 900, fontSize: 32, color: '#F5F5F5', minWidth: 40, textAlign: 'center' }}>{quantity}</span>
-                      <button onClick={() => setQuantity(q => q + 1)}
-                        style={{ width: 40, height: 40, borderRadius: '50%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', color: '#F5F5F5', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                      <button onClick={() => setQuantity(q => ticketType === 'weekly_earlybird' ? Math.min(q + 1, earlyBirdLeft) : q + 1)}
+                        disabled={ticketType === 'weekly_earlybird' && quantity >= earlyBirdLeft}
+                        style={{ width: 40, height: 40, borderRadius: '50%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', color: '#F5F5F5', fontSize: 20, cursor: ticketType === 'weekly_earlybird' && quantity >= earlyBirdLeft ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: ticketType === 'weekly_earlybird' && quantity >= earlyBirdLeft ? 0.4 : 1 }}>+</button>
                       <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
                         <div style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC' }}>TOTAL</div>
                         <div style={{ ...F, fontWeight: 900, fontSize: 28, color: '#FACC15' }}>{total} DKK</div>
@@ -312,52 +314,46 @@ export default function TicketsPage() {
           {/* ENTRANTS TAB */}
           {activeTab === 'entrants' && (
             <div>
-              {/* Weekly */}
-              <div style={{ marginBottom: 32 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                  <span style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#FACC15' }}>🏁 WEEKLY TOURNAMENT ENTRANTS</span>
-                  <div style={{ flex: 1, height: 1, background: 'rgba(250,204,21,0.2)' }} />
-                  <span style={{ ...F, fontSize: 11, color: '#B8C1CC' }}>{weeklyEntrants.length} entered</span>
+                <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 20 }}>
+                  Members who have registered their car for a race. Grouped by race category.
                 </div>
-                {weeklyEntrants.length === 0 ? (
-                  <div style={{ ...FB, fontSize: 14, color: '#6B7280', textAlign: 'center', padding: '40px 0' }}>No entrants yet. Be the first!</div>
-                ) : weeklyEntrants.map((e, i) => (
-                  <div key={e.id} onClick={() => setFighter(e)}
-                    style={{ background: '#071426', border: `1px solid ${i < 3 ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 12, padding: '14px 18px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, transition: 'border-color 0.15s' }}>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 22, color: i === 0 ? '#FACC15' : i === 1 ? '#aaa' : i === 2 ? '#CD7F32' : '#6B7280', minWidth: 32, textAlign: 'center' }}>
-                      {i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5' }}>{e.member_name}</div>
-                      <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>
-                        {e.ticket_type === 'weekly_earlybird' ? '🐦 Early Bird' : '🏁 Weekly'} · {e.quantity} ticket{e.quantity > 1 ? 's' : ''}
-                      </div>
-                    </div>
-                    <div style={{ ...F, fontSize: 11, color: '#DC2626', letterSpacing: 1 }}>VIEW →</div>
+                {entrants.length === 0 ? (
+                  <div style={{ ...FB, fontSize: 14, color: '#6B7280', textAlign: 'center', padding: '40px 0' }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>🏁</div>
+                    No race entries yet. Register your car and enter a tournament!
                   </div>
-                ))}
-              </div>
-
-              {/* Season */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                  <span style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#DC2626' }}>🏆 END SEASON ENTRANTS</span>
-                  <div style={{ flex: 1, height: 1, background: 'rgba(220,38,38,0.2)' }} />
-                  <span style={{ ...F, fontSize: 11, color: '#B8C1CC' }}>{seasonEntrants.length} entered</span>
-                </div>
-                {seasonEntrants.length === 0 ? (
-                  <div style={{ ...FB, fontSize: 14, color: '#6B7280', textAlign: 'center', padding: '40px 0' }}>Season event coming soon.</div>
-                ) : seasonEntrants.map((e, i) => (
-                  <div key={e.id} onClick={() => setFighter(e)}
-                    style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 12, padding: '14px 18px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#DC2626', minWidth: 32, textAlign: 'center' }}>#{i + 1}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5' }}>{e.member_name}</div>
-                      <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>🏆 Season · {e.quantity} ticket{e.quantity > 1 ? 's' : ''}</div>
-                    </div>
-                    <div style={{ ...F, fontSize: 11, color: '#DC2626', letterSpacing: 1 }}>VIEW →</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                    {CATS.map(cat => {
+                      const catEntrants = entrants.filter(e => e.race_category === cat.id);
+                      return (
+                        <div key={cat.id}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                            <span style={{ fontSize: 16 }}>{cat.icon}</span>
+                            <span style={{ ...F, fontWeight: 900, fontSize: 16, color: cat.color, letterSpacing: 2 }}>{cat.label.toUpperCase()}</span>
+                            <div style={{ flex: 1, height: 1, background: cat.color + '33' }} />
+                            <span style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{catEntrants.length} entered</span>
+                          </div>
+                          {catEntrants.length === 0 ? (
+                            <div style={{ ...FB, fontSize: 13, color: '#6B7280', padding: '12px 0 0' }}>No entries yet in this category.</div>
+                          ) : catEntrants.map((e, i) => (
+                            <div key={e.id} onClick={() => setFighter(e)}
+                              style={{ background: '#071426', border: `1px solid ${i < 3 ? cat.color + '33' : 'rgba(255,255,255,0.06)'}`, borderRadius: 12, padding: '14px 18px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
+                              <div style={{ ...F, fontWeight: 900, fontSize: 20, color: i === 0 ? '#FACC15' : i === 1 ? '#aaa' : i === 2 ? '#CD7F32' : '#6B7280', minWidth: 28, textAlign: 'center' }}>
+                                {i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ ...F, fontWeight: 900, fontSize: 17, color: '#F5F5F5' }}>{e.member_name || e.member_email?.split('@')[0]}</div>
+                                <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>🏎️ {e.car_name || '—'} · {e.chassis || '—'}</div>
+                              </div>
+                              <div style={{ ...F, fontSize: 11, color: '#DC2626', letterSpacing: 1 }}>VIEW →</div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                )}
               </div>
             </div>
           )}

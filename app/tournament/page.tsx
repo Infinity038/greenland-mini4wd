@@ -79,6 +79,7 @@ export default function TournamentPage() {
 
   // Fighter card modal
   const [fighter, setFighter]           = useState(null);
+  const [fighterCars, setFighterCars]   = useState([]);
 
   useEffect(() => {
     const reg = isRegistered();
@@ -111,6 +112,15 @@ export default function TournamentPage() {
 
   const openRegModal = (t) => { setRegTournament(t); setRegCar(''); setRegCategory(''); setRegError(''); setRegSuccess(''); setRegModal(true); };
   const openEntrantsModal = (t) => { setEntrantsTournament(t); setEntrantsModal(true); };
+
+  const openFighter = async (e) => {
+    setFighter(e);
+    setFighterCars([]);
+    if (e.member_email) {
+      const { data } = await supabase.from('cars').select('*').eq('member_email', e.member_email).eq('status', 'approved');
+      setFighterCars(data || []);
+    }
+  };
 
   const submitEntry = async () => {
     if (!regCar || !regCategory) { setRegError('Select a car and category.'); return; }
@@ -247,15 +257,33 @@ export default function TournamentPage() {
                                 👥 {total} ENTRANT{total !== 1 ? 'S' : ''} →
                               </button>
                               {loggedIn ? (
-                                availableTickets > 0 ? (
-                                  <button onClick={()=>openRegModal(t)} style={{ background:'#DC2626', color:'#fff', border:'none', borderRadius:8, padding:'10px 20px', ...F, fontWeight:900, fontSize:13, letterSpacing:1, cursor:'pointer' }}>
-                                    ENTER RACE →
-                                  </button>
-                                ) : (
-                                  <a href="/tickets" style={{ display:'inline-block', background:'rgba(220,38,38,0.15)', color:'#DC2626', border:'1px solid rgba(220,38,38,0.3)', borderRadius:8, padding:'10px 20px', ...F, fontWeight:700, fontSize:12, letterSpacing:1, textDecoration:'none' }}>
-                                    BUY TICKET FIRST
-                                  </a>
-                                )
+                                (() => {
+                                  // Match tickets to tournament type
+                                  const tType = t.ticket_type || 'weekly';
+                                  const matchingTickets = myTickets.filter(tk =>
+                                    tType === 'season' ? tk.ticket_type === 'season' :
+                                    tk.ticket_type === 'weekly' || tk.ticket_type === 'weekly_earlybird'
+                                  );
+                                  const matchingUsed = myEntries.filter(e => e.tournament_id === t.id).length;
+                                  const matchingAvail = matchingTickets.reduce((s,tk)=>s+(Number(tk.quantity)||1),0) - matchingUsed;
+                                  if (matchingAvail > 0) return (
+                                    <button onClick={()=>openRegModal(t)} style={{ background:'#DC2626', color:'#fff', border:'none', borderRadius:8, padding:'10px 20px', ...F, fontWeight:900, fontSize:13, letterSpacing:1, cursor:'pointer' }}>
+                                      ENTER RACE →
+                                    </button>
+                                  );
+                                  if (myTotalTickets > 0 && matchingAvail <= 0) return (
+                                    <div style={{ textAlign:'right' }}>
+                                      <a href="/tickets" style={{ display:'inline-block', background:'rgba(220,38,38,0.15)', color:'#DC2626', border:'1px solid rgba(220,38,38,0.3)', borderRadius:8, padding:'8px 14px', ...F, fontWeight:700, fontSize:11, letterSpacing:1, textDecoration:'none' }}>
+                                        {tType === 'season' ? 'NEED SEASON TICKET' : 'NEED WEEKLY TICKET'}
+                                      </a>
+                                    </div>
+                                  );
+                                  return (
+                                    <a href="/tickets" style={{ display:'inline-block', background:'rgba(220,38,38,0.15)', color:'#DC2626', border:'1px solid rgba(220,38,38,0.3)', borderRadius:8, padding:'10px 20px', ...F, fontWeight:700, fontSize:12, letterSpacing:1, textDecoration:'none' }}>
+                                      BUY TICKET FIRST
+                                    </a>
+                                  );
+                                })()
                               ) : (
                                 <a href="/register" style={{ display:'inline-block', background:'#DC2626', color:'#fff', borderRadius:8, padding:'10px 20px', ...F, fontWeight:900, fontSize:13, letterSpacing:1, textDecoration:'none' }}>
                                   REGISTER →
@@ -386,7 +414,7 @@ export default function TournamentPage() {
                     const isTop3 = i < 3;
                     const crown  = i===0 ? '👑' : i===1 ? '🥈' : '🥉';
                     return (
-                      <button key={e.id} onClick={()=>{ setFighter(e); setEntrantsModal(false); }}
+                      <button key={e.id} onClick={()=>{ openFighter(e); setEntrantsModal(false); }}
                         style={{ background: isTop3 ? 'rgba(250,204,21,0.05)' : 'rgba(255,255,255,0.03)', border:`1px solid ${isTop3 ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)'}`, borderRadius:10, padding:'14px 16px', display:'flex', alignItems:'center', gap:12, cursor:'pointer', textAlign:'left', width:'100%' }}>
                         <div style={{ width:30, height:30, borderRadius:'50%', background: isTop3 ? '#FACC15' : '#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', ...F, fontWeight:900, fontSize:13, color: isTop3 ? '#111' : '#B8C1CC', flexShrink:0 }}>
                           {isTop3 ? crown : i+1}
@@ -502,6 +530,23 @@ export default function TournamentPage() {
                   </div>
                 ))}
               </div>
+              {/* Cars */}
+              {fighterCars.length > 0 && (
+                <div style={{ marginBottom:16 }}>
+                  <div style={{ ...F, fontSize:10, letterSpacing:3, color:'#6B7280', marginBottom:8 }}>GARAGE CARS</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {fighterCars.map(car => (
+                      <div key={car.id} style={{ background:'rgba(255,255,255,0.04)', borderRadius:8, padding:'10px 14px', display:'flex', alignItems:'center', gap:10 }}>
+                        <span style={{ fontSize:18 }}>🏎️</span>
+                        <div>
+                          <div style={{ ...F, fontWeight:700, fontSize:14, color:'#F5F5F5' }}>{car.name}</div>
+                          <div style={{ ...FB, fontSize:11, color:'#B8C1CC' }}>{car.chassis}{car.series ? ` · ${car.series}` : ''}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div style={{ ...FB, fontSize:12, color:'#6B7280', textAlign:'center', marginBottom:16 }}>Win records appear after first race</div>
               <button onClick={()=>{ setFighter(null); setEntrantsModal(true); }} style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:12, ...F, fontWeight:700, fontSize:15, color:'#F5F5F5', cursor:'pointer', letterSpacing:1 }}>
                 ← BACK TO ENTRANTS
