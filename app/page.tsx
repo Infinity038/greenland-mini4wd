@@ -1,3 +1,6 @@
+// @ts-nocheck
+'use client';
+import { useEffect, useState } from 'react';
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import Hero from "@/components/sections/Hero";
@@ -8,14 +11,18 @@ import Gallery from "@/components/sections/Gallery";
 import Blog from "@/components/sections/Blog";
 import ShopPreview from "@/components/sections/ShopPreview";
 import JoinCTA from "@/components/sections/JoinCTA";
+import { isRegistered } from "@/lib/member";
 
 export default function HomePage() {
+  const [registered, setRegistered] = useState(false);
+  useEffect(() => { setRegistered(isRegistered()); }, []);
+
   return (
     <>
       <Navbar />
       <main>
         <Hero />
-        <RegisterFirst />
+        {!registered && <RegisterFirst />}
         <About />
         <Events />
         <Gallery />

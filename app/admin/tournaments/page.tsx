@@ -7,8 +7,8 @@ const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const SC: Record<string,string> = {upcoming:'#3B82F6',ongoing:'#22C55E',completed:'#6B7280',cancelled:'#DC2626'};
 const STATUSES = ['upcoming','ongoing','completed','cancelled'];
-const RACE_CLASSES = ['Box Stock','PRO-Stock','Basic','Advanced','BMAX','Open'];
-const CLASS_COLORS: Record<string,string> = {'Box Stock':'#22C55E','PRO-Stock':'#3B82F6','Basic':'#A855F7','Advanced':'#F97316','BMAX':'#FACC15','Open':'#DC2626'};
+const RACE_CLASSES = ['Box Stock','Open Box Stock','B-Max','Open Class'];
+const CLASS_COLORS: Record<string,string> = {'Box Stock':'#22C55E','Open Box Stock':'#3B82F6','B-Max':'#F97316','Open Class':'#DC2626'};
 const inp = (x?:any) => ({width:'100%',background:'#050505',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'11px 14px',color:'#F5F5F5',fontFamily:"'DM Sans',sans-serif",fontSize:14,outline:'none',boxSizing:'border-box' as const,...x});
 
 function checkAuth(){if(typeof window==='undefined')return false;const s=localStorage.getItem('adminSession');if(!s)return false;try{const{expires}=JSON.parse(s);return Date.now()<expires;}catch{return false;}}
