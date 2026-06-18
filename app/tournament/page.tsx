@@ -104,9 +104,9 @@ export default function TournamentPage() {
     load();
   }, []);
 
-  const myTotalTickets  = myTickets.reduce((s,t)=>s+(Number(t.quantity)||1),0);
-  const usedTickets     = myEntries.length;
-  const availableTickets = myTotalTickets - usedTickets;
+  const myTotalTickets   = myTickets.reduce((s,t)=>s+(Number(t.quantity)||1),0);
+  const usedTickets      = myEntries.length;  // each entry consumes 1 ticket
+  const availableTickets = Math.max(0, myTotalTickets - usedTickets);
   const myEntriesFor    = (tid) => myEntries.filter(e=>e.tournament_id===tid);
   const allEntriesFor   = (tid) => allEntries.filter(e=>e.tournament_id===tid);
 

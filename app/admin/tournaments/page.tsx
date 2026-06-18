@@ -75,7 +75,12 @@ export default function AdminTournamentsPage() {
                     {t.description && <div style={{...FB,fontSize:12,color:'#6B7280',marginTop:8}}>{t.description}</div>}
                   </div>
                   <div style={{display:'flex',gap:6}}>
-                    <button onClick={()=>setEditing({...EMPTY,...t,race_categories:t.race_categories||['Box Stock']})} style={{...F,fontSize:12,letterSpacing:1,padding:'8px 14px',borderRadius:6,background:'transparent',border:'1px solid rgba(255,255,255,0.15)',color:'#F5F5F5',cursor:'pointer'}}>EDIT</button>
+                    <button onClick={()=>{
+                      // Format date for datetime-local input (remove seconds)
+                      let d = t.date || '';
+                      if (d && d.length > 16) d = d.slice(0, 16);
+                      setEditing({...EMPTY,...t, date: d, race_categories:t.race_categories||['Box Stock']});
+                    }} style={{...F,fontSize:12,letterSpacing:1,padding:'8px 14px',borderRadius:6,background:'transparent',border:'1px solid rgba(255,255,255,0.15)',color:'#F5F5F5',cursor:'pointer'}}>EDIT</button>
                     <button onClick={()=>del(t.id)} style={{...F,fontSize:12,letterSpacing:1,padding:'8px 14px',borderRadius:6,background:'transparent',border:'1px solid rgba(220,38,38,0.3)',color:'#DC2626',cursor:'pointer'}}>DEL</button>
                   </div>
                 </div>

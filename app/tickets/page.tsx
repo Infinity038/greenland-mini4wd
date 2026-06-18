@@ -66,10 +66,12 @@ export default function TicketsPage() {
   useEffect(() => { if (member?.email) fetchLoyalty(member.email); }, [member]);
 
   async function fetchEarlyBirdSlots() {
-    const { data } = await supabase.from('race_tickets').select('id').eq('ticket_type', 'weekly_earlybird').eq('payment_status', 'payment_confirmed');
+    const { data } = await supabase.from('race_tickets').select('quantity').eq('ticket_type', 'weekly_earlybird').eq('payment_status', 'payment_confirmed');
     const { data: cfg } = await supabase.from('admin_config').select('value').eq('key', 'earlybird_slots').single();
     const maxSlots = cfg ? parseInt(cfg.value) : 10;
-    setEarlyBirdLeft(Math.max(0, maxSlots - (data?.length || 0)));
+    // Sum quantity field — one row can represent multiple tickets
+    const used = (data || []).reduce((sum, row) => sum + (Number(row.quantity) || 1), 0);
+    setEarlyBirdLeft(Math.max(0, maxSlots - used));
   }
 
   async function fetchEntries() {

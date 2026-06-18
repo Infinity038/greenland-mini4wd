@@ -116,7 +116,13 @@ export async function getTicketWallet(email: string): Promise<TicketWallet> {
     .filter((t: any) => t.used === true || t.status === 'used')
     .reduce((sum: number, t: any) => sum + (Number(t.quantity) || 1), 0);
 
-  const paidAvailable = paidTotal - paidUsed;
+  // Also deduct tickets consumed by race entries
+  const { data: raceEntries } = await supabase
+    .from('race_entries')
+    .select('id')
+    .eq('member_email', email);
+  const entriesUsed: number = (raceEntries || []).length;
+  const paidAvailable = Math.max(0, paidTotal - paidUsed - entriesUsed);
 
   // Bonus tickets
   const bonusAvailable = all
