@@ -36,6 +36,8 @@ export default function ProfilePage() {
   );
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [ticketHistory, setTicketHistory] = useState<any[]>([]);
+  const [raceEntries, setRaceEntries] = useState<any[]>([]);
 
   useEffect(() => {
     const local = getMemberData();
@@ -55,6 +57,10 @@ export default function ProfilePage() {
         setReferral(r);
         const { data: carsData } = await supabase.from('cars').select('*').eq('member_email', local.email).order('created_at', { ascending: false });
         setCars(carsData || []);
+        const { data: tkData } = await supabase.from('race_tickets').select('*').eq('member_email', local.email).order('created_at', { ascending: false });
+        setTicketHistory(tkData || []);
+        const { data: reData } = await supabase.from('race_entries').select('*').eq('member_email', local.email).order('created_at', { ascending: false });
+        setRaceEntries(reData || []);
       } catch {
         setMember(local);
       } finally {
@@ -294,6 +300,127 @@ export default function ProfilePage() {
                 </ul>
               </div>
 
+              {/* Race Entries */}
+              {raceEntries.length > 0 && (
+                <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
+                  <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 16 }}>MY RACE ENTRIES</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {raceEntries.map((e: any) => (
+                      <div key={e.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 18 }}>🏎️</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F5F5F5' }}>{e.car_name || '—'}</div>
+                          <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>
+                            {e.race_category?.replace('_', ' ').toUpperCase()} · {new Date(e.created_at).toLocaleDateString('en-GB')}
+                          </div>
+                        </div>
+                        <span style={{ ...F, fontSize: 10, letterSpacing: 1, padding: '3px 10px', borderRadius: 20, background: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
+                          ✅ ENTERED · 1 TICKET USED
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ticket Purchase History */}
+              <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
+                <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 16 }}>TICKET PURCHASE HISTORY</div>
+                {ticketHistory.length === 0 ? (
+                  <div style={{ ...FB, fontSize: 14, color: '#6B7280', textAlign: 'center', padding: '20px 0' }}>No tickets purchased yet.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {ticketHistory.map((t: any) => {
+                      const statusColor: Record<string,string> = {
+                        payment_confirmed: '#22C55E',
+                        proof_uploaded: '#3B82F6',
+                        awaiting_payment: '#FACC15',
+                        cancelled: '#DC2626',
+                      };
+                      const statusLabel: Record<string,string> = {
+                        payment_confirmed: '✅ Confirmed',
+                        proof_uploaded: '🔄 Proof Uploaded',
+                        awaiting_payment: '⏳ Awaiting Payment',
+                        cancelled: '❌ Cancelled',
+                      };
+                      const color = statusColor[t.payment_status] || '#6B7280';
+                      const label = statusLabel[t.payment_status] || t.payment_status;
+                      const typeLabel: Record<string,string> = {
+                        weekly_earlybird: '🐦 Early Bird',
+                        weekly: '🏁 Weekly',
+                        season: '🏆 Season',
+                        bonus: '🎁 Bonus',
+                      };
+                      return (
+                        <div key={t.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${color}22`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                              <span style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F5F5F5' }}>{typeLabel[t.ticket_type] || t.ticket_type} × {t.quantity}</span>
+                              <span style={{ ...F, fontSize: 10, letterSpacing: 1, padding: '2px 8px', borderRadius: 20, background: color + '18', color, border: `1px solid ${color}33` }}>{label}</span>
+                            </div>
+                            <div style={{ ...FB, fontSize: 12, color: '#6B7280', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                              <span>{new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                              {t.total_price && <span style={{ color: '#FACC15', fontWeight: 600 }}>{t.total_price} DKK</span>}
+                              {t.payment_reference && <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#B8C1CC' }}>Ref: {t.payment_reference}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Race Entries */}
+              {raceEntries.length > 0 && (
+                <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
+                  <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 16 }}>MY RACE ENTRIES</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {raceEntries.map((e: any) => (
+                      <div key={e.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F5F5F5', marginBottom: 2 }}>🏎️ {e.car_name || '—'} <span style={{ color: '#B8C1CC', fontWeight: 400, fontSize: 13 }}>→ {(e.race_category || '').replace(/_/g, ' ').toUpperCase()}</span></div>
+                          <div style={{ ...FB, fontSize: 12, color: '#6B7280' }}>{new Date(e.created_at).toLocaleDateString('en-GB')}</div>
+                        </div>
+                        <span style={{ ...F, fontSize: 10, letterSpacing: 1, padding: '3px 10px', borderRadius: 20, background: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)', flexShrink: 0 }}>✅ 1 TICKET USED</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ticket Purchase History */}
+              <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
+                <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 16 }}>TICKET PURCHASE HISTORY</div>
+                {ticketHistory.length === 0 ? (
+                  <div style={{ ...FB, fontSize: 14, color: '#6B7280', textAlign: 'center', padding: '20px 0' }}>No tickets purchased yet.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {ticketHistory.map((t: any) => {
+                      const SC: Record<string,string> = { payment_confirmed:'#22C55E', proof_uploaded:'#3B82F6', awaiting_payment:'#FACC15', cancelled:'#DC2626' };
+                      const SL: Record<string,string> = { payment_confirmed:'✅ Confirmed', proof_uploaded:'🔄 Proof Uploaded', awaiting_payment:'⏳ Awaiting Payment', cancelled:'❌ Cancelled' };
+                      const TL: Record<string,string> = { weekly_earlybird:'🐦 Early Bird', weekly:'🏁 Weekly', season:'🏆 Season', bonus:'🎁 Bonus' };
+                      const color = SC[t.payment_status] || '#6B7280';
+                      return (
+                        <div key={t.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${color}22`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                              <span style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F5F5F5' }}>{TL[t.ticket_type] || t.ticket_type} × {t.quantity}</span>
+                              <span style={{ ...F, fontSize: 10, letterSpacing: 1, padding: '2px 8px', borderRadius: 20, background: color + '18', color, border: `1px solid ${color}33` }}>{SL[t.payment_status] || t.payment_status}</span>
+                            </div>
+                            <div style={{ ...FB, fontSize: 12, color: '#6B7280', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                              <span>{new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                              {t.total_price && <span style={{ color: '#FACC15', fontWeight: 600 }}>{t.total_price} DKK</span>}
+                              {t.payment_reference && <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#B8C1CC' }}>Ref: {t.payment_reference}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <a href="/tournament" style={{ display: 'block', textAlign: 'center', background: '#DC2626', color: '#fff', borderRadius: 12, padding: '16px 24px', ...F, fontWeight: 900, fontSize: 18, letterSpacing: 2, textDecoration: 'none' }}>
                 VIEW UPCOMING TOURNAMENTS →
               </a>
@@ -394,11 +521,22 @@ export default function ProfilePage() {
                     <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                       {car.chassis && <span>Chassis: <strong style={{ color: '#F5F5F5' }}>{car.chassis}</strong></span>}
                       {car.series && <span>Series: <strong style={{ color: '#F5F5F5' }}>{car.series}</strong></span>}
-                      {car.color && <span>Color: <strong style={{ color: '#F5F5F5' }}>{car.color}</strong></span>}
+                      {car.color && <span>Color: <strong style={{ color: '#F5F5F5' }}>{car.color}</strong>}</span>}
                       <span>{car.bought_from === 'club_shop' ? '🏪 Club Shop' : '🛒 Outside Purchase'}</span>
                     </div>
                     {car.notes && <div style={{ ...FB, fontSize: 12, color: '#6B7280', marginTop: 4 }}>{car.notes}</div>}
                     {car.status === 'pending' && <div style={{ ...FB, fontSize: 11, color: '#FACC15', marginTop: 6 }}>⏳ Awaiting admin approval before you can race with this car.</div>}
+                    {car.status === 'rejected' && <div style={{ ...FB, fontSize: 11, color: '#DC2626', marginTop: 6 }}>✕ Rejected. Contact admin for details.</div>}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                    <button onClick={async () => {
+                      if (!confirm('Remove this car from your garage?')) return;
+                      await supabase.from('cars').delete().eq('id', car.id);
+                      const { data } = await supabase.from('cars').select('*').eq('member_email', member?.email).order('created_at', { ascending: false });
+                      setCars(data || []);
+                    }} style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 6, padding: '6px 12px', ...FB, fontSize: 12, color: '#DC2626', cursor: 'pointer' }}>
+                      Remove
+                    </button>
                   </div>
                 </div>
               ))}
