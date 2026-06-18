@@ -179,6 +179,25 @@ export default function ProfilePage() {
                   ))}
                 </div>
               </div>
+
+              {/* Race Entries on Overview */}
+              {raceEntries.length > 0 && (
+                <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24, marginTop: 12 }}>
+                  <div style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 3, color: '#B8C1CC', marginBottom: 16 }}>MY RACE ENTRIES</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {raceEntries.map((e: any) => (
+                      <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '10px 14px' }}>
+                        <span style={{ fontSize: 20 }}>🏎️</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F5F5F5' }}>{e.car_name || '—'}</div>
+                          <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>{(e.race_category || '').replace(/_/g, ' ').toUpperCase()} · {new Date(e.created_at).toLocaleDateString('en-GB')}</div>
+                        </div>
+                        <span style={{ ...F, fontSize: 10, letterSpacing: 1, padding: '3px 10px', borderRadius: 20, background: 'rgba(34,197,94,0.1)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.25)', flexShrink: 0 }}>✅ ENTERED</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -231,7 +250,7 @@ export default function ProfilePage() {
                 {[
                   { label: 'Paid Available', value: wallet.paid_available, color: '#22C55E' },
                   { label: 'Bonus Available', value: wallet.bonus_available, color: '#FACC15' },
-                  { label: 'Used', value: wallet.paid_used, color: '#6B7280' },
+                  { label: 'Used (Entries)', value: raceEntries.length, color: '#6B7280' },
                 ].map(s => (
                   <div key={s.label} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '20px 12px', textAlign: 'center' }}>
                     <div style={{ ...F, fontWeight: 900, fontSize: 40, color: s.color }}>{s.value}</div>
@@ -300,76 +319,6 @@ export default function ProfilePage() {
                 </ul>
               </div>
 
-              {/* Race Entries */}
-              {raceEntries.length > 0 && (
-                <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
-                  <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 16 }}>MY RACE ENTRIES</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {raceEntries.map((e: any) => (
-                      <div key={e.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 18 }}>🏎️</span>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F5F5F5' }}>{e.car_name || '—'}</div>
-                          <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>
-                            {e.race_category?.replace('_', ' ').toUpperCase()} · {new Date(e.created_at).toLocaleDateString('en-GB')}
-                          </div>
-                        </div>
-                        <span style={{ ...F, fontSize: 10, letterSpacing: 1, padding: '3px 10px', borderRadius: 20, background: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
-                          ✅ ENTERED · 1 TICKET USED
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Ticket Purchase History */}
-              <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
-                <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 16 }}>TICKET PURCHASE HISTORY</div>
-                {ticketHistory.length === 0 ? (
-                  <div style={{ ...FB, fontSize: 14, color: '#6B7280', textAlign: 'center', padding: '20px 0' }}>No tickets purchased yet.</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {ticketHistory.map((t: any) => {
-                      const statusColor: Record<string,string> = {
-                        payment_confirmed: '#22C55E',
-                        proof_uploaded: '#3B82F6',
-                        awaiting_payment: '#FACC15',
-                        cancelled: '#DC2626',
-                      };
-                      const statusLabel: Record<string,string> = {
-                        payment_confirmed: '✅ Confirmed',
-                        proof_uploaded: '🔄 Proof Uploaded',
-                        awaiting_payment: '⏳ Awaiting Payment',
-                        cancelled: '❌ Cancelled',
-                      };
-                      const color = statusColor[t.payment_status] || '#6B7280';
-                      const label = statusLabel[t.payment_status] || t.payment_status;
-                      const typeLabel: Record<string,string> = {
-                        weekly_earlybird: '🐦 Early Bird',
-                        weekly: '🏁 Weekly',
-                        season: '🏆 Season',
-                        bonus: '🎁 Bonus',
-                      };
-                      return (
-                        <div key={t.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${color}22`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                              <span style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F5F5F5' }}>{typeLabel[t.ticket_type] || t.ticket_type} × {t.quantity}</span>
-                              <span style={{ ...F, fontSize: 10, letterSpacing: 1, padding: '2px 8px', borderRadius: 20, background: color + '18', color, border: `1px solid ${color}33` }}>{label}</span>
-                            </div>
-                            <div style={{ ...FB, fontSize: 12, color: '#6B7280', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                              <span>{new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                              {t.total_price && <span style={{ color: '#FACC15', fontWeight: 600 }}>{t.total_price} DKK</span>}
-                              {t.payment_reference && <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#B8C1CC' }}>Ref: {t.payment_reference}</span>}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
 
               {/* Race Entries */}
               {raceEntries.length > 0 && (
@@ -521,7 +470,7 @@ export default function ProfilePage() {
                     <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                       {car.chassis && <span>Chassis: <strong style={{ color: '#F5F5F5' }}>{car.chassis}</strong></span>}
                       {car.series && <span>Series: <strong style={{ color: '#F5F5F5' }}>{car.series}</strong></span>}
-                      {car.color && <span>Color: <strong style={{ color: '#F5F5F5' }}>{car.color}</strong>}</span>}
+                      {car.color && <span>Color: <strong style={{ color: '#F5F5F5' }}>{car.color}</strong></span>}
                       <span>{car.bought_from === 'club_shop' ? '🏪 Club Shop' : '🛒 Outside Purchase'}</span>
                     </div>
                     {car.notes && <div style={{ ...FB, fontSize: 12, color: '#6B7280', marginTop: 4 }}>{car.notes}</div>}
