@@ -17,7 +17,7 @@ export default function Blog() {
 
   useEffect(() => {
     supabase.from('news_posts').select('*').eq('published', true).order('created_at', { ascending: false }).limit(2)
-      .then(({ data }) => setPosts(data && data.length > 0 ? data : FALLBACK));
+      .then(({ data }: { data: any[] | null }) => setPosts(data && data.length > 0 ? data : FALLBACK));
   }, []);
 
   return (
