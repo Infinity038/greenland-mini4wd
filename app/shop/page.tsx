@@ -153,6 +153,7 @@ export default function ShopPage() {
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [paymentOption, setPaymentOption] = useState<'full' | 'deposit'>('deposit');
   const [lightbox, setLightbox] = useState<Product | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -180,6 +181,7 @@ export default function ShopPage() {
     if (p.status === 'sold out') return;
     setSelected(p); setStep('confirm');
     setOrderId(''); setPayRef(''); setProofFile(null); setProofPreview(null); setError('');
+    setPaymentOption('deposit');
   };
 
   const placeOrder = async () => {
@@ -188,6 +190,8 @@ export default function ShopPage() {
     const type = getType(selected.id);
     const price = getPrice(selected);
     try {
+      const depositAmount = Math.ceil(price / 2);
+      const payNow = paymentOption === 'deposit' ? depositAmount : price;
       const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
       const { data, error: err } = await supabase.from('orders').insert({
         member_email: member.email,
@@ -198,7 +202,9 @@ export default function ShopPage() {
         quantity: 1,
         status: 'pending',
         payment_status: 'awaiting_payment',
-        notes: `Price: ${price} DKK`,
+        notes: paymentOption === 'deposit'
+          ? `50% Deposit: ${depositAmount} DKK (Remaining: ${price - depositAmount} DKK on pickup)`
+          : `Full Payment: ${price} DKK`,
       }).select().single();
       if (err || !data) throw new Error('failed');
       const ref = generatePaymentRef(data.id);
@@ -391,7 +397,29 @@ export default function ShopPage() {
                     <div style={{ ...F, fontWeight: 900, fontSize: 32, color: '#FACC15' }}>{getPrice(selected).toLocaleString()} DKK</div>
                   </div>
 
-                  {getType(selected.id) === 'built' && (
+                  <div style={{ background: 'rgba(250,204,21,0.07)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 12, padding: 16 }}>
+                    <div style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 2, color: '#FACC15', marginBottom: 12 }}>💳 PAYMENT OPTION</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div onClick={() => setPaymentOption('deposit')} style={{ background: paymentOption === 'deposit' ? 'rgba(250,204,21,0.1)' : '#050505', border: `1.5px solid ${paymentOption === 'deposit' ? '#FACC15' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: 14, cursor: 'pointer' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5' }}>50% DEPOSIT NOW</div>
+                            <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 2 }}>Pay the rest on pickup · Recommended</div>
+                          </div>
+                          <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#FACC15' }}>{Math.ceil(getPrice(selected) / 2)} DKK</div>
+                        </div>
+                      </div>
+                      <div onClick={() => setPaymentOption('full')} style={{ background: paymentOption === 'full' ? 'rgba(34,197,94,0.08)' : '#050505', border: `1.5px solid ${paymentOption === 'full' ? '#22C55E' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: 14, cursor: 'pointer' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5' }}>FULL PAYMENT NOW</div>
+                            <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 2 }}>Pay in full upfront · No balance on pickup</div>
+                          </div>
+                          <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#22C55E' }}>{getPrice(selected)} DKK</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                     <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#FCA5A5', lineHeight: 1.6 }}>
                       ⚡ <strong style={{ color: '#fff' }}>Race-Ready Car:</strong> This is a fully assembled and tuned Mini 4WD — no building required. Open the box and race immediately.
                     </div>
@@ -417,7 +445,7 @@ export default function ShopPage() {
                     <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#FACC15', marginBottom: 12 }}>💳 MOBILEPAY INSTRUCTIONS</div>
                     <ol style={{ ...FB, fontSize: 14, color: '#F5F5F5', lineHeight: 2.2, margin: 0, paddingLeft: 20 }}>
                       <li>Open MobilePay on your phone</li>
-                      <li>Send <strong>{getPrice(selected).toLocaleString()} DKK</strong> to <strong>+45 54 32 79 41</strong> (Jovannie Ducay)</li>
+                      <li>Send <strong>{paymentOption === 'deposit' ? Math.ceil(getPrice(selected) / 2) : getPrice(selected)} DKK</strong> to <strong>+45 54 32 79 41</strong> (Jovannie Ducay)</li>
                       <li>Reference: <strong style={{ color: '#FACC15', fontFamily: 'monospace' }}>{payRef}</strong></li>
                       <li>Screenshot the confirmation</li>
                       <li>Upload it on the next step</li>
