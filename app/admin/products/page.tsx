@@ -7,7 +7,7 @@ const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const STATUS_COLORS: Record<string,string> = {'in stock':'#22C55E','preorder only':'#3B82F6','limited':'#FACC15','sold out':'#DC2626','coming soon':'#6B7280'};
 const STATUSES = ['in stock','preorder only','limited','sold out','coming soon'];
-const CHASSIS = ['AR','MA','VS','MS','FM-A','S2','Other'];
+const CHASSIS = ['AR','MA','MS','VS','FM-A','S2','ME','Super FM','FM','VZ','Super TZ-X','Super TZ','Super XX','Super X','Super-1','Zero','Type 5','Type 4','Type 3','Type 2','Type 1','Other'];
 const inp = (x?: any) => ({ width:'100%', background:'#050505', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'11px 14px', color:'#F5F5F5', fontFamily:"'DM Sans',sans-serif", fontSize:14, outline:'none', boxSizing:'border-box' as const, ...x });
 
 // Variant price field pairs shown in the pricing section

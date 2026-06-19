@@ -206,11 +206,40 @@ export default function ShopPage() {
   const [preorderSending, setPreorderSending] = useState(false);
   const [preorderDone, setPreorderDone] = useState(false);
 
+  // Shareable product links
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const didDeepLink = useRef(false);
+
   useEffect(() => {
     setMember(getMemberData());
     fetchProducts();
     fetchInventory();
   }, []);
+
+  // Deep-link: /shop?product=<id> scrolls to and highlights that card
+  useEffect(() => {
+    if (didDeepLink.current || loading || products.length === 0) return;
+    const pid = new URLSearchParams(window.location.search).get('product');
+    if (pid) {
+      didDeepLink.current = true;
+      setTimeout(() => {
+        const el = document.getElementById(`product-${pid}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setHighlightId(pid);
+          setTimeout(() => setHighlightId(null), 2500);
+        }
+      }, 300);
+    }
+  }, [loading, products]);
+
+  const shareProduct = (p: Product) => {
+    const url = `${window.location.origin}/shop?product=${p.id}`;
+    if (navigator.clipboard) navigator.clipboard.writeText(url);
+    setCopiedId(p.id);
+    setTimeout(() => setCopiedId(null), 1800);
+  };
 
   async function fetchProducts() {
     setLoading(true);
@@ -354,8 +383,12 @@ export default function ShopPage() {
                 {collectors.map(p => {
                   const best = cheapestAvailableVariant(p, globalCaseStock);
                   return (
-                    <div key={p.id} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden' }}>
+                    <div key={p.id} id={`product-${p.id}`} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.3s', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
+                      <button onClick={() => shareProduct(p)} title="Copy share link"
+                        style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer' }}>
+                        {copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}
+                      </button>
                       <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15', marginBottom: 4 }}>✦ COLLECTOR · LIMITED</div>
                       <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
                         <ProductImage product={p} onClick={() => setLightbox(p)} />
@@ -408,13 +441,17 @@ export default function ShopPage() {
                 const sc = STOCK_COLORS[p.status] || '#6B7280';
                 const isCollector = p.status === 'limited';
                 return (
-                  <div key={p.id}
-                    style={{ background: isCollector ? 'linear-gradient(135deg, #0a0f1a, #071426)' : '#071426', border: `1px solid ${isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', transition: 'transform 0.15s, border-color 0.15s' }}
+                  <div key={p.id} id={`product-${p.id}`}
+                    style={{ background: isCollector ? 'linear-gradient(135deg, #0a0f1a, #071426)' : '#071426', border: `1px solid ${isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.3s', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.5)' : 'rgba(220,38,38,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
                     {isCollector && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)', zIndex: 1 }} />}
                     {p.status === 'preorder only' && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>PREORDER</div>}
                     {isCollector && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#FACC1522', color: '#FACC15', border: '1px solid #FACC1544' }}>COLLECTOR</div>}
+                    <button onClick={() => shareProduct(p)} title="Copy share link"
+                      style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}
+                    </button>
 
                     <div style={{ height: 180, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', position: 'relative' }}>
                       <ProductImage product={p} onClick={() => parseImages(p.image_url).length > 0 && setLightbox(p)} />
