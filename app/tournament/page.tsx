@@ -249,7 +249,9 @@ export default function TournamentPage() {
                           {/* Right side */}
                           <div style={{ textAlign:'right', flexShrink:0 }}>
                             {t.ticket_price_dkk && <div style={{ ...F, fontWeight:900, fontSize:28, color:'#FACC15' }}>{t.ticket_price_dkk} DKK</div>}
-                            {t.max_participants && <div style={{ ...FB, fontSize:11, color:'#6B7280', marginBottom:8 }}>Max {t.max_participants} racers</div>}
+                            <div style={{ ...FB, fontSize:11, color:'#B8C1CC', marginBottom:8 }}>
+                              {t.ticket_type === 'season' ? '⚠️ Min 2 racers to proceed' : '⚠️ Min 5 per category or pushed to next week'}
+                            </div>
                             <div style={{ display:'flex', flexDirection:'column', gap:8, alignItems:'flex-end' }}>
                               {/* View Entrants button */}
                               <button onClick={()=>openEntrantsModal(t)}
@@ -326,7 +328,7 @@ export default function TournamentPage() {
                 { icon:'🎟️', title:'1 Ticket = 1 Entry', desc:'Each ticket lets you enter 1 car into 1 race category. Buy more tickets to enter more cars or categories.' },
                 { icon:'🏁', title:'Qualification Format', desc:'2 timed runs per entry. Best run counts. Top qualifiers advance to single-elimination finals.' },
                 { icon:'⚡', title:'Single Elimination Finals', desc:'Head-to-head racing. Win or go home. No second chances.' },
-                { icon:'🔄', title:'Multi-Category Entry', desc:'Same car can enter multiple different categories in one race day. Cannot enter the same category twice.' },
+                { icon:'🔄', title:'Multi-Category Entry', desc:"Same car can enter multiple categories in one race day, but not the same category twice. One racer can enter multiple cars into the same category." },
                 { icon:'🔋', title:'Alkaline AA Only', desc:'Standard Alkaline AA batteries only. No NiMH, lithium, or rechargeable batteries.' },
                 { icon:'👤', title:'Official Members Only', desc:'Tournament entry requires Official Member status. Complete a qualifying purchase to unlock.' },
               ].map(r => (
@@ -358,11 +360,11 @@ export default function TournamentPage() {
                 <div style={{ ...F, fontWeight:900, fontSize:32, color:'#FACC15', marginBottom:8 }}>25 kr/hr</div>
                 <div style={{ ...FB, fontSize:14, color:'#B8C1CC', lineHeight:1.6 }}>Batteries included. Try before you buy.</div>
               </div>
-              <div style={{ background:'#071426', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'24px 20px' }}>
-                <div style={{ fontSize:28, marginBottom:12 }}>🔋</div>
-                <div style={{ ...F, fontWeight:800, fontSize:18, color:'#F5F5F5', marginBottom:4 }}>Battery Rental Only</div>
-                <div style={{ ...F, fontWeight:900, fontSize:32, color:'#F5F5F5', marginBottom:8 }}>15 kr</div>
-                <div style={{ ...FB, fontSize:14, color:'#B8C1CC', lineHeight:1.6 }}>For testing your own car. Non-refundable if kept.</div>
+              <div style={{ background:'#0a0a0a', border:'1px solid rgba(255,255,255,0.05)', borderRadius:14, padding:'24px 20px', opacity:0.5 }}>
+                <div style={{ fontSize:28, marginBottom:12, filter:'grayscale(1)' }}>🔋</div>
+                <div style={{ ...F, fontWeight:800, fontSize:18, color:'#6B7280', marginBottom:4 }}>Battery Rental Only</div>
+                <div style={{ ...F, fontWeight:900, fontSize:20, color:'#6B7280', marginBottom:8, letterSpacing:1 }}>COMING SOON</div>
+                <div style={{ ...FB, fontSize:14, color:'#4B5563', lineHeight:1.6 }}>For testing your own car. Not yet available.</div>
               </div>
             </div>
           </section>
@@ -468,10 +470,16 @@ export default function TournamentPage() {
               ))}
             </div>
 
-            {/* Category select */}
+            {/* Category select — only categories tagged on THIS tournament */}
             <div style={{ marginBottom:24 }}>
               <label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:8 }}>SELECT RACE CATEGORY</label>
-              {RACE_CLASSES.map(cls => {
+              {(() => {
+                const tournamentCats: string[] = regTournament.race_categories || [];
+                const availableClasses = tournamentCats.length > 0
+                  ? RACE_CLASSES.filter(cls => tournamentCats.includes(cls.label))
+                  : RACE_CLASSES; // fallback: show all if tournament has no tags set
+                return availableClasses;
+              })().map(cls => {
                 const already = myEntries.some(e=>e.tournament_id===regTournament.id && e.car_id===regCar && e.race_category===cls.id);
                 return (
                   <button key={cls.id} onClick={()=>!already && setRegCategory(cls.id)} disabled={already}
