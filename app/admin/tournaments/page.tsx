@@ -9,6 +9,7 @@ const SC: Record<string,string> = {upcoming:'#3B82F6',ongoing:'#22C55E',complete
 const STATUSES = ['upcoming','ongoing','completed','cancelled'];
 const RACE_CLASSES = ['Box Stock','Open Box Stock','B-Max','Open Class'];
 const CLASS_COLORS: Record<string,string> = {'Box Stock':'#22C55E','Open Box Stock':'#3B82F6','B-Max':'#F97316','Open Class':'#DC2626'};
+const CLASS_ICONS: Record<string,string> = {'Box Stock':'📦','Open Box Stock':'🔓','B-Max':'⚡','Open Class':'🔥'};
 const inp = (x?:any) => ({width:'100%',background:'#050505',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'11px 14px',color:'#F5F5F5',fontFamily:"'DM Sans',sans-serif",fontSize:14,outline:'none',boxSizing:'border-box' as const,...x});
 
 function checkAuth(){if(typeof window==='undefined')return false;const s=localStorage.getItem('adminSession');if(!s)return false;try{const{expires}=JSON.parse(s);return Date.now()<expires;}catch{return false;}}
@@ -62,7 +63,7 @@ export default function AdminTournamentsPage() {
                     <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap'}}>
                       <span style={{...F,fontSize:10,letterSpacing:2,padding:'2px 10px',borderRadius:20,background:c+'22',color:c}}>● {t.status.toUpperCase()}</span>
                       {cats.map((cat:string) => (
-                        <span key={cat} style={{...F,fontSize:9,letterSpacing:1,padding:'2px 8px',borderRadius:20,background:(CLASS_COLORS[cat]||'#6B7280')+'22',color:CLASS_COLORS[cat]||'#6B7280',border:`1px solid ${CLASS_COLORS[cat]||'#6B7280'}44`}}>{cat.toUpperCase()}</span>
+                        <span key={cat} style={{...F,fontSize:9,letterSpacing:1,padding:'2px 8px',borderRadius:20,background:(CLASS_COLORS[cat]||'#6B7280')+'22',color:CLASS_COLORS[cat]||'#6B7280',border:`1px solid ${CLASS_COLORS[cat]||'#6B7280'}44`}}>{CLASS_ICONS[cat]?CLASS_ICONS[cat]+' ':''}{cat.toUpperCase()}</span>
                       ))}
                     </div>
                     <div style={{...F,fontWeight:900,fontSize:22,color:'#F5F5F5',marginBottom:4}}>{t.name}</div>

@@ -135,7 +135,7 @@ export default function EventsPage() {
                           ) : (
                             <a href="/register" style={{ background: '#DC2626', color: '#fff', borderRadius: 8, padding: '10px 20px', ...F, fontWeight: 900, fontSize: 14, letterSpacing: 2, textDecoration: 'none' }}>REGISTER TO ENTER →</a>
                           )}
-                          <a href="/tournament" style={{ background: 'transparent', color: '#B8C1CC', borderRadius: 8, padding: '10px 16px', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.1)' }}>RACE RULES</a>
+                          <a href="/rules" style={{ background: 'transparent', color: '#B8C1CC', borderRadius: 8, padding: '10px 16px', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.1)' }}>RACE RULES</a>
                         </div>
                       )}
                     </div>

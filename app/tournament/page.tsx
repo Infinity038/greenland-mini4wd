@@ -219,9 +219,12 @@ export default function TournamentPage() {
                               <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 10px', borderRadius:20, background: isLive ? 'rgba(34,197,94,0.15)' : 'rgba(59,130,246,0.15)', color: isLive ? '#22C55E' : '#3B82F6' }}>
                                 {isLive ? '🔴 LIVE NOW' : '🗓️ UPCOMING'}
                               </span>
-                              {cats.map(cat => (
-                                <span key={cat} style={{ ...F, fontSize:9, letterSpacing:1, padding:'2px 8px', borderRadius:20, background:'rgba(255,255,255,0.06)', color:'#B8C1CC' }}>{cat.toUpperCase()}</span>
-                              ))}
+                              {cats.map(cat => {
+                                const cc = RACE_CLASSES.find(c => c.label === cat);
+                                return (
+                                  <span key={cat} style={{ ...F, fontSize:9, letterSpacing:1, padding:'2px 8px', borderRadius:20, background:(cc?.color||'#6B7280')+'22', color:cc?.color||'#B8C1CC', border:`1px solid ${cc?.color||'#6B7280'}44` }}>{cc ? cc.icon+' ' : ''}{cat.toUpperCase()}</span>
+                                );
+                              })}
                             </div>
                             <div style={{ ...F, fontWeight:900, fontSize:24, color:'#F5F5F5', marginBottom:4 }}>{t.name}</div>
                             <div style={{ ...FB, fontSize:13, color:'#B8C1CC', display:'flex', flexWrap:'wrap', gap:12, marginBottom:8 }}>
@@ -425,7 +428,7 @@ export default function TournamentPage() {
                           <div style={{ ...F, fontWeight:700, fontSize:16, color:'#F5F5F5' }}>{e.member_name || e.member_email?.split('@')[0]}</div>
                           <div style={{ ...FB, fontSize:11, color:'#B8C1CC' }}>🏎️ {e.car_name} · {e.chassis}</div>
                         </div>
-                        {cls && <span style={{ ...F, fontSize:9, letterSpacing:1, padding:'3px 9px', borderRadius:20, background:cls.color+'22', color:cls.color, border:`1px solid ${cls.color}44`, flexShrink:0 }}>{cls.label.toUpperCase()}</span>}
+                        {cls && <span style={{ ...F, fontSize:9, letterSpacing:1, padding:'3px 9px', borderRadius:20, background:cls.color+'22', color:cls.color, border:`1px solid ${cls.color}44`, flexShrink:0 }}>{cls.icon} {cls.label.toUpperCase()}</span>}
                         <span style={{ ...FB, fontSize:11, color:'#6B7280' }}>→</span>
                       </button>
                     );
