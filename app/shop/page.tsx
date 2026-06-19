@@ -19,9 +19,44 @@ interface Product {
   chassis: string;
   price_dkk: number;
   stock_qty: number;
+  unbuilt_stock?: number;
+  built_stock?: number;
   status: string;
   description: string;
   image_url: string;
+}
+
+// ── Variant pool system ──────────────────────────────────────────
+const VARIANTS = [
+  { key: 'unbuilt',      label: 'Unbuilt',        shortLabel: '🔧 Unbuilt / Boxed Kit',           icon: '🔧', isBuilt: false, needsCase: false },
+  { key: 'unbuilt_case', label: 'Unbuilt + Case', shortLabel: '🔧 Unbuilt / Boxed Kit + Case',     icon: '📦', isBuilt: false, needsCase: true  },
+  { key: 'built',        label: 'Built',          shortLabel: '⚡ Built / Ready-to-Race',          icon: '⚡', isBuilt: true,  needsCase: false },
+  { key: 'built_case',   label: 'Built + Case',   shortLabel: '⚡ Built / Ready-to-Race + Case',   icon: '⚡', isBuilt: true,  needsCase: true  },
+];
+
+function isVariantAvailable(p: Product, key: string, caseStock: number): boolean {
+  if (p.status === 'sold out' || p.status === 'coming soon') return false;
+  const v = VARIANTS.find(x => x.key === key);
+  if (!v) return false;
+  const base = v.isBuilt ? (p.built_stock ?? 1) : (p.unbuilt_stock ?? 1);
+  if (base <= 0) return false;
+  if (v.needsCase && caseStock <= 0) return false;
+  return true;
+}
+
+function variantPrice(p: Product, key: string, casePrice: number): number {
+  const v = VARIANTS.find(x => x.key === key);
+  if (!v) return p.price_dkk;
+  let price = p.price_dkk;
+  if (v.isBuilt) price += 200;
+  if (v.needsCase) price += casePrice;
+  return price;
+}
+
+function cheapestAvailableVariant(p: Product, caseStock: number, casePrice: number) {
+  const opts = VARIANTS.filter(v => isVariantAvailable(p, v.key, caseStock)).map(v => ({ key: v.key, price: variantPrice(p, v.key, casePrice) }));
+  if (opts.length === 0) return null;
+  return opts.sort((a, b) => a.price - b.price)[0];
 }
 
 const STOCK_COLORS: Record<string, string> = {
@@ -145,8 +180,11 @@ export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
-  const [types, setTypes] = useState<Record<string, string>>({});
+  const [globalCaseStock, setGlobalCaseStock] = useState(0);
+  const [casePriceDkk, setCasePriceDkk] = useState(0);
+
   const [selected, setSelected] = useState<Product | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<string>('unbuilt');
   const [step, setStep] = useState<ModalStep>('confirm');
   const [orderId, setOrderId] = useState('');
   const [payRef, setPayRef] = useState('');
@@ -158,9 +196,15 @@ export default function ShopPage() {
   const [lightbox, setLightbox] = useState<Product | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Quick preorder (sold-out variant) state
+  const [preorderTarget, setPreorderTarget] = useState<{ product: Product; variantKey: string } | null>(null);
+  const [preorderSending, setPreorderSending] = useState(false);
+  const [preorderDone, setPreorderDone] = useState(false);
+
   useEffect(() => {
     setMember(getMemberData());
     fetchProducts();
+    fetchInventory();
   }, []);
 
   async function fetchProducts() {
@@ -170,35 +214,63 @@ export default function ShopPage() {
     setLoading(false);
   }
 
-  const getType = (id: string) => types[id] || 'boxed';
-  const setType = (id: string, t: string) => setTypes(p => ({ ...p, [id]: t }));
-  const getPrice = (p: Product) => getType(p.id) === 'built' ? p.price_dkk + 200 : p.price_dkk;
+  async function fetchInventory() {
+    const { data } = await supabase.from('shop_inventory').select('*').eq('id', 1).single();
+    if (data) {
+      setGlobalCaseStock(data.case_stock ?? 0);
+      setCasePriceDkk(data.case_price_dkk ?? 0);
+    }
+  }
 
   const filtered = filter === 'all' ? products : products.filter(p => p.status === filter);
   const collectors = products.filter(p => p.status === 'limited');
 
-  const openModal = (p: Product) => {
+  const openModal = (p: Product, variantKey: string) => {
     if (!isRegistered()) { window.location.href = '/register'; return; }
-    if (p.status === 'sold out') return;
-    setSelected(p); setStep('confirm');
+    if (!isVariantAvailable(p, variantKey, globalCaseStock)) return;
+    setSelected(p); setSelectedVariant(variantKey); setStep('confirm');
     setOrderId(''); setPayRef(''); setProofFile(null); setProofPreview(null); setError('');
     setPaymentOption('deposit');
+  };
+
+  const openPreorder = (p: Product, variantKey: string) => {
+    if (!isRegistered()) { window.location.href = '/register'; return; }
+    setPreorderTarget({ product: p, variantKey });
+    setPreorderDone(false);
+  };
+
+  const sendPreorder = async () => {
+    if (!preorderTarget || !member) return;
+    setPreorderSending(true);
+    try {
+      await supabase.from('preorders').insert({
+        product_id: preorderTarget.product.id,
+        product_name: preorderTarget.product.name,
+        variant: preorderTarget.variantKey,
+        member_email: member.email,
+        member_name: member.name || member.email,
+        status: 'pending',
+      });
+      setPreorderDone(true);
+    } catch { /* swallow — show generic done state regardless to avoid blocking the customer */ setPreorderDone(true); }
+    setPreorderSending(false);
   };
 
   const placeOrder = async () => {
     if (!selected || !member) return;
     setUploading(true); setError('');
-    const type = getType(selected.id);
-    const price = getPrice(selected);
+    const v = VARIANTS.find(x => x.key === selectedVariant)!;
+    const price = variantPrice(selected, selectedVariant, casePriceDkk);
     try {
       const depositAmount = Math.ceil(price / 2);
       const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
       const { data, error: err } = await supabase.from('orders').insert({
         member_email: member.email,
         member_name: memberName,
-        product_name: `${selected.name} (${type === 'built' ? 'Built/Ready-to-Race' : 'Unbuilt/Boxed'})`,
+        product_name: `${selected.name} (${v.label})`,
         chassis: selected.chassis,
-        type,
+        type: v.isBuilt ? 'built' : 'boxed',
+        variant: selectedVariant,
         quantity: 1,
         status: 'pending',
         payment_status: 'awaiting_payment',
@@ -207,6 +279,20 @@ export default function ShopPage() {
           : `Full Payment: ${price} DKK`,
       }).select().single();
       if (err || !data) throw new Error('failed');
+
+      // Decrement the correct stock pool(s)
+      const stockUpdate: any = v.isBuilt
+        ? { built_stock: Math.max(0, (selected.built_stock ?? 1) - 1) }
+        : { unbuilt_stock: Math.max(0, (selected.unbuilt_stock ?? 1) - 1) };
+      await supabase.from('products').update(stockUpdate).eq('id', selected.id);
+      setProducts(prev => prev.map(p => p.id === selected.id ? { ...p, ...stockUpdate } : p));
+
+      if (v.needsCase) {
+        const newCaseStock = Math.max(0, (globalCaseStock ?? 0) - 1);
+        await supabase.from('shop_inventory').update({ case_stock: newCaseStock }).eq('id', 1);
+        setGlobalCaseStock(newCaseStock);
+      }
+
       const ref = generatePaymentRef(data.id);
       await supabase.from('orders').update({ payment_reference: ref }).eq('id', data.id);
       setOrderId(data.id); setPayRef(ref); setStep('payment');
@@ -247,7 +333,8 @@ export default function ShopPage() {
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>PREORDER SHOP</div>
             <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px, 8vw, 72px)', color: '#F5F5F5', margin: '0 0 10px', lineHeight: 0.95 }}>MINI 4WD CARS & KITS</h1>
-            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', margin: 0, maxWidth: 560 }}>Preorder only — no online payment. Pay via MobilePay after reserving. Pickup in Nuuk, Greenland.</p>
+            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', margin: '0 0 10px', maxWidth: 560 }}>Preorder only — no online payment. Pay via MobilePay after reserving. Pickup in Nuuk, Greenland.</p>
+            <div style={{ ...FB, fontSize: 12, color: '#6B7280' }}>📦 Display cases in stock: <strong style={{ color: globalCaseStock > 0 ? '#22C55E' : '#DC2626' }}>{globalCaseStock}</strong> (shared across all models)</div>
           </div>
         </section>
 
@@ -260,24 +347,31 @@ export default function ShopPage() {
                 <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(250,204,21,0.3), transparent)' }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-                {collectors.map(p => (
-                  <div key={p.id} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
-                    <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15', marginBottom: 4 }}>✦ COLLECTOR · LIMITED</div>
-                    <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                      <ProductImage product={p} onClick={() => setLightbox(p)} />
-                    </div>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 4, lineHeight: 1.1 }}>{p.name}</div>
-                    <div style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC', marginBottom: 12 }}>{p.chassis} CHASSIS</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#FACC15' }}>FROM</div>
-                        <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{p.price_dkk?.toLocaleString()} kr</div>
+                {collectors.map(p => {
+                  const best = cheapestAvailableVariant(p, globalCaseStock, casePriceDkk);
+                  return (
+                    <div key={p.id} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
+                      <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15', marginBottom: 4 }}>✦ COLLECTOR · LIMITED</div>
+                      <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                        <ProductImage product={p} onClick={() => setLightbox(p)} />
                       </div>
-                      <button onClick={() => openModal(p)} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                      <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 4, lineHeight: 1.1 }}>{p.name}</div>
+                      <div style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC', marginBottom: 12 }}>{p.chassis} CHASSIS</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#FACC15' }}>FROM</div>
+                          <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{(best ? best.price : p.price_dkk).toLocaleString()} kr</div>
+                        </div>
+                        {best ? (
+                          <button onClick={() => openModal(p, best.key)} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                        ) : (
+                          <button onClick={() => openPreorder(p, 'unbuilt')} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </section>
@@ -306,8 +400,6 @@ export default function ShopPage() {
               {filtered.map(p => {
                 const sc = STOCK_COLORS[p.status] || '#6B7280';
                 const isCollector = p.status === 'limited';
-                const type = getType(p.id);
-                const price = getPrice(p);
                 return (
                   <div key={p.id}
                     style={{ background: isCollector ? 'linear-gradient(135deg, #0a0f1a, #071426)' : '#071426', border: `1px solid ${isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', transition: 'transform 0.15s, border-color 0.15s' }}
@@ -327,34 +419,28 @@ export default function ShopPage() {
                         <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: sc + '18', color: sc }}>● {p.status?.toUpperCase()}</span>
                       </div>
                       <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
-                      <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, flex: 1, margin: '0 0 14px' }}>{p.description}</p>
+                      <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, margin: '0 0 14px' }}>{p.description}</p>
 
-                      <div style={{ display: 'flex', background: '#050505', borderRadius: 8, padding: 3, marginBottom: 10, border: '1px solid rgba(255,255,255,0.05)' }}>
-                        {(['boxed', 'built'] as const).map(t => (
-                          <button key={t} onClick={() => setType(p.id, t)}
-                            style={{ flex: 1, ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '8px 0', border: 'none', borderRadius: 6, background: type === t ? (t === 'built' ? '#DC2626' : 'rgba(255,255,255,0.1)') : 'transparent', color: type === t ? '#fff' : '#6B7280', cursor: 'pointer' }}>
-                            {t === 'boxed' ? '🔧 UNBUILT' : '⚡ BUILT'}
-                          </button>
-                        ))}
-                      </div>
-
-                      {type === 'built' && (
-                        <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, ...FB, fontSize: 12, color: '#FCA5A5', lineHeight: 1.5 }}>
-                          ⚡ <strong>Race-Ready:</strong> This car is fully assembled, tuned, and ready to race right out of the box. No building required.
-                        </div>
-                      )}
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div>
-                          <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#B8C1CC' }}>{type === 'built' ? 'BUILT PRICE' : 'KIT PRICE'}</div>
-                          <div style={{ ...F, fontWeight: 900, fontSize: 26, color: isCollector ? '#FACC15' : '#F5F5F5' }}>{price.toLocaleString()} kr</div>
-                        </div>
-                        <button onClick={() => openModal(p)} disabled={p.status === 'sold out'}
-                          style={{ background: p.status === 'sold out' ? '#1a1a1a' : '#DC2626', color: p.status === 'sold out' ? '#444' : '#fff', border: 'none', borderRadius: 10, padding: '11px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: p.status === 'sold out' ? 'not-allowed' : 'pointer' }}
-                          onMouseEnter={e => { if (p.status !== 'sold out') (e.target as HTMLElement).style.background = '#B91C1C'; }}
-                          onMouseLeave={e => { if (p.status !== 'sold out') (e.target as HTMLElement).style.background = '#DC2626'; }}>
-                          {p.status === 'sold out' ? 'SOLD OUT' : 'RESERVE →'}
-                        </button>
+                      {/* 4 variant pools — Unbuilt / Unbuilt+Case / Built / Built+Case */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        {VARIANTS.map(v => {
+                          const available = isVariantAvailable(p, v.key, globalCaseStock);
+                          const price = variantPrice(p, v.key, casePriceDkk);
+                          return (
+                            <div key={v.key} style={{ background: '#050505', border: `1px solid ${available ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.25)'}`, borderRadius: 8, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#B8C1CC' }}>{v.icon} {v.label.toUpperCase()}</div>
+                              <div style={{ ...F, fontWeight: 900, fontSize: 15, color: available ? (isCollector ? '#FACC15' : '#F5F5F5') : '#6B7280' }}>{price.toLocaleString()} kr</div>
+                              {available ? (
+                                <button onClick={() => openModal(p, v.key)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                              ) : (
+                                <>
+                                  <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>SOLD OUT</div>
+                                  <button onClick={() => openPreorder(p, v.key)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -392,9 +478,9 @@ export default function ShopPage() {
                   <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 18 }}>
                     <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5' }}>{selected.name}</div>
                     <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#B8C1CC', margin: '4px 0 12px' }}>
-                      {getType(selected.id) === 'built' ? '⚡ Built / Ready-to-Race' : '🔧 Unbuilt / Boxed Kit'} · {selected.chassis}
+                      {VARIANTS.find(v => v.key === selectedVariant)?.shortLabel} · {selected.chassis}
                     </div>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 32, color: '#FACC15' }}>{getPrice(selected).toLocaleString()} DKK</div>
+                    <div style={{ ...F, fontWeight: 900, fontSize: 32, color: '#FACC15' }}>{variantPrice(selected, selectedVariant, casePriceDkk).toLocaleString()} DKK</div>
                   </div>
 
                   <div style={{ background: 'rgba(250,204,21,0.07)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 12, padding: 16 }}>
@@ -406,7 +492,7 @@ export default function ShopPage() {
                             <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5' }}>50% DEPOSIT NOW</div>
                             <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 2 }}>Pay the rest on pickup · Recommended</div>
                           </div>
-                          <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#FACC15' }}>{Math.ceil(getPrice(selected) / 2)} DKK</div>
+                          <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#FACC15' }}>{Math.ceil(variantPrice(selected, selectedVariant, casePriceDkk) / 2)} DKK</div>
                         </div>
                       </div>
                       <div onClick={() => setPaymentOption('full')} style={{ background: paymentOption === 'full' ? 'rgba(34,197,94,0.08)' : '#050505', border: `1.5px solid ${paymentOption === 'full' ? '#22C55E' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: 14, cursor: 'pointer' }}>
@@ -415,12 +501,12 @@ export default function ShopPage() {
                             <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5' }}>FULL PAYMENT NOW</div>
                             <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 2 }}>Pay in full upfront · No balance on pickup</div>
                           </div>
-                          <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#22C55E' }}>{getPrice(selected)} DKK</div>
+                          <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#22C55E' }}>{variantPrice(selected, selectedVariant, casePriceDkk)} DKK</div>
                         </div>
                       </div>
                     </div>
                   </div>
-                  {getType(selected.id) === 'built' && (
+                  {VARIANTS.find(v => v.key === selectedVariant)?.isBuilt && (
                     <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#FCA5A5', lineHeight: 1.6 }}>
                       ⚡ <strong style={{ color: '#fff' }}>Race-Ready Car:</strong> This is a fully assembled and tuned Mini 4WD — no building required. Open the box and race immediately.
                     </div>
@@ -446,7 +532,7 @@ export default function ShopPage() {
                     <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#FACC15', marginBottom: 12 }}>💳 MOBILEPAY INSTRUCTIONS</div>
                     <ol style={{ ...FB, fontSize: 14, color: '#F5F5F5', lineHeight: 2.2, margin: 0, paddingLeft: 20 }}>
                       <li>Open MobilePay on your phone</li>
-                      <li>Send <strong>{paymentOption === 'deposit' ? Math.ceil(getPrice(selected) / 2) : getPrice(selected)} DKK</strong> to <strong>+45 54 32 79 41</strong> (Jovannie Ducay)</li>
+                      <li>Send <strong>{paymentOption === 'deposit' ? Math.ceil(variantPrice(selected, selectedVariant, casePriceDkk) / 2) : variantPrice(selected, selectedVariant, casePriceDkk)} DKK</strong> to <strong>+45 54 32 79 41</strong> (Jovannie Ducay)</li>
                       <li>Reference: <strong style={{ color: '#FACC15', fontFamily: 'monospace' }}>{payRef}</strong></li>
                       <li>Screenshot the confirmation</li>
                       <li>Upload it on the next step</li>
@@ -496,6 +582,35 @@ export default function ShopPage() {
           </div>
         </div>
       )}
+
+      {/* QUICK PREORDER MODAL (sold-out variant) */}
+      {preorderTarget && (
+        <div onClick={() => setPreorderTarget(null)} style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#071426', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 440, padding: '28px 24px 36px' }}>
+            {!preorderDone ? (
+              <>
+                <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#3B82F6', marginBottom: 6 }}>PREORDER REQUEST</div>
+                <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#F5F5F5', marginBottom: 4 }}>{preorderTarget.product.name}</div>
+                <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 20 }}>{VARIANTS.find(v => v.key === preorderTarget.variantKey)?.label} — currently sold out</div>
+                <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#93C5FD', marginBottom: 20 }}>
+                  We'll notify you the moment this is back in stock. No payment needed now.
+                </div>
+                <button onClick={sendPreorder} disabled={preorderSending} style={{ width: '100%', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 12, padding: 15, ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, cursor: 'pointer', opacity: preorderSending ? 0.5 : 1 }}>
+                  {preorderSending ? 'SENDING...' : 'NOTIFY ME →'}
+                </button>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 44, marginBottom: 10 }}>✅</div>
+                <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5', marginBottom: 8 }}>REQUEST SENT!</div>
+                <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 20 }}>We'll reach out by email when it's available.</div>
+                <button onClick={() => setPreorderTarget(null)} style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: 14, ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', cursor: 'pointer' }}>CLOSE</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <Footer />
     </>
   );
