@@ -8,7 +8,6 @@ const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const STATUS_COLORS: Record<string,string> = {'in stock':'#22C55E','preorder only':'#3B82F6','limited':'#FACC15','sold out':'#DC2626','coming soon':'#6B7280'};
 const STATUSES = ['in stock','preorder only','limited','sold out','coming soon'];
 const CHASSIS = ['AR','MA','VS','MS','FM-A','S2','Other'];
-const TYPES = ['boxed','built','preorder'];
 const inp = (x?: any) => ({ width:'100%', background:'#050505', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'11px 14px', color:'#F5F5F5', fontFamily:"'DM Sans',sans-serif", fontSize:14, outline:'none', boxSizing:'border-box' as const, ...x });
 
 // Variant price field pairs shown in the pricing section
@@ -255,10 +254,7 @@ export default function AdminProductsPage() {
             </div>
             <div style={{ padding:22, display:'flex', flexDirection:'column', gap:14 }}>
               <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>NAME *</label><input value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})} style={inp()} /></div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>CHASSIS</label><select value={editing.chassis} onChange={e=>setEditing({...editing,chassis:e.target.value})} style={inp()}>{CHASSIS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
-                <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>TYPE</label><select value={editing.type} onChange={e=>setEditing({...editing,type:e.target.value})} style={inp()}>{TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
-              </div>
+              <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>CHASSIS</label><select value={editing.chassis} onChange={e=>setEditing({...editing,chassis:e.target.value})} style={inp()}>{CHASSIS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
 
               {/* Stock pools */}
               <div style={{ background:'#050505', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:14 }}>
@@ -280,11 +276,11 @@ export default function AdminProductsPage() {
                       <div style={{ ...F, fontSize:11, letterSpacing:1, color:'#F5F5F5', minWidth:120 }}>{f.label}</div>
                       <div>
                         <label style={{ ...F, fontSize:9, letterSpacing:2, color:'#B8C1CC', display:'block', marginBottom:4 }}>PRICE (DKK)</label>
-                        <input type="number" min={0} value={editing[f.priceField] ?? 0} onChange={e=>setEditing({...editing, [f.priceField]: Number(e.target.value)})} style={inp()} />
+                        <input type="number" min={0} step="0.01" value={editing[f.priceField] ?? 0} onChange={e=>setEditing({...editing, [f.priceField]: Number(e.target.value)})} style={inp()} />
                       </div>
                       <div>
                         <label style={{ ...F, fontSize:9, letterSpacing:2, color:'#B8C1CC', display:'block', marginBottom:4 }}>ORIGINAL (OPTIONAL)</label>
-                        <input type="number" min={0} value={editing[f.origField] ?? 0} onChange={e=>setEditing({...editing, [f.origField]: Number(e.target.value)})} style={inp()} />
+                        <input type="number" min={0} step="0.01" value={editing[f.origField] ?? 0} onChange={e=>setEditing({...editing, [f.origField]: Number(e.target.value)})} style={inp()} />
                       </div>
                     </div>
                   ))}
