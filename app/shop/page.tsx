@@ -44,17 +44,23 @@ function isVariantAvailable(p: Product, key: string, caseStock: number): boolean
   return true;
 }
 
-function variantPrice(p: Product, key: string, casePrice: number): number {
-  const v = VARIANTS.find(x => x.key === key);
-  if (!v) return p.price_dkk;
-  let price = p.price_dkk;
-  if (v.isBuilt) price += 200;
-  if (v.needsCase) price += casePrice;
-  return price;
+const VARIANT_PRICE_FIELDS: Record<string, { price: string; original: string }> = {
+  unbuilt:      { price: 'unbuilt_price_dkk',      original: 'unbuilt_original_price_dkk' },
+  unbuilt_case: { price: 'unbuilt_case_price_dkk', original: 'unbuilt_case_original_price_dkk' },
+  built:        { price: 'built_price_dkk',        original: 'built_original_price_dkk' },
+  built_case:   { price: 'built_case_price_dkk',   original: 'built_case_original_price_dkk' },
+};
+
+function variantPricing(p: any, key: string): { price: number; original: number | null } {
+  const f = VARIANT_PRICE_FIELDS[key];
+  if (!f) return { price: p.price_dkk || 0, original: null };
+  const price = p[f.price] ?? p.price_dkk ?? 0;
+  const original = p[f.original];
+  return { price, original: original && original > price ? original : null };
 }
 
-function cheapestAvailableVariant(p: Product, caseStock: number, casePrice: number) {
-  const opts = VARIANTS.filter(v => isVariantAvailable(p, v.key, caseStock)).map(v => ({ key: v.key, price: variantPrice(p, v.key, casePrice) }));
+function cheapestAvailableVariant(p: Product, caseStock: number) {
+  const opts = VARIANTS.filter(v => isVariantAvailable(p, v.key, caseStock)).map(v => ({ key: v.key, ...variantPricing(p, v.key) }));
   if (opts.length === 0) return null;
   return opts.sort((a, b) => a.price - b.price)[0];
 }
@@ -181,7 +187,6 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [globalCaseStock, setGlobalCaseStock] = useState(0);
-  const [casePriceDkk, setCasePriceDkk] = useState(0);
 
   const [selected, setSelected] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<string>('unbuilt');
@@ -216,10 +221,7 @@ export default function ShopPage() {
 
   async function fetchInventory() {
     const { data } = await supabase.from('shop_inventory').select('*').eq('id', 1).single();
-    if (data) {
-      setGlobalCaseStock(data.case_stock ?? 0);
-      setCasePriceDkk(data.case_price_dkk ?? 0);
-    }
+    if (data) setGlobalCaseStock(data.case_stock ?? 0);
   }
 
   const filtered = filter === 'all' ? products : products.filter(p => p.status === filter);
@@ -260,7 +262,7 @@ export default function ShopPage() {
     if (!selected || !member) return;
     setUploading(true); setError('');
     const v = VARIANTS.find(x => x.key === selectedVariant)!;
-    const price = variantPrice(selected, selectedVariant, casePriceDkk);
+    const price = variantPricing(selected, selectedVariant).price;
     try {
       const depositAmount = Math.ceil(price / 2);
       const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
@@ -322,6 +324,8 @@ export default function ShopPage() {
   };
 
   const closeModal = () => setSelected(null);
+  const modalPricing = selected ? variantPricing(selected, selectedVariant) : { price: 0, original: null };
+  const modalPrice = modalPricing.price;
 
   return (
     <>
@@ -348,7 +352,7 @@ export default function ShopPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
                 {collectors.map(p => {
-                  const best = cheapestAvailableVariant(p, globalCaseStock, casePriceDkk);
+                  const best = cheapestAvailableVariant(p, globalCaseStock);
                   return (
                     <div key={p.id} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden' }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
@@ -361,7 +365,10 @@ export default function ShopPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#FACC15' }}>FROM</div>
-                          <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{(best ? best.price : p.price_dkk).toLocaleString()} kr</div>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                            {best?.original && <span style={{ ...FB, fontSize: 13, color: '#6B7280', textDecoration: 'line-through' }}>{best.original.toLocaleString()}</span>}
+                            <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{(best ? best.price : variantPricing(p, 'unbuilt').price).toLocaleString()} kr</div>
+                          </div>
                         </div>
                         {best ? (
                           <button onClick={() => openModal(p, best.key)} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
@@ -425,11 +432,14 @@ export default function ShopPage() {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                         {VARIANTS.map(v => {
                           const available = isVariantAvailable(p, v.key, globalCaseStock);
-                          const price = variantPrice(p, v.key, casePriceDkk);
+                          const { price, original } = variantPricing(p, v.key);
                           return (
                             <div key={v.key} style={{ background: '#050505', border: `1px solid ${available ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.25)'}`, borderRadius: 8, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                               <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#B8C1CC' }}>{v.icon} {v.label.toUpperCase()}</div>
-                              <div style={{ ...F, fontWeight: 900, fontSize: 15, color: available ? (isCollector ? '#FACC15' : '#F5F5F5') : '#6B7280' }}>{price.toLocaleString()} kr</div>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                                {original && <span style={{ ...FB, fontSize: 11, color: '#6B7280', textDecoration: 'line-through' }}>{original.toLocaleString()}</span>}
+                                <div style={{ ...F, fontWeight: 900, fontSize: 15, color: available ? (original ? '#22C55E' : (isCollector ? '#FACC15' : '#F5F5F5')) : '#6B7280' }}>{price.toLocaleString()} kr</div>
+                              </div>
                               {available ? (
                                 <button onClick={() => openModal(p, v.key)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
                               ) : (
@@ -480,7 +490,10 @@ export default function ShopPage() {
                     <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#B8C1CC', margin: '4px 0 12px' }}>
                       {VARIANTS.find(v => v.key === selectedVariant)?.shortLabel} · {selected.chassis}
                     </div>
-                    <div style={{ ...F, fontWeight: 900, fontSize: 32, color: '#FACC15' }}>{variantPrice(selected, selectedVariant, casePriceDkk).toLocaleString()} DKK</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                      {modalPricing.original && <span style={{ ...FB, fontSize: 16, color: '#6B7280', textDecoration: 'line-through' }}>{modalPricing.original.toLocaleString()} DKK</span>}
+                      <div style={{ ...F, fontWeight: 900, fontSize: 32, color: modalPricing.original ? '#22C55E' : '#FACC15' }}>{modalPrice.toLocaleString()} DKK</div>
+                    </div>
                   </div>
 
                   <div style={{ background: 'rgba(250,204,21,0.07)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 12, padding: 16 }}>
@@ -492,7 +505,7 @@ export default function ShopPage() {
                             <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5' }}>50% DEPOSIT NOW</div>
                             <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 2 }}>Pay the rest on pickup · Recommended</div>
                           </div>
-                          <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#FACC15' }}>{Math.ceil(variantPrice(selected, selectedVariant, casePriceDkk) / 2)} DKK</div>
+                          <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#FACC15' }}>{Math.ceil(modalPrice / 2)} DKK</div>
                         </div>
                       </div>
                       <div onClick={() => setPaymentOption('full')} style={{ background: paymentOption === 'full' ? 'rgba(34,197,94,0.08)' : '#050505', border: `1.5px solid ${paymentOption === 'full' ? '#22C55E' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: 14, cursor: 'pointer' }}>
@@ -501,7 +514,7 @@ export default function ShopPage() {
                             <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5' }}>FULL PAYMENT NOW</div>
                             <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 2 }}>Pay in full upfront · No balance on pickup</div>
                           </div>
-                          <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#22C55E' }}>{variantPrice(selected, selectedVariant, casePriceDkk)} DKK</div>
+                          <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#22C55E' }}>{modalPrice} DKK</div>
                         </div>
                       </div>
                     </div>
@@ -532,7 +545,7 @@ export default function ShopPage() {
                     <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#FACC15', marginBottom: 12 }}>💳 MOBILEPAY INSTRUCTIONS</div>
                     <ol style={{ ...FB, fontSize: 14, color: '#F5F5F5', lineHeight: 2.2, margin: 0, paddingLeft: 20 }}>
                       <li>Open MobilePay on your phone</li>
-                      <li>Send <strong>{paymentOption === 'deposit' ? Math.ceil(variantPrice(selected, selectedVariant, casePriceDkk) / 2) : variantPrice(selected, selectedVariant, casePriceDkk)} DKK</strong> to <strong>+45 54 32 79 41</strong> (Jovannie Ducay)</li>
+                      <li>Send <strong>{paymentOption === 'deposit' ? Math.ceil(modalPrice / 2) : modalPrice} DKK</strong> to <strong>+45 54 32 79 41</strong> (Jovannie Ducay)</li>
                       <li>Reference: <strong style={{ color: '#FACC15', fontFamily: 'monospace' }}>{payRef}</strong></li>
                       <li>Screenshot the confirmation</li>
                       <li>Upload it on the next step</li>
