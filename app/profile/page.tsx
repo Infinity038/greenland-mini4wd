@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { getMemberData, getMemberDataFromSupabase, getTicketWallet, getReferralStats, RANK_COLORS, RANK_NEXT_POINTS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, getMemberOrdersFromSupabase, logout } from '@/lib/member';
+import { isMemberActive, daysRemaining } from '@/lib/loyalty';
 import type { Member, TicketWallet, ReferralStats } from '@/lib/member';
 import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/layout/Navbar';
@@ -14,7 +15,7 @@ const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const DEMO_WALLET: TicketWallet = { paid_total: 3, paid_used: 2, paid_available: 1, bonus_available: 0, loyalty_progress: 3, loyalty_needed: 7 };
 const DEMO_REFERRAL: ReferralStats = { referral_code: 'DEMO1234', referral_link: 'https://greenland-mini4wd.vercel.app/register?ref=DEMO1234', confirmed_referrals: 1, pending_referrals: 2, bonus_tickets_earned: 1 };
 
-type Tab = 'overview' | 'orders' | 'tickets' | 'garage' | 'referral';
+type Tab = 'overview' | 'orders' | 'tickets' | 'garage' | 'referral' | 'wishlist';
 
 export default function ProfilePage() {
   const [member, setMember] = useState<Member | null>(null);
@@ -29,7 +30,7 @@ export default function ProfilePage() {
     () => {
       if (typeof window !== "undefined") {
         const p = new URLSearchParams(window.location.search).get("tab");
-        if (p === "orders" || p === "tickets" || p === "referral" || p === "garage") return p as Tab;
+        if (p === "orders" || p === "tickets" || p === "referral" || p === "garage" || p === "wishlist") return p as Tab;
       }
       return "overview";
     }
@@ -38,6 +39,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [ticketHistory, setTicketHistory] = useState<any[]>([]);
   const [raceEntries, setRaceEntries] = useState<any[]>([]);
+  const [wishlist, setWishlist] = useState<any[]>([]);
 
   useEffect(() => {
     const local = getMemberData();
@@ -61,6 +63,13 @@ export default function ProfilePage() {
         setTicketHistory(tkData || []);
         const { data: reData } = await supabase.from('race_entries').select('*').eq('member_email', local.email).order('created_at', { ascending: false });
         setRaceEntries(reData || []);
+        const { data: wlData } = await supabase.from('wishlist').select('*').eq('member_email', local.email).order('created_at', { ascending: false });
+        if (wlData && wlData.length > 0) {
+          const { data: prods } = await supabase.from('products').select('*').in('id', wlData.map((w: any) => w.product_id));
+          setWishlist(wlData.map((w: any) => ({ ...w, product: (prods || []).find((p: any) => p.id === w.product_id) })));
+        } else {
+          setWishlist([]);
+        }
       } catch {
         setMember(local);
       } finally {
@@ -81,6 +90,13 @@ export default function ProfilePage() {
   const points = member?.total_points || 0;
   const nextPoints = RANK_NEXT_POINTS[rank] || 5;
   const progressPct = rank === 'Legend' ? 100 : Math.min((points / nextPoints) * 100, 100);
+  const memberActive = isMemberActive(member as any);
+  const memberDaysLeft = daysRemaining(member as any);
+
+  const removeFromWishlist = async (id: string) => {
+    await supabase.from('wishlist').delete().eq('id', id);
+    setWishlist(prev => prev.filter(w => w.id !== id));
+  };
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -88,7 +104,7 @@ export default function ProfilePage() {
     </div>
   );
 
-  const TABS: Tab[] = ['overview', 'orders', 'tickets', 'garage', 'referral'];
+  const TABS: Tab[] = ['overview', 'orders', 'tickets', 'garage', 'wishlist', 'referral'];
 
   return (
     <>
@@ -107,6 +123,9 @@ export default function ProfilePage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
                   <h1 style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', margin: 0 }}>{member?.name || 'Member'}</h1>
                   <span style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 2, padding: '3px 10px', borderRadius: 4, background: rankColor + '22', color: rankColor, border: `1px solid ${rankColor}55` }}>{rank}</span>
+                  <span style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 2, padding: '3px 10px', borderRadius: 4, background: memberActive ? 'rgba(34,197,94,0.15)' : 'rgba(220,38,38,0.15)', color: memberActive ? '#22C55E' : '#DC2626', border: `1px solid ${memberActive ? 'rgba(34,197,94,0.4)' : 'rgba(220,38,38,0.4)'}` }}>
+                    {memberActive ? `🟢 ACTIVE · ${memberDaysLeft}d LEFT` : '🔴 INACTIVE — TOP UP TO RACE'}
+                  </span>
                   {member?.member_status === 'official' && (
                     <span style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 2, padding: '3px 10px', borderRadius: 4, background: 'rgba(250,204,21,0.15)', color: '#FACC15', border: '1px solid rgba(250,204,21,0.3)' }}>✓ OFFICIAL</span>
                   )}
@@ -151,6 +170,7 @@ export default function ProfilePage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }}>
                 {[
                   { label: 'Total Points', value: points, color: '#FACC15' },
+                  { label: 'Lifetime Spend', value: `${(member as any)?.lifetime_spending || 0} kr`, color: '#A855F7' },
                   { label: 'Tickets Available', value: wallet.paid_available + wallet.bonus_available, color: '#22C55E' },
                   { label: 'Orders', value: orders.length, color: '#3B82F6' },
                   { label: 'Referrals', value: referral.confirmed_referrals, color: '#DC2626' },
@@ -493,6 +513,36 @@ export default function ProfilePage() {
               <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#93C5FD', lineHeight: 1.7 }}>
                 ℹ️ All cars require admin approval before race entry. Cars are verified to ensure fair competition. Approval usually takes less than 24 hours.
               </div>
+            </div>
+          )}
+
+          {/* WISHLIST */}
+          {tab === 'wishlist' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {wishlist.length === 0 ? (
+                <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 40, textAlign: 'center', ...FB, color: '#B8C1CC' }}>
+                  Nothing saved yet. <a href="/shop" style={{ color: '#DC2626' }}>Browse the shop →</a>
+                </div>
+              ) : wishlist.map((w: any) => {
+                const p = w.product;
+                if (!p) return null;
+                const inStock = p.status !== 'sold out' && p.status !== 'coming soon' && ((p.unbuilt_stock ?? 1) > 0 || (p.built_stock ?? 1) > 0);
+                return (
+                  <div key={w.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 16, display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ width: 56, height: 56, background: '#050505', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                      {p.image_url ? <img src={p.image_url.split(',')[0]?.trim()} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 20 }}>🏎️</span>}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ ...F, fontWeight: 700, fontSize: 16, color: '#F5F5F5' }}>{p.name}</div>
+                      <div style={{ ...F, fontSize: 10, letterSpacing: 1, padding: '2px 8px', borderRadius: 20, display: 'inline-block', marginTop: 4, background: inStock ? 'rgba(34,197,94,0.15)' : 'rgba(220,38,38,0.15)', color: inStock ? '#22C55E' : '#DC2626' }}>
+                        {inStock ? '✓ BACK IN STOCK' : 'STILL SOLD OUT'}
+                      </div>
+                    </div>
+                    <a href={`/shop?product=${p.id}`} style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#fff', background: '#DC2626', borderRadius: 8, padding: '8px 14px', textDecoration: 'none', flexShrink: 0 }}>VIEW</a>
+                    <button onClick={() => removeFromWishlist(w.id)} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: 18, cursor: 'pointer', flexShrink: 0 }}>✕</button>
+                  </div>
+                );
+              })}
             </div>
           )}
 

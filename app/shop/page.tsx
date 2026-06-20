@@ -80,10 +80,22 @@ const FILTER_TABS = [
   { key: 'limited', label: 'Limited / Rare' },
 ];
 
+// Cloudinary's console/media-library "view" URL (res-console.cloudinary.com) requires an
+// authenticated dashboard session — it loads on desktop if you're logged into Cloudinary in
+// that browser tab, but always fails on mobile / other devices / logged-out sessions.
+// Auto-rewrite it to the real public CDN delivery URL (res.cloudinary.com) so it works everywhere.
+function fixImageUrl(url: string): string {
+  if (!url) return url;
+  return url.replace(
+    /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
+    'res.cloudinary.com/$1/image/upload/'
+  );
+}
+
 // Parse comma-separated image URLs
 function parseImages(url: string): string[] {
   if (!url) return [];
-  return url.split(',').map(u => u.trim()).filter(Boolean);
+  return url.split(',').map(u => fixImageUrl(u.trim())).filter(Boolean);
 }
 
 function ProductImage({ product, onClick }: { product: Product; onClick?: () => void }) {
@@ -206,6 +218,15 @@ export default function ShopPage() {
   const [preorderSending, setPreorderSending] = useState(false);
   const [preorderDone, setPreorderDone] = useState(false);
 
+  // Wishlist
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+
+  // Discount codes
+  const [discountInput, setDiscountInput] = useState('');
+  const [discountApplied, setDiscountApplied] = useState<{ code: string; percent: number; codeId: string } | null>(null);
+  const [discountError, setDiscountError] = useState('');
+  const [discountChecking, setDiscountChecking] = useState(false);
+
   // Shareable product links
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -215,7 +236,55 @@ export default function ShopPage() {
     setMember(getMemberData());
     fetchProducts();
     fetchInventory();
+    fetchWishlist();
   }, []);
+
+  async function fetchWishlist() {
+    const m = getMemberData();
+    if (!m?.email) return;
+    const { data } = await supabase.from('wishlist').select('product_id').eq('member_email', m.email);
+    setWishlistIds(new Set((data || []).map((w: any) => w.product_id)));
+  }
+
+  const toggleWishlist = async (p: Product) => {
+    if (!isRegistered() || !member) { window.location.href = '/register'; return; }
+    const has = wishlistIds.has(p.id);
+    if (has) {
+      await supabase.from('wishlist').delete().eq('member_email', member.email).eq('product_id', p.id);
+      setWishlistIds(prev => { const next = new Set(prev); next.delete(p.id); return next; });
+    } else {
+      await supabase.from('wishlist').insert({ member_email: member.email, product_id: p.id });
+      setWishlistIds(prev => new Set(prev).add(p.id));
+    }
+  };
+
+  const TIER_ORDER: Record<string, number> = { non_member: 0, member: 1, season_3rd: 2, season_2nd: 3, season_1st: 4, hall_of_fame: 5 };
+
+  const applyDiscountCode = async () => {
+    if (!discountInput.trim() || !member) return;
+    setDiscountChecking(true); setDiscountError('');
+    try {
+      const { data: code } = await supabase.from('discount_codes').select('*').eq('code', discountInput.trim().toUpperCase()).single();
+      if (!code) { setDiscountError('Invalid code.'); setDiscountChecking(false); return; }
+      const now = Date.now();
+      if (new Date(code.valid_from).getTime() > now || new Date(code.valid_until).getTime() < now) {
+        setDiscountError('This code has expired.'); setDiscountChecking(false); return;
+      }
+      if (code.max_uses != null && code.uses_count >= code.max_uses) {
+        setDiscountError('This code has reached its usage limit.'); setDiscountChecking(false); return;
+      }
+      if (code.min_tier) {
+        const { data: m } = await supabase.from('members').select('loyalty_tier').eq('email', member.email).single();
+        const memberTierRank = TIER_ORDER[m?.loyalty_tier || 'member'] ?? 1;
+        const requiredRank = TIER_ORDER[code.min_tier] ?? 0;
+        if (memberTierRank < requiredRank) { setDiscountError(`This code requires ${code.min_tier.replace('_', ' ')} tier or higher.`); setDiscountChecking(false); return; }
+      }
+      const { data: already } = await supabase.from('discount_code_redemptions').select('id').eq('code_id', code.id).eq('member_email', member.email).single();
+      if (already) { setDiscountError("You've already used this code."); setDiscountChecking(false); return; }
+      setDiscountApplied({ code: code.code, percent: Number(code.percent_off), codeId: code.id });
+    } catch { setDiscountError('Invalid code.'); }
+    setDiscountChecking(false);
+  };
 
   // Deep-link: /shop?product=<id> scrolls to and highlights that card
   useEffect(() => {
@@ -262,6 +331,7 @@ export default function ShopPage() {
     setSelected(p); setSelectedVariant(variantKey); setStep('confirm');
     setOrderId(''); setPayRef(''); setProofFile(null); setProofPreview(null); setError('');
     setPaymentOption('deposit');
+    setDiscountInput(''); setDiscountApplied(null); setDiscountError('');
   };
 
   const openPreorder = (p: Product, variantKey: string) => {
@@ -291,7 +361,8 @@ export default function ShopPage() {
     if (!selected || !member) return;
     setUploading(true); setError('');
     const v = VARIANTS.find(x => x.key === selectedVariant)!;
-    const price = variantPricing(selected, selectedVariant).price;
+    const rawPrice = variantPricing(selected, selectedVariant).price;
+    const price = discountApplied ? Math.round(rawPrice * (1 - discountApplied.percent / 100)) : rawPrice;
     try {
       const depositAmount = Math.ceil(price / 2);
       const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
@@ -305,11 +376,18 @@ export default function ShopPage() {
         quantity: 1,
         status: 'pending',
         payment_status: 'awaiting_payment',
-        notes: paymentOption === 'deposit'
+        spend_amount_dkk: price,
+        notes: (discountApplied ? `Code ${discountApplied.code} applied (-${discountApplied.percent}%). ` : '') + (paymentOption === 'deposit'
           ? `50% Deposit: ${depositAmount} DKK (Remaining: ${price - depositAmount} DKK on pickup)`
-          : `Full Payment: ${price} DKK`,
+          : `Full Payment: ${price} DKK`),
       }).select().single();
       if (err || !data) throw new Error('failed');
+
+      if (discountApplied) {
+        await supabase.from('discount_code_redemptions').insert({ code_id: discountApplied.codeId, member_email: member.email, order_id: data.id });
+        const { data: codeRow } = await supabase.from('discount_codes').select('uses_count').eq('id', discountApplied.codeId).single();
+        await supabase.from('discount_codes').update({ uses_count: (codeRow?.uses_count || 0) + 1 }).eq('id', discountApplied.codeId);
+      }
 
       // Decrement the correct stock pool(s)
       const stockUpdate: any = v.isBuilt
@@ -354,7 +432,8 @@ export default function ShopPage() {
 
   const closeModal = () => setSelected(null);
   const modalPricing = selected ? variantPricing(selected, selectedVariant) : { price: 0, original: null };
-  const modalPrice = modalPricing.price;
+  const rawModalPrice = modalPricing.price;
+  const modalPrice = discountApplied ? Math.round(rawModalPrice * (1 - discountApplied.percent / 100)) : rawModalPrice;
 
   return (
     <>
@@ -385,10 +464,16 @@ export default function ShopPage() {
                   return (
                     <div key={p.id} id={`product-${p.id}`} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.3s', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
-                      <button onClick={() => shareProduct(p)} title="Copy share link"
-                        style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer' }}>
-                        {copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}
-                      </button>
+                      <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', gap: 6 }}>
+                        <button onClick={() => toggleWishlist(p)} title="Save to wishlist"
+                          style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 9px', fontSize: 12, color: wishlistIds.has(p.id) ? '#DC2626' : '#fff', cursor: 'pointer' }}>
+                          {wishlistIds.has(p.id) ? '♥' : '♡'}
+                        </button>
+                        <button onClick={() => shareProduct(p)} title="Copy share link"
+                          style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer' }}>
+                          {copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}
+                        </button>
+                      </div>
                       <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15', marginBottom: 4 }}>✦ COLLECTOR · LIMITED</div>
                       <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
                         <ProductImage product={p} onClick={() => setLightbox(p)} />
@@ -448,10 +533,16 @@ export default function ShopPage() {
                     {isCollector && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)', zIndex: 1 }} />}
                     {p.status === 'preorder only' && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>PREORDER</div>}
                     {isCollector && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#FACC1522', color: '#FACC15', border: '1px solid #FACC1544' }}>COLLECTOR</div>}
-                    <button onClick={() => shareProduct(p)} title="Copy share link"
-                      style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}
-                    </button>
+                    <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', gap: 6 }}>
+                      <button onClick={() => toggleWishlist(p)} title="Save to wishlist"
+                        style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 9px', fontSize: 12, color: wishlistIds.has(p.id) ? '#DC2626' : '#fff', cursor: 'pointer' }}>
+                        {wishlistIds.has(p.id) ? '♥' : '♡'}
+                      </button>
+                      <button onClick={() => shareProduct(p)} title="Copy share link"
+                        style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}
+                      </button>
+                    </div>
 
                     <div style={{ height: 180, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', position: 'relative' }}>
                       <ProductImage product={p} onClick={() => parseImages(p.image_url).length > 0 && setLightbox(p)} />
@@ -561,6 +652,26 @@ export default function ShopPage() {
                       ⚡ <strong style={{ color: '#fff' }}>Race-Ready Car:</strong> This is a fully assembled and tuned Mini 4WD — no building required. Open the box and race immediately.
                     </div>
                   )}
+
+                  {/* Discount code */}
+                  <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 14 }}>
+                    {discountApplied ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ ...FB, fontSize: 13, color: '#22C55E' }}>✓ Code <strong>{discountApplied.code}</strong> applied — {discountApplied.percent}% off</div>
+                        <button onClick={() => { setDiscountApplied(null); setDiscountInput(''); }} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: 12, cursor: 'pointer' }}>Remove</button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input value={discountInput} onChange={e => setDiscountInput(e.target.value)} placeholder="Discount code (optional)"
+                          style={{ flex: 1, background: '#071426', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#F5F5F5', ...FB, fontSize: 13, outline: 'none' }} />
+                        <button onClick={applyDiscountCode} disabled={discountChecking || !discountInput.trim()}
+                          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '10px 16px', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#F5F5F5', cursor: 'pointer', opacity: discountChecking ? 0.6 : 1 }}>
+                          {discountChecking ? '...' : 'APPLY'}
+                        </button>
+                      </div>
+                    )}
+                    {discountError && <div style={{ ...FB, fontSize: 12, color: '#DC2626', marginTop: 8 }}>{discountError}</div>}
+                  </div>
 
                   <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 7 }}>
                     <div style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>👤 <span style={{ color: '#F5F5F5' }}>{member?.name}</span></div>

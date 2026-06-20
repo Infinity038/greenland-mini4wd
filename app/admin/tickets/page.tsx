@@ -2,6 +2,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { awardForPayment, clawbackForPayment } from '@/lib/loyalty';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -80,10 +81,9 @@ export default function AdminTicketsPage() {
     if (!status) return;
     setSaving(id);
     const ticket = tickets.find(t => t.id === id);
+    const ticketUpdates: any = { payment_status: status };
 
-    await supabase.from('race_tickets').update({ payment_status: status }).eq('id', id);
-
-    // Auto-increment loyalty on confirmation
+    // Auto-increment loyalty punch card on confirmation
     if (status === 'payment_confirmed' && ticket?.payment_status !== 'payment_confirmed') {
       const col = ticket?.ticket_type === 'season' ? 'season_loyalty_progress' : 'weekly_loyalty_progress';
       const qty = ticket?.quantity || 1;
@@ -96,10 +96,35 @@ export default function AdminTicketsPage() {
         await supabase.from('members').update({ [col]: newVal }).eq('email', ticket.member_email);
         if (grantFree) setMsg(`✅ Updated · 🎁 ${ticket.member_name} earned a FREE ticket!`);
         else setMsg('✅ Updated');
+      } else {
+        setMsg('✅ Updated');
       }
+
+      // Points + membership days — once per ticket, same engine the shop uses
+      if (!ticket?.rewards_applied) {
+        const spend = Number(ticket?.total_price) || 0;
+        if (spend > 0 && ticket?.member_email) {
+          try {
+            const result = await awardForPayment(ticket.member_email, spend);
+            if (result) {
+              ticketUpdates.points_awarded = result.points;
+              ticketUpdates.membership_days_awarded = result.days;
+              ticketUpdates.rewards_applied = true;
+            }
+          } catch (e: any) { setMsg('⚠️ Updated, but rewards sync failed: ' + e.message); }
+        }
+      }
+    } else if (status === 'cancelled' && ticket?.rewards_applied) {
+      try {
+        await clawbackForPayment(ticket.member_email, Number(ticket.points_awarded) || 0, Number(ticket.membership_days_awarded) || 0);
+        ticketUpdates.rewards_applied = false;
+      } catch (e: any) { setMsg('⚠️ Cancelled, but clawback failed: ' + e.message); }
+      setMsg('✅ Updated');
     } else {
       setMsg('✅ Updated');
     }
+
+    await supabase.from('race_tickets').update(ticketUpdates).eq('id', id);
 
     loadData();
     setSaving(null);

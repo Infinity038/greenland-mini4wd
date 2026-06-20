@@ -33,6 +33,16 @@ export default function Navbar() {
     setMember(getMemberData());
   }, []);
 
+  // Lock body scroll while mobile menu is open so the page behind it can't scroll
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
   const firstName = member?.name?.split(' ')[0] || member?.first_name || "Member";
 
   return (
@@ -108,9 +118,9 @@ export default function Navbar() {
         </button>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile menu — own fixed scroll container, independent of the page behind it */}
       {open && (
-        <div style={{ background: "#050505", borderTop: "1px solid rgba(255,255,255,0.05)", padding: "8px 16px 24px" }}>
+        <div style={{ position: "fixed", top: 60, left: 0, right: 0, bottom: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", background: "#050505", borderTop: "1px solid rgba(255,255,255,0.05)", padding: "8px 16px 24px", zIndex: 49 }}>
           {NAV_LINKS.map(link => (
             <a key={link.label} href={link.href} onClick={() => setOpen(false)}
               style={{ display: "block", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 22, color: link.label === 'Race Rules' ? '#22C55E' : "#F5F5F5", letterSpacing: 3, textDecoration: "none" }}>

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { checkAndUpdateHOF, getMemberLifetimeStat } from '@/lib/hallOfFame';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -71,10 +72,34 @@ export default function AdminRaceResults() {
       points_earned: parseInt(form.points_earned) || 0,
       notes: form.notes,
     });
+
+    let hofMsg = '';
+    if (!error) {
+      try {
+        // Fastest lap — single-run record, checked directly against this result
+        if (form.lap_time_seconds) {
+          const lapSeconds = parseFloat(form.lap_time_seconds);
+          const r = await checkAndUpdateHOF('fastest_lap', form.member_id, form.member_name, lapSeconds, `${lapSeconds}s`, true);
+          if (r.broke_record) hofMsg += ' 🏆 New fastest lap record!';
+        }
+        // Most wins / most points — cumulative lifetime totals, recomputed after this insert
+        const lifetimeWins = await getMemberLifetimeStat(form.member_id, 'wins');
+        if (lifetimeWins > 0) {
+          const r = await checkAndUpdateHOF('most_wins', form.member_id, form.member_name, lifetimeWins, `${lifetimeWins} wins`, false);
+          if (r.broke_record) hofMsg += ' 🏆 New Most Wins record!';
+        }
+        const lifetimePoints = await getMemberLifetimeStat(form.member_id, 'points_earned');
+        if (lifetimePoints > 0) {
+          const r = await checkAndUpdateHOF('most_points', form.member_id, form.member_name, lifetimePoints, `${lifetimePoints} pts`, false);
+          if (r.broke_record) hofMsg += ' 🏆 New Most Points record!';
+        }
+      } catch (e: any) { hofMsg = ' ⚠️ HOF check failed: ' + e.message; }
+    }
+
     if (error) { setMsg('Error: ' + error.message); }
-    else { setMsg('✅ Result saved!'); setForm(f => ({ ...f, member_id: '', member_name: '', position: '', lap_time_seconds: '', wins: '0', points_earned: '0', notes: '' })); loadData(); }
+    else { setMsg('✅ Result saved!' + hofMsg); setForm(f => ({ ...f, member_id: '', member_name: '', position: '', lap_time_seconds: '', wins: '0', points_earned: '0', notes: '' })); loadData(); }
     setSaving(false);
-    setTimeout(() => setMsg(''), 3000);
+    setTimeout(() => setMsg(''), 5000);
   }
 
   async function handleDelete(id: string) {

@@ -40,6 +40,10 @@ export default function AdminLoyalty() {
   const [msg, setMsg] = useState('');
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [discountCodes, setDiscountCodes] = useState<any[]>([]);
+  const [codeForm, setCodeForm] = useState({ code: '', percent_off: '', min_tier: '', max_uses: '', valid_until: '', description: '' });
+  const [codeSaving, setCodeSaving] = useState(false);
+  const [codeMsg, setCodeMsg] = useState('');
 
   useEffect(() => { if (checkAuth()) { setAuthed(true); loadData(); } }, []);
 
@@ -56,6 +60,32 @@ export default function AdminLoyalty() {
 
     const { data: tData } = await supabase.from('points_transactions').select('*').order('created_at', { ascending: false }).limit(30);
     setTransactions(tData || []);
+
+    const { data: dcData } = await supabase.from('discount_codes').select('*').order('created_at', { ascending: false });
+    setDiscountCodes(dcData || []);
+  }
+
+  async function handleCreateCode() {
+    if (!codeForm.code.trim() || !codeForm.percent_off || !codeForm.valid_until) { setCodeMsg('Code, % off, and expiry date are required.'); return; }
+    setCodeSaving(true);
+    const { error } = await supabase.from('discount_codes').insert({
+      code: codeForm.code.trim().toUpperCase(),
+      percent_off: Number(codeForm.percent_off),
+      min_tier: codeForm.min_tier || null,
+      max_uses: codeForm.max_uses ? Number(codeForm.max_uses) : null,
+      valid_until: codeForm.valid_until,
+      description: codeForm.description,
+    });
+    if (error) setCodeMsg('Error: ' + error.message);
+    else { setCodeMsg('✅ Code created!'); setCodeForm({ code: '', percent_off: '', min_tier: '', max_uses: '', valid_until: '', description: '' }); loadData(); }
+    setCodeSaving(false);
+    setTimeout(() => setCodeMsg(''), 3000);
+  }
+
+  async function deleteCode(id: string) {
+    if (!confirm('Delete this code?')) return;
+    await supabase.from('discount_codes').delete().eq('id', id);
+    loadData();
   }
 
   function handleLogin() {
@@ -288,6 +318,63 @@ export default function AdminLoyalty() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+
+        {/* DISCOUNT CODES */}
+        <div style={s.card}>
+          <div style={s.title}>🎟️ DISCOUNT CODES</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={s.label}>Code</label>
+              <input style={s.input} placeholder="RACE10" value={codeForm.code} onChange={e => setCodeForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} />
+            </div>
+            <div>
+              <label style={s.label}>% Off</label>
+              <input style={s.input} type="number" placeholder="10" value={codeForm.percent_off} onChange={e => setCodeForm(f => ({ ...f, percent_off: e.target.value }))} />
+            </div>
+            <div>
+              <label style={s.label}>Min Tier (optional)</label>
+              <select style={s.select} value={codeForm.min_tier} onChange={e => setCodeForm(f => ({ ...f, min_tier: e.target.value }))}>
+                <option value="">Anyone</option>
+                {TIERS.filter(t => t.key !== 'non_member').map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={s.label}>Max Uses (optional)</label>
+              <input style={s.input} type="number" placeholder="Unlimited" value={codeForm.max_uses} onChange={e => setCodeForm(f => ({ ...f, max_uses: e.target.value }))} />
+            </div>
+            <div>
+              <label style={s.label}>Expires</label>
+              <input style={s.input} type="datetime-local" value={codeForm.valid_until} onChange={e => setCodeForm(f => ({ ...f, valid_until: e.target.value }))} />
+            </div>
+            <div>
+              <label style={s.label}>Description</label>
+              <input style={s.input} placeholder="e.g. Season 2 launch promo" value={codeForm.description} onChange={e => setCodeForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
+          </div>
+          <button style={s.btn} onClick={handleCreateCode} disabled={codeSaving}>{codeSaving ? 'Saving...' : 'CREATE CODE'}</button>
+          {codeMsg && <div style={s.msg}>{codeMsg}</div>}
+
+          <div style={{ marginTop: '20px' }}>
+            {discountCodes.length === 0 ? (
+              <div style={{ color: '#4B5563', fontSize: '13px' }}>No discount codes yet.</div>
+            ) : discountCodes.map((c: any) => {
+              const expired = new Date(c.valid_until).getTime() < Date.now();
+              const usedUp = c.max_uses != null && c.uses_count >= c.max_uses;
+              return (
+                <div key={c.id} style={{ ...s.txRow, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: (expired || usedUp) ? '#6B7280' : '#22C55E' }}>{c.code}</span>
+                    <span style={{ color: '#B8C1CC', marginLeft: 10 }}>{c.percent_off}% off</span>
+                    {c.min_tier && <span style={{ color: '#6B7280', marginLeft: 10 }}>· {TIERS.find(t => t.key === c.min_tier)?.label || c.min_tier}+</span>}
+                    <span style={{ color: '#6B7280', marginLeft: 10 }}>· {c.uses_count}{c.max_uses ? `/${c.max_uses}` : ''} used</span>
+                    <span style={{ color: expired ? '#DC2626' : '#6B7280', marginLeft: 10 }}>· {expired ? 'Expired' : `Until ${new Date(c.valid_until).toLocaleDateString('en-GB')}`}</span>
+                  </div>
+                  <button style={s.btn} onClick={() => deleteCode(c.id)}>Delete</button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
