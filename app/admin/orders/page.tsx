@@ -106,21 +106,35 @@ export default function AdminOrders() {
     else setPwError('Wrong password');
   }
 
+  // Orders created before this engine existed have no spend_amount_dkk — recover the
+  // real amount from the notes text so re-saving an old order still backfills correctly.
+  function extractSpendFromNotes(notes: string): number {
+    if (!notes) return 0;
+    const full = notes.match(/Full Payment:\s*([\d.]+)\s*DKK/i);
+    if (full) return parseFloat(full[1]);
+    const deposit = notes.match(/Deposit:\s*([\d.]+)\s*DKK\s*\(Remaining:\s*([\d.]+)\s*DKK/i);
+    if (deposit) return parseFloat(deposit[1]) + parseFloat(deposit[2]);
+    return 0;
+  }
+
+  // Any status from here on means money actually changed hands — award (once) on first entry.
+  const PAID_STATUSES = ['payment_confirmed', 'reserved', 'awaiting_stock', 'in_transit', 'ready_for_pickup', 'completed'];
+
   async function updateStatus(id: string, status: string) {
     setSaving(id);
     const order = orders.find((o: any) => o.id === id);
     const updates: any = { payment_status: status };
 
     try {
-      // Award points + membership days the moment payment is confirmed — once only.
-      if (status === 'payment_confirmed' && order && !order.rewards_applied) {
-        const spend = Number(order.spend_amount_dkk) || 0;
+      if (PAID_STATUSES.includes(status) && order && !order.rewards_applied) {
+        const spend = Number(order.spend_amount_dkk) || extractSpendFromNotes(order.notes);
         if (spend > 0 && (order.member_email || order.email)) {
           const result = await awardForPayment(order.member_email || order.email, spend);
           if (result) {
             updates.points_awarded = result.points;
             updates.membership_days_awarded = result.days;
             updates.rewards_applied = true;
+            updates.spend_amount_dkk = spend; // backfill so it's correct going forward too
           }
         }
       }

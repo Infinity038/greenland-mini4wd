@@ -80,12 +80,18 @@ const FILTER_TABS = [
   { key: 'limited', label: 'Limited / Rare' },
 ];
 
-// Cloudinary's console/media-library "view" URL (res-console.cloudinary.com) requires an
-// authenticated dashboard session — it loads on desktop if you're logged into Cloudinary in
-// that browser tab, but always fails on mobile / other devices / logged-out sessions.
-// Auto-rewrite it to the real public CDN delivery URL (res.cloudinary.com) so it works everywhere.
+// Cloudinary console "drilldown" search-view links — generated when you copy a link from
+// inside the Cloudinary web app's media library. These return an HTML page, not the image
+// itself, so they always fail in an <img> tag regardless of browser/login state.
+// Pattern: .../image/upload/v<version>/<base64-encoded-filename>/drilldown
+// Decode the base64 chunk to recover the real public_id and rebuild a proper delivery URL.
 function fixImageUrl(url: string): string {
   if (!url) return url;
+  const drilldown = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
+  if (drilldown) {
+    try { return drilldown[1] + atob(drilldown[2]); } catch { /* fall through */ }
+  }
+  // Also handle the older console thumbnail-viewer URL, which needs a login session
   return url.replace(
     /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
     'res.cloudinary.com/$1/image/upload/'

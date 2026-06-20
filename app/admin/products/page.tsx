@@ -23,6 +23,24 @@ function cheapestPrice(p: any): number {
   return vals.length ? Math.min(...vals) : (p.price_dkk || 0);
 }
 
+// Cloudinary console "drilldown" search-view links — generated when you copy a link from
+// inside the Cloudinary web app's media library. These return an HTML page, not the image
+// itself, so they always fail in an <img> tag regardless of browser/login state.
+function fixImageUrl(url: string): string {
+  if (!url) return url;
+  return url.split(',').map(u => {
+    const trimmed = u.trim();
+    const drilldown = trimmed.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
+    if (drilldown) {
+      try { return drilldown[1] + atob(drilldown[2]); } catch { /* fall through */ }
+    }
+    return trimmed.replace(
+      /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
+      'res.cloudinary.com/$1/image/upload/'
+    );
+  }).join(',');
+}
+
 function checkAuth() {
   if (typeof window === 'undefined') return false;
   const session = localStorage.getItem('adminSession');
@@ -36,7 +54,7 @@ function saveAuth() {
 
 function ProductThumb({ url, size = 56 }: { url: string; size?: number }) {
   const [failed, setFailed] = useState(false);
-  const first = url?.split(',')[0]?.trim();
+  const first = fixImageUrl(url || '').split(',')[0]?.trim();
   if (!first || failed) return (
     <div style={{ width: size, height: size, borderRadius: 8, background: '#050505', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       <span style={{ ...F, fontSize: 10, color: 'rgba(255,255,255,0.15)' }}>NO IMG</span>
@@ -109,7 +127,7 @@ export default function AdminProductsPage() {
     setSaving(true); setSaveError('');
     try {
       // price_dkk kept in sync to the cheapest variant for any legacy code that still reads it
-      const payload = { ...editing, price_dkk: cheapestPrice(editing) || editing.price_dkk || 0 };
+      const payload = { ...editing, image_url: fixImageUrl(editing.image_url), price_dkk: cheapestPrice(editing) || editing.price_dkk || 0 };
       if (editing.id) {
         const { error } = await supabase.from('products').update(payload).eq('id', editing.id);
         if (error) throw error;
@@ -140,7 +158,7 @@ export default function AdminProductsPage() {
   if (!checked) return null;
   if (!authed) return <LoginScreen title="Manage Products" onLogin={() => { setAuthed(true); fetchProducts(); fetchInventory(); fetchPreorders(); }} />;
 
-  const editPreviewUrl = editing?.image_url?.split(',')[0]?.trim();
+  const editPreviewUrl = fixImageUrl(editing?.image_url || '').split(',')[0]?.trim();
 
   return (
     <div style={{ minHeight:'100vh', background:'#050505', color:'#F5F5F5' }}>
