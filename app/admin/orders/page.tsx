@@ -114,6 +114,8 @@ export default function AdminOrders() {
     if (full) return parseFloat(full[1]);
     const deposit = notes.match(/Deposit:\s*([\d.]+)\s*DKK\s*\(Remaining:\s*([\d.]+)\s*DKK/i);
     if (deposit) return parseFloat(deposit[1]) + parseFloat(deposit[2]);
+    const price = notes.match(/Price:\s*([\d.]+)\s*DKK/i);
+    if (price) return parseFloat(price[1]);
     return 0;
   }
 

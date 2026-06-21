@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { isRegistered, getMemberData } from '@/lib/member';
+import { isMemberActive } from '@/lib/loyalty';
 import { supabase } from '@/lib/supabase';
 
 const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
@@ -62,6 +63,7 @@ export default function TournamentPage() {
   const [myCars, setMyCars]             = useState([]);
   const [myTickets, setMyTickets]       = useState([]);
   const [myEntries, setMyEntries]       = useState([]);
+  const [memberActive, setMemberActive] = useState(true);
   const [loading, setLoading]           = useState(true);
 
   // Race entry modal
@@ -98,13 +100,18 @@ export default function TournamentPage() {
         setMyTickets(tkData || []);
         const { data: meData } = await supabase.from('race_entries').select('*').eq('member_email',local.email);
         setMyEntries(meData || []);
+        const { data: memberRow } = await supabase.from('members').select('membership_expires_at').eq('email',local.email).single();
+        setMemberActive(isMemberActive(memberRow));
       }
       setLoading(false);
     }
     load();
   }, []);
 
-  const myTotalTickets   = myTickets.reduce((s,t)=>s+(Number(t.quantity)||1),0);
+  // Expired members can still race, but only on tickets they paid real money for —
+  // bonus/punch-card tickets are excluded once membership lapses.
+  const eligibleTickets  = memberActive ? myTickets : myTickets.filter(t=>t.ticket_type !== 'bonus');
+  const myTotalTickets   = eligibleTickets.reduce((s,t)=>s+(Number(t.quantity)||1),0);
   const usedTickets      = myEntries.length;  // each entry consumes 1 ticket
   const availableTickets = Math.max(0, myTotalTickets - usedTickets);
   const myEntriesFor    = (tid) => myEntries.filter(e=>e.tournament_id===tid);
@@ -131,7 +138,7 @@ export default function TournamentPage() {
     if (dup) { setRegError('This car is already entered in this category.'); return; }
     setRegSaving(true); setRegError('');
     const usedIds = myEntries.map(e=>e.ticket_id).filter(Boolean);
-    const availTicket = myTickets.find(t=>!usedIds.includes(t.id));
+    const availTicket = eligibleTickets.find(t=>!usedIds.includes(t.id));
     const { error } = await supabase.from('race_entries').insert({
       tournament_id: regTournament.id, member_email: member.email,
       member_name: member.name || member.email, car_id: regCar,
@@ -360,7 +367,7 @@ export default function TournamentPage() {
               <div style={{ background:'#071426', border:'1px solid rgba(250,204,21,0.2)', borderRadius:14, padding:'24px 20px' }}>
                 <div style={{ fontSize:28, marginBottom:12 }}>🚗</div>
                 <div style={{ ...F, fontWeight:800, fontSize:18, color:'#FACC15', marginBottom:4 }}>House Car Rental</div>
-                <div style={{ ...F, fontWeight:900, fontSize:32, color:'#FACC15', marginBottom:8 }}>25 kr/hr</div>
+                <div style={{ ...F, fontWeight:900, fontSize:32, color:'#FACC15', marginBottom:8 }}>69 kr/hr</div>
                 <div style={{ ...FB, fontSize:14, color:'#B8C1CC', lineHeight:1.6 }}>Batteries included. Try before you buy.</div>
               </div>
               <div style={{ background:'#0a0a0a', border:'1px solid rgba(255,255,255,0.05)', borderRadius:14, padding:'24px 20px', opacity:0.5 }}>
