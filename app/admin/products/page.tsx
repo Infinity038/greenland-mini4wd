@@ -29,15 +29,23 @@ function cheapestPrice(p: any): number {
 function fixImageUrl(url: string): string {
   if (!url) return url;
   return url.split(',').map(u => {
-    const trimmed = u.trim();
+    let trimmed = u.trim();
+
     const drilldown = trimmed.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
     if (drilldown) {
-      try { return drilldown[1] + atob(drilldown[2]); } catch { /* fall through */ }
+      try { trimmed = drilldown[1] + atob(drilldown[2]); } catch { /* leave as-is */ }
     }
-    return trimmed.replace(
+
+    trimmed = trimmed.replace(
       /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
       'res.cloudinary.com/$1/image/upload/'
     );
+
+    if (/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/[^./]+$/.test(trimmed)) {
+      trimmed = trimmed + '.png';
+    }
+
+    return trimmed;
   }).join(',');
 }
 
