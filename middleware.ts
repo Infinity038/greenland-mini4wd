@@ -7,7 +7,7 @@ const MEMBER_ONLY = ["/profile", "/tickets/checkout"];
 // Pages that are always public
 // Everything else is public by default
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Always allow static/admin/api/register
