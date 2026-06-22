@@ -101,6 +101,7 @@ export default function AdminProductsPage() {
   const [tab, setTab] = useState<'products' | 'preorders'>('products');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [msg, setMsg] = useState('');
 
   const [caseStock, setCaseStock] = useState(10);
   const [caseSaving, setCaseSaving] = useState(false);
@@ -125,6 +126,8 @@ export default function AdminProductsPage() {
   };
   const fetchPreorders = async () => { const { data } = await supabase.from('preorders').select('*').order('created_at',{ascending:false}); setPreorders(data||[]); };
 
+  const flash = (text: string) => { setMsg(text); setTimeout(() => setMsg(''), 6000); };
+
   const save = async () => {
     if (!editing) return;
     if (!editing.name?.trim()) { setSaveError('Name is required.'); return; }
@@ -146,17 +149,38 @@ export default function AdminProductsPage() {
     setSaving(false);
   };
 
-  const del = async (id:string) => { if(!confirm('Delete?'))return; await supabase.from('products').delete().eq('id',id); await fetchProducts(); };
-  const quickStatus = async (p:any, status:string) => { await supabase.from('products').update({status}).eq('id',p.id); await fetchProducts(); };
+  const del = async (id:string) => {
+    if(!confirm('Delete?')) return;
+    const { error } = await supabase.from('products').delete().eq('id',id);
+    if (error) { flash('❌ Delete failed: ' + error.message); return; }
+    flash('✅ Product deleted');
+    await fetchProducts();
+  };
+  const quickStatus = async (p:any, status:string) => {
+    const { error } = await supabase.from('products').update({status}).eq('id',p.id);
+    if (error) { flash('❌ Status update failed: ' + error.message); return; }
+    await fetchProducts();
+  };
 
   const saveInventory = async () => {
     setCaseSaving(true);
-    await supabase.from('shop_inventory').update({ case_stock: caseStock }).eq('id', 1);
+    const { error } = await supabase.from('shop_inventory').update({ case_stock: caseStock }).eq('id', 1);
+    if (error) flash('❌ Case inventory save failed: ' + error.message);
     setCaseSaving(false);
   };
 
-  const markPreorderDone = async (id: string) => { await supabase.from('preorders').update({ status: 'fulfilled' }).eq('id', id); await fetchPreorders(); };
-  const delPreorder = async (id: string) => { if(!confirm('Delete this preorder request?'))return; await supabase.from('preorders').delete().eq('id', id); await fetchPreorders(); };
+  const markPreorderDone = async (id: string) => {
+    const { error } = await supabase.from('preorders').update({ status: 'fulfilled' }).eq('id', id);
+    if (error) { flash('❌ Update failed: ' + error.message); return; }
+    await fetchPreorders();
+  };
+  const delPreorder = async (id: string) => {
+    if(!confirm('Delete this preorder request?')) return;
+    const { error } = await supabase.from('preorders').delete().eq('id', id);
+    if (error) { flash('❌ Delete failed: ' + error.message); return; }
+    flash('✅ Preorder deleted');
+    await fetchPreorders();
+  };
 
   if (!checked) return null;
   if (!authed) return <LoginScreen title="Manage Products" onLogin={() => { setAuthed(true); fetchProducts(); fetchInventory(); fetchPreorders(); }} />;
@@ -181,6 +205,8 @@ export default function AdminProductsPage() {
       </div>
 
       <div style={{ maxWidth:1000, margin:'0 auto', padding:'24px 20px' }}>
+
+        {msg && <div style={{ ...FB, fontSize:13, color: msg.startsWith('❌') ? '#FCA5A5' : '#22C55E', marginBottom:16, background: msg.startsWith('❌') ? 'rgba(220,38,38,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${msg.startsWith('❌') ? 'rgba(220,38,38,0.2)' : 'rgba(34,197,94,0.2)'}`, borderRadius:8, padding:'10px 14px' }}>{msg}</div>}
 
         <div style={{ display:'flex', gap:8, marginBottom:20 }}>
           <button onClick={()=>setTab('products')} style={{ ...F, fontWeight:700, fontSize:13, letterSpacing:1, padding:'9px 18px', borderRadius:8, border:'none', cursor:'pointer', background: tab==='products' ? '#DC2626' : 'rgba(255,255,255,0.06)', color: tab==='products' ? '#fff' : '#B8C1CC' }}>PRODUCTS</button>
