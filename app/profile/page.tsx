@@ -15,6 +15,9 @@ const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const DEMO_WALLET: TicketWallet = { paid_total: 3, paid_used: 2, paid_available: 1, bonus_available: 0, loyalty_progress: 3, loyalty_needed: 7 };
 const DEMO_REFERRAL: ReferralStats = { referral_code: 'DEMO1234', referral_link: 'https://greenland-mini4wd.vercel.app/register?ref=DEMO1234', confirmed_referrals: 1, pending_referrals: 2, bonus_tickets_earned: 1 };
 
+const TIER_LABELS: Record<string, string> = { non_member: 'Non-Member', member: 'Member', season_3rd: '🥉 Season 3rd', season_2nd: '🥈 Season 2nd', season_1st: '👑 Season 1st', hall_of_fame: '🏆 Hall of Fame' };
+const TIER_COLORS: Record<string, string> = { non_member: '#6B7280', member: '#3B82F6', season_3rd: '#B45309', season_2nd: '#9CA3AF', season_1st: '#FACC15', hall_of_fame: '#DC2626' };
+
 type Tab = 'overview' | 'orders' | 'tickets' | 'garage' | 'referral' | 'wishlist';
 
 export default function ProfilePage() {
@@ -92,6 +95,8 @@ export default function ProfilePage() {
   const progressPct = rank === 'Legend' ? 100 : Math.min((points / nextPoints) * 100, 100);
   const memberActive = isMemberActive(member as any);
   const memberDaysLeft = daysRemaining(member as any);
+  const loyaltyTier = (member as any)?.loyalty_tier || 'member';
+  const loyaltyColor = TIER_COLORS[loyaltyTier] || '#6B7280';
 
   const removeFromWishlist = async (id: string) => {
     await supabase.from('wishlist').delete().eq('id', id);
@@ -128,6 +133,11 @@ export default function ProfilePage() {
                   </span>
                   {member?.member_status === 'official' && (
                     <span style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 2, padding: '3px 10px', borderRadius: 4, background: 'rgba(250,204,21,0.15)', color: '#FACC15', border: '1px solid rgba(250,204,21,0.3)' }}>✓ OFFICIAL</span>
+                  )}
+                  {loyaltyTier !== 'member' && loyaltyTier !== 'non_member' && (
+                    <span style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 2, padding: '3px 10px', borderRadius: 4, background: loyaltyColor + '22', color: loyaltyColor, border: `1px solid ${loyaltyColor}55` }}>
+                      {TIER_LABELS[loyaltyTier]}
+                    </span>
                   )}
                 </div>
                 <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', marginBottom: 10 }}>{member?.email}</div>
