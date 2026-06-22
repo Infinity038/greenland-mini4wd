@@ -12,6 +12,22 @@ const FALLBACK = [
   { id: 4, name: 'GM4WD Club Jersey', category: 'merchandise', subcategory: 'Jersey',        price_dkk: 199, emoji: '👕' },
 ];
 
+function fixImageUrl(url: string): string {
+  if (!url) return url;
+  const drilldown = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
+  if (drilldown) {
+    try { url = drilldown[1] + atob(drilldown[2]); } catch { /* leave as-is */ }
+  }
+  url = url.replace(
+    /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
+    'res.cloudinary.com/$1/image/upload/'
+  );
+  if (/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/[^./]+$/.test(url)) {
+    url = url + '.png';
+  }
+  return url;
+}
+
 function cheapestPrice(p: any): number {
   if (p.category !== 'cars') return p.price_dkk || 0;
   const vals = [p.unbuilt_price_dkk, p.unbuilt_case_price_dkk, p.built_price_dkk, p.built_case_price_dkk].filter((v: any) => typeof v === 'number' && v > 0);
@@ -48,13 +64,13 @@ export default function ShopPreview() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 16, marginBottom: 40 }}>
           {display.map(item => {
             const imgs = item.image_url ? item.image_url.split(',') : [];
-            const firstImg = imgs[0]?.trim();
+            const firstImg = imgs[0] ? fixImageUrl(imgs[0].trim()) : '';
             const label = item.subcategory || item.category || item.chassis || '';
             return (
               <a key={item.id} href={shopLink(item)} style={{ textDecoration: 'none', display: 'block', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, overflow: 'hidden', transition: 'border-color 0.2s' }}>
                 <div style={{ height: 160, background: '#0d0d0d', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                   {firstImg ? (
-                    <img src={firstImg} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 12 }} />
+                    <img src={firstImg} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 12 }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
                     <span style={{ fontSize: 40 }}>{item.emoji || '🚗'}</span>
                   )}
