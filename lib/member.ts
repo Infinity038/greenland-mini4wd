@@ -203,12 +203,12 @@ export const ORDER_STATUS_COLORS: Record<string, string> = {
 
 // ─── Rank system ─────────────────────────────────────────────
 export function getRankFromPoints(points: number): MemberRank {
-  if (points >= 500) return 'Legend';
-  if (points >= 250) return 'Champion';
-  if (points >= 100) return 'Contender';
-  if (points >= 50) return 'Tuner';
-  if (points >= 20) return 'Racer';
-  if (points >= 5) return 'Builder';
+  if (points >= 1500) return 'Legend';
+  if (points >= 750) return 'Champion';
+  if (points >= 300) return 'Contender';
+  if (points >= 150) return 'Tuner';
+  if (points >= 60) return 'Racer';
+  if (points >= 15) return 'Builder';
   return 'Rookie';
 }
 
@@ -223,11 +223,11 @@ export const RANK_COLORS: Record<MemberRank, string> = {
 };
 
 export const RANK_NEXT_POINTS: Record<MemberRank, number> = {
-  Rookie: 5,
-  Builder: 20,
-  Racer: 50,
-  Tuner: 100,
-  Contender: 250,
-  Champion: 500,
+  Rookie: 15,
+  Builder: 60,
+  Racer: 150,
+  Tuner: 300,
+  Contender: 750,
+  Champion: 1500,
   Legend: Infinity,
 };
