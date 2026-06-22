@@ -35,12 +35,13 @@ export default function HowToJoin() {
               You automatically become a member by making your first purchase — whether that's a car kit, parts, tickets, or merchandise. There is no fixed membership fee.
             </p>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              <strong style={{ color: '#F5F5F5' }}>Your membership is active</strong> for one year from your most recent purchase. After 12 months with no activity, your membership expires — but you can reactivate anytime by buying a ticket or product.
+              <strong style={{ color: '#F5F5F5' }}>Your membership length is tied directly to how much you spend:</strong> every 20 DKK you spend adds 1 day of membership. The more active you are, the longer your membership stays active.
             </p>
+
             <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
               <div style={{ ...F, fontSize: 14, fontWeight: 700, color: '#DC2626', marginBottom: 12 }}>💡 EXAMPLE</div>
               <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.8 }}>
-                You buy an AR Chassis kit on January 1st → membership active until January 1st next year. If you buy a race ticket on December 15th, your membership extends for another year from that date.
+                You spend 200 DKK on a chassis kit → +10 days of membership. Later that season you spend 1,000 DKK on tickets and parts → +50 more days. Keep racing and shopping, and your membership stays active continuously.
               </div>
             </div>
           </section>
@@ -76,16 +77,16 @@ export default function HowToJoin() {
           <section style={{ marginBottom: 60 }}>
             <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>4. Climb the Rankings</h2>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              Your rank is based on your racing performance and membership history. There are six tiers:
+              Your rank is based on your season placement. There are six tiers:
             </p>
             <div style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
               {[
-                { title: 'Rookie Racer', color: '#6B7280', desc: 'Your first year of racing. Build experience.' },
-                { title: 'Club Racer', color: '#3B82F6', desc: 'Active member with solid performance.' },
-                { title: 'Pro Racer', color: '#8B5CF6', desc: 'Top competitor, proven skill, 3rd place finishes.' },
-                { title: 'Elite Racer', color: '#EC4899', desc: 'Elite driver, 2nd place finishes and strong streak.' },
-                { title: 'Arctic Champion', color: '#DC2626', desc: 'Season champion — highest honor of the year.' },
-                { title: 'Hall of Fame', color: '#FACC15', desc: 'Legendary status — multiple championships or historic wins.' },
+                { title: 'Rookie Racer', color: '#6B7280', desc: "Hasn't placed in a season yet." },
+                { title: 'Club Racer', color: '#3B82F6', desc: 'Active member, no season finish yet.' },
+                { title: 'Pro Racer', color: '#8B5CF6', desc: 'Finished 3rd overall in a season.' },
+                { title: 'Elite Racer', color: '#EC4899', desc: 'Finished 2nd overall in a season.' },
+                { title: 'Arctic Champion', color: '#DC2626', desc: '1st place season champion.' },
+                { title: 'Hall of Fame', color: '#FACC15', desc: 'Legendary status — never resets.' },
               ].map((tier, i) => (
                 <div key={i} style={{ background: `${tier.color}15`, border: `1px solid ${tier.color}40`, borderRadius: 8, padding: 16 }}>
                   <div style={{ ...F, fontSize: 14, fontWeight: 700, color: tier.color, marginBottom: 4 }}>{tier.title}</div>
@@ -126,7 +127,7 @@ export default function HowToJoin() {
             <div style={{ background: '#071426', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 12, padding: 20 }}>
               <div style={{ ...F, fontSize: 14, fontWeight: 700, color: '#22C55E', marginBottom: 12 }}>⏰ MEMBERSHIP REQUIREMENT</div>
               <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.8 }}>
-                <strong style={{ color: '#F5F5F5' }}>Active members can use any ticket type.</strong> If your membership expires, you can still race with a paid ticket (weekly or season), but free bonus tickets become unavailable until you renew.
+                <strong style={{ color: '#F5F5F5' }}>Active members can use any ticket type.</strong> If your membership runs out, you can still race with a paid ticket (weekly or season), but free bonus tickets become unavailable until you spend again and renew.
               </div>
             </div>
           </section>
@@ -137,23 +138,20 @@ export default function HowToJoin() {
               Build or buy a Mini 4WD and add it to your garage. Your car must be approved by an admin before you can race it.
             </p>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              <strong style={{ color: '#F5F5F5' }}>Race categories</strong> are: Box Stock, PRO-Stock, Basic, Advanced, B-Max, and Open. Your car's modification level determines which categories it can enter.
+              <strong style={{ color: '#F5F5F5' }}>Race categories</strong> are: Box Stock, Open Box Stock, B-Max, and Open Class.
             </p>
             <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 12, padding: 20 }}>
               <div style={{ ...F, fontSize: 14, fontWeight: 700, color: '#DC2626', marginBottom: 12 }}>📋 EXAMPLE</div>
               <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.8 }}>
-                You build a basic AR kit from the shop. You register it as a "Box Stock" car. At the next race, you can enter it in Box Stock, B-Max, and Open categories — but not in Advanced, PRO-Stock, or Basic.
+                You build a basic AR kit from the shop with no modifications. Since it meets the strictest requirements, it's eligible for any category — Box Stock, Open Box Stock, B-Max, or Open Class.
               </div>
             </div>
           </section>
 
           <section style={{ marginBottom: 60 }}>
             <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>7. Unlock Discounts</h2>
-            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              Higher tiers unlock time-limited discount codes. Redeem them on shop purchases to save 20% off regular prices.
-            </p>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 24, lineHeight: 1.8 }}>
-              Earn your way up the rankings, and the deals come to you. Pro Racers and above get exclusive shopping discounts every season.
+              The club occasionally drops exclusive promo codes for higher-ranked members. Keep an eye on our social pages — codes are announced there when available.
             </p>
           </section>
 
@@ -166,12 +164,12 @@ export default function HowToJoin() {
                   a: 'No. You can race without membership if you buy a paid ticket (weekly or season). However, you cannot use free bonus tickets unless your membership is active.',
                 },
                 {
-                  q: 'What if my membership expires?',
-                  a: 'You can still buy and race with tickets. To reactivate membership benefits, make any purchase (ticket, car, or product) and your membership extends another year.',
+                  q: 'What if my membership runs out?',
+                  a: 'You can still buy and race with tickets. To reactivate membership benefits, make any purchase — every 20 DKK you spend adds 1 day back.',
                 },
                 {
                   q: 'How do I move up in rank?',
-                  a: "Rank is based on race performance and history. Win races, build a winning streak, and you'll naturally climb from Rookie to Champion. Hall of Fame is earned through legendary achievements.",
+                  a: "Rank is based on season placement. Finish 3rd, 2nd, or 1st in a season and you'll move up to Pro Racer, Elite Racer, or Arctic Champion. Hall of Fame is earned through legendary achievements.",
                 },
                 {
                   q: 'Can I use my punch card (free ticket) after membership expires?',

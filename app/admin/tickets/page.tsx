@@ -83,7 +83,6 @@ export default function AdminTicketsPage() {
     const ticket = tickets.find(t => t.id === id);
     const ticketUpdates: any = { payment_status: status };
 
-    // Auto-increment loyalty punch card on confirmation
     if (status === 'payment_confirmed' && ticket?.payment_status !== 'payment_confirmed') {
       const col = ticket?.ticket_type === 'season' ? 'season_loyalty_progress' : 'weekly_loyalty_progress';
       const qty = ticket?.quantity || 1;
@@ -91,7 +90,7 @@ export default function AdminTicketsPage() {
       if (member) {
         const m = member as any;
         const current = m[col] || 0;
-        const newVal = (current + qty) % 10; // resets at 10
+        const newVal = (current + qty) % 10;
         const grantFree = (current + qty) >= 10;
         await supabase.from('members').update({ [col]: newVal }).eq('email', ticket.member_email);
         if (grantFree) setMsg(`✅ Updated · 🎁 ${ticket.member_name} earned a FREE ticket!`);
@@ -100,7 +99,6 @@ export default function AdminTicketsPage() {
         setMsg('✅ Updated');
       }
 
-      // Points + membership days — once per ticket, same engine the shop uses
       if (!ticket?.rewards_applied) {
         const spend = Number(ticket?.total_price) || 0;
         if (spend > 0 && ticket?.member_email) {
@@ -141,7 +139,14 @@ export default function AdminTicketsPage() {
 
   async function deleteTicket(id: string) {
     if (!confirm('Delete this ticket?')) return;
-    await supabase.from('race_tickets').delete().eq('id', id);
+    const { error } = await supabase.from('race_tickets').delete().eq('id', id);
+    if (error) {
+      setMsg('❌ Delete failed: ' + error.message);
+      setTimeout(() => setMsg(''), 7000);
+      return;
+    }
+    setMsg('✅ Ticket deleted');
+    setTimeout(() => setMsg(''), 3000);
     loadData();
   }
 
@@ -187,9 +192,8 @@ export default function AdminTicketsPage() {
       </div>
 
       <div style={s.body}>
-        {msg && <div style={{ ...FB, fontSize: 13, color: '#22C55E', marginBottom: 16, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 8, padding: '10px 14px' }}>{msg}</div>}
+        {msg && <div style={{ ...FB, fontSize: 13, color: msg.startsWith('❌') ? '#FCA5A5' : '#22C55E', marginBottom: 16, background: msg.startsWith('❌') ? 'rgba(220,38,38,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${msg.startsWith('❌') ? 'rgba(220,38,38,0.2)' : 'rgba(34,197,94,0.2)'}`, borderRadius: 8, padding: '10px 14px' }}>{msg}</div>}
 
-        {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: 24 }}>
           {[
             { label: 'Total', value: stats.total, color: '#3B82F6' },
@@ -207,7 +211,6 @@ export default function AdminTicketsPage() {
           ))}
         </div>
 
-        {/* Early Bird Config */}
         <div style={{ background: '#071426', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
           <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#22C55E', marginBottom: 4, letterSpacing: 1 }}>🐦 EARLY BIRD SLOT CONTROL</div>
           <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginBottom: 14 }}>Set how many early bird slots (130 DKK) are available. Once filled, early bird option is hidden from members.</div>
@@ -224,7 +227,6 @@ export default function AdminTicketsPage() {
           </div>
         </div>
 
-        {/* Filters */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
           {['all', 'awaiting_payment', 'proof_uploaded', 'payment_confirmed', 'cancelled'].map(f => (
             <button key={f} onClick={() => setFilter(f)}
@@ -241,7 +243,6 @@ export default function AdminTicketsPage() {
           ))}
         </div>
 
-        {/* Ticket list */}
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', ...FB, color: '#6B7280' }}>No tickets found.</div>
         ) : filtered.map(ticket => (

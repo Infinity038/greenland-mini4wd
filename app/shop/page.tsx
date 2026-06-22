@@ -11,13 +11,16 @@ const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
 type ModalStep = 'confirm' | 'payment' | 'upload' | 'done';
+type ShopTab = 'cars' | 'parts' | 'merchandise';
 
 interface Product {
   id: string;
   name: string;
   category: string;
+  subcategory?: string;
   chassis: string;
   price_dkk: number;
+  original_price_dkk?: number;
   stock_qty: number;
   unbuilt_stock?: number;
   built_stock?: number;
@@ -26,7 +29,6 @@ interface Product {
   image_url: string;
 }
 
-// ── Variant pool system ──────────────────────────────────────────
 const VARIANTS = [
   { key: 'unbuilt',      label: 'Unbuilt',        shortLabel: '🔧 Unbuilt / Boxed Kit',           icon: '🔧', isBuilt: false, needsCase: false },
   { key: 'unbuilt_case', label: 'Unbuilt + Case', shortLabel: '🔧 Unbuilt / Boxed Kit + Case',     icon: '📦', isBuilt: false, needsCase: true  },
@@ -65,6 +67,17 @@ function cheapestAvailableVariant(p: Product, caseStock: number) {
   return opts.sort((a, b) => a.price - b.price)[0];
 }
 
+// Simple (non-car) availability + pricing — parts & merchandise use a flat price_dkk
+// and a single stock_qty pool instead of the 4-variant unbuilt/built system.
+function isSimpleAvailable(p: Product): boolean {
+  return p.status !== 'sold out' && p.status !== 'coming soon' && (p.stock_qty ?? 0) > 0;
+}
+function simplePricing(p: Product): { price: number; original: number | null } {
+  const price = p.price_dkk || 0;
+  const original = p.original_price_dkk && p.original_price_dkk > price ? p.original_price_dkk : null;
+  return { price, original };
+}
+
 const STOCK_COLORS: Record<string, string> = {
   'in stock': '#22C55E',
   'preorder only': '#3B82F6',
@@ -80,53 +93,25 @@ const FILTER_TABS = [
   { key: 'limited', label: 'Limited / Rare' },
 ];
 
-// 10 chassis filters for the CARS tab
 const CHASSIS_FILTERS = ['AR', 'EZ', 'FM-A', 'MA', 'ME', 'MS', 'Super II', 'Super XX', 'VS', 'VZ'];
+const PARTS_SUBCATEGORIES = ['Bearings', 'Brakes/Dampers', 'Chassis', 'Shafts/Gears', 'Motors', 'Plates', 'Rollers/Stabilizers', 'Screws/Nuts', 'Wheels/Tires', 'Accessories'];
 
-// PARTS tab — external categories linking to lil's Hobby Center
-const PARTS_CATEGORIES = [
-  { name: 'Bearings', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Bearings' },
-  { name: 'Brakes/Dampers', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Brakes-and-Dampers' },
-  { name: 'Chassis', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Chassis' },
-  { name: 'Shafts/Gears', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Shafts-and-Gears' },
-  { name: 'Motors', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Mini-4WD-Motors' },
-  { name: 'Plates', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Plate-Sets' },
-  { name: 'Rollers/Stabilizers', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Rollers' },
-  { name: 'Screws/Nuts', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Screws-Nuts' },
-  { name: 'Wheels/Tires', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Wheels-and-Tires' },
-  { name: 'Accessories', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Mini-4WD-Accessories' },
-];
-
-// Cloudinary console "drilldown" search-view links — generated when you copy a link from
-// inside the Cloudinary web app's media library. These return an HTML page, not the image
-// itself, so they always fail in an <img> tag regardless of browser/login state.
-// Pattern: .../image/upload/v<version>/<base64-encoded-filename>/drilldown
-// Decode the base64 chunk to recover the real public_id and rebuild a proper delivery URL.
 function fixImageUrl(url: string): string {
   if (!url) return url;
-
-  // Drilldown console link — decode the base64 filename chunk into a real delivery URL
   const drilldown = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
   if (drilldown) {
     try { url = drilldown[1] + atob(drilldown[2]); } catch { /* leave as-is */ }
   }
-
-  // Old console thumbnail-viewer link — needs a login session to load
   url = url.replace(
     /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
     'res.cloudinary.com/$1/image/upload/'
   );
-
-  // Any Cloudinary delivery URL missing a file extension fails to load reliably —
-  // every asset here is a ChatGPT-exported PNG, so append it when absent.
   if (/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/[^./]+$/.test(url)) {
     url = url + '.png';
   }
-
   return url;
 }
 
-// Parse comma-separated image URLs
 function parseImages(url: string): string[] {
   if (!url) return [];
   return url.split(',').map(u => fixImageUrl(u.trim())).filter(Boolean);
@@ -142,7 +127,7 @@ function ProductImage({ product, onClick }: { product: Product; onClick?: () => 
 
   if (!current || isFailed) return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-      <span style={{ ...F, fontWeight: 900, fontSize: 40, color: 'rgba(255,255,255,0.06)', letterSpacing: 2 }}>{product.chassis}</span>
+      <span style={{ ...F, fontWeight: 900, fontSize: 40, color: 'rgba(255,255,255,0.06)', letterSpacing: 2 }}>{product.chassis || product.subcategory || ''}</span>
       <span style={{ ...FB, fontSize: 10, color: 'rgba(255,255,255,0.15)' }}>Image coming soon</span>
     </div>
   );
@@ -176,7 +161,6 @@ function ProductImage({ product, onClick }: { product: Product; onClick?: () => 
   );
 }
 
-// Fullscreen lightbox
 function Lightbox({ product, onClose }: { product: Product; onClose: () => void }) {
   const images = parseImages(product.image_url);
   const [idx, setIdx] = useState(0);
@@ -195,7 +179,6 @@ function Lightbox({ product, onClose }: { product: Product; onClose: () => void 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
       <button onClick={onClose} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', width: 40, height: 40, fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
-
       <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {!failed[idx] && images[idx] ? (
           <img src={images[idx]} alt={product.name} onError={() => setFailed(f => ({ ...f, [idx]: true }))}
@@ -210,7 +193,6 @@ function Lightbox({ product, onClose }: { product: Product; onClose: () => void 
           <button onClick={() => setIdx(i => i + 1)} style={{ position: 'absolute', right: -50, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', width: 40, height: 40, fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
         )}
       </div>
-
       <div style={{ marginTop: 16, ...F, fontSize: 16, color: '#F5F5F5', fontWeight: 700 }}>{product.name}</div>
       {images.length > 1 && (
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -227,6 +209,40 @@ function Lightbox({ product, onClose }: { product: Product; onClose: () => void 
   );
 }
 
+// Shared card for PARTS & MERCHANDISE — flat price, single stock pool, no variant grid
+function SimpleProductCard({ p, wishlistIds, toggleWishlist, shareProduct, copiedId, openModal, openPreorder, setLightbox, highlightId }: any) {
+  const available = isSimpleAvailable(p);
+  const { price, original } = simplePricing(p);
+  return (
+    <div id={`product-${p.id}`} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}>
+      <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', gap: 6 }}>
+        <button onClick={() => toggleWishlist(p)} style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 9px', fontSize: 12, color: wishlistIds.has(p.id) ? '#DC2626' : '#fff', cursor: 'pointer' }}>{wishlistIds.has(p.id) ? '♥' : '♡'}</button>
+        <button onClick={() => shareProduct(p)} style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer' }}>{copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}</button>
+      </div>
+      <div style={{ height: 160, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <ProductImage product={p} onClick={() => parseImages(p.image_url).length > 0 && setLightbox(p)} />
+      </div>
+      <div style={{ padding: '16px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {p.subcategory && <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#B8C1CC', alignSelf: 'flex-start', marginBottom: 8 }}>{p.subcategory}</span>}
+        <h3 style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5', margin: '0 0 6px' }}>{p.name}</h3>
+        <p style={{ ...FB, fontSize: 12, color: '#B8C1CC', lineHeight: 1.5, margin: '0 0 14px', flex: 1 }}>{p.description}</p>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+          {original && <span style={{ ...FB, fontSize: 13, color: '#6B7280', textDecoration: 'line-through' }}>{original.toLocaleString()}</span>}
+          <div style={{ ...F, fontWeight: 900, fontSize: 20, color: original ? '#22C55E' : '#FACC15' }}>{price.toLocaleString()} kr</div>
+        </div>
+        {available ? (
+          <button onClick={() => openModal(p, 'standard')} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 0', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+        ) : (
+          <>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 1, color: '#DC2626', fontWeight: 700, marginBottom: 6 }}>SOLD OUT</div>
+            <button onClick={() => openPreorder(p, 'standard')} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '10px 0', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ShopPage() {
   const [member, setMember] = useState<any>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -234,9 +250,14 @@ export default function ShopPage() {
   const [filter, setFilter] = useState('all');
   const [globalCaseStock, setGlobalCaseStock] = useState(0);
 
-  // CARS / PARTS top-level tab + chassis filter (new)
-  const [shopTab, setShopTab] = useState<'cars' | 'parts'>('cars');
+  const [shopTab, setShopTab] = useState<ShopTab>('cars');
   const [chassisFilter, setChassisFilter] = useState('');
+  const [partsFilter, setPartsFilter] = useState('');
+  const [merchFilter, setMerchFilter] = useState('');
+  const [carsSearch, setCarsSearch] = useState('');
+  const [partsSearch, setPartsSearch] = useState('');
+  const [merchSearch, setMerchSearch] = useState('');
+  const didInitFromUrl = useRef(false);
 
   const [selected, setSelected] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<string>('unbuilt');
@@ -251,21 +272,17 @@ export default function ShopPage() {
   const [lightbox, setLightbox] = useState<Product | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Quick preorder (sold-out variant) state
   const [preorderTarget, setPreorderTarget] = useState<{ product: Product; variantKey: string } | null>(null);
   const [preorderSending, setPreorderSending] = useState(false);
   const [preorderDone, setPreorderDone] = useState(false);
 
-  // Wishlist
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
 
-  // Discount codes
   const [discountInput, setDiscountInput] = useState('');
   const [discountApplied, setDiscountApplied] = useState<{ code: string; percent: number; codeId: string } | null>(null);
   const [discountError, setDiscountError] = useState('');
   const [discountChecking, setDiscountChecking] = useState(false);
 
-  // Shareable product links
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const didDeepLink = useRef(false);
@@ -275,6 +292,21 @@ export default function ShopPage() {
     fetchProducts();
     fetchInventory();
     fetchWishlist();
+  }, []);
+
+  // Read ?tab= and ?filter= from URL once on first load (homepage deep-links land here)
+  useEffect(() => {
+    if (didInitFromUrl.current) return;
+    didInitFromUrl.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    const flt = params.get('filter');
+    if (tab === 'parts' || tab === 'merchandise' || tab === 'cars') setShopTab(tab as ShopTab);
+    if (flt) {
+      if (tab === 'parts') setPartsFilter(flt);
+      else if (tab === 'merchandise') setMerchFilter(flt);
+      else setChassisFilter(flt);
+    }
   }, []);
 
   async function fetchWishlist() {
@@ -324,7 +356,6 @@ export default function ShopPage() {
     setDiscountChecking(false);
   };
 
-  // Deep-link: /shop?product=<id> scrolls to and highlights that card
   useEffect(() => {
     if (didDeepLink.current || loading || products.length === 0) return;
     const pid = new URLSearchParams(window.location.search).get('product');
@@ -360,17 +391,39 @@ export default function ShopPage() {
     if (data) setGlobalCaseStock(data.case_stock ?? 0);
   }
 
-  // Status filter + new chassis filter combined
-  const filtered = products.filter(p => {
+  const isCarProduct = (p: Product) => !p.category || p.category === 'cars';
+
+  const carsFiltered = products.filter(p => {
+    if (!isCarProduct(p)) return false;
     const matchesStatus = filter === 'all' || p.status === filter;
     const matchesChassis = !chassisFilter || p.chassis === chassisFilter;
-    return matchesStatus && matchesChassis;
+    const matchesSearch = !carsSearch.trim() || p.name.toLowerCase().includes(carsSearch.trim().toLowerCase());
+    return matchesStatus && matchesChassis && matchesSearch;
   });
-  const collectors = products.filter(p => p.status === 'limited');
+  const collectors = products.filter(p => isCarProduct(p) && p.status === 'limited');
+
+  const partsFiltered = products.filter(p => {
+    if (p.category !== 'parts') return false;
+    const matchesSub = !partsFilter || p.subcategory === partsFilter;
+    const matchesSearch = !partsSearch.trim() || p.name.toLowerCase().includes(partsSearch.trim().toLowerCase());
+    return matchesSub && matchesSearch;
+  });
+
+  const merchProducts = products.filter(p => p.category === 'merchandise');
+  const merchSubcats = Array.from(new Set(merchProducts.map(p => p.subcategory).filter(Boolean))) as string[];
+  const merchFiltered = merchProducts.filter(p => {
+    const matchesSub = !merchFilter || p.subcategory === merchFilter;
+    const matchesSearch = !merchSearch.trim() || p.name.toLowerCase().includes(merchSearch.trim().toLowerCase());
+    return matchesSub && matchesSearch;
+  });
 
   const openModal = (p: Product, variantKey: string) => {
     if (!isRegistered()) { window.location.href = '/register'; return; }
-    if (!isVariantAvailable(p, variantKey, globalCaseStock)) return;
+    if (isCarProduct(p)) {
+      if (!isVariantAvailable(p, variantKey, globalCaseStock)) return;
+    } else {
+      if (!isSimpleAvailable(p)) return;
+    }
     setSelected(p); setSelectedVariant(variantKey); setStep('confirm');
     setOrderId(''); setPayRef(''); setProofFile(null); setProofPreview(null); setError('');
     setPaymentOption('deposit');
@@ -396,26 +449,28 @@ export default function ShopPage() {
         status: 'pending',
       });
       setPreorderDone(true);
-    } catch { /* swallow — show generic done state regardless to avoid blocking the customer */ setPreorderDone(true); }
+    } catch { setPreorderDone(true); }
     setPreorderSending(false);
   };
 
   const placeOrder = async () => {
     if (!selected || !member) return;
     setUploading(true); setError('');
-    const v = VARIANTS.find(x => x.key === selectedVariant)!;
-    const rawPrice = variantPricing(selected, selectedVariant).price;
+    const isCar = isCarProduct(selected);
+    const v = isCar ? VARIANTS.find(x => x.key === selectedVariant)! : null;
+    const rawPrice = isCar ? variantPricing(selected, selectedVariant).price : simplePricing(selected).price;
     const price = discountApplied ? Math.round(rawPrice * (1 - discountApplied.percent / 100)) : rawPrice;
     try {
       const depositAmount = Math.ceil(price / 2);
       const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
+      const productLabel = isCar ? `${selected.name} (${v!.label})` : selected.name;
       const { data, error: err } = await supabase.from('orders').insert({
         member_email: member.email,
         member_name: memberName,
-        product_name: `${selected.name} (${v.label})`,
-        chassis: selected.chassis,
-        type: v.isBuilt ? 'built' : 'boxed',
-        variant: selectedVariant,
+        product_name: productLabel,
+        chassis: selected.chassis || null,
+        type: isCar ? (v!.isBuilt ? 'built' : 'boxed') : selected.category,
+        variant: isCar ? selectedVariant : 'standard',
         quantity: 1,
         status: 'pending',
         payment_status: 'awaiting_payment',
@@ -432,17 +487,22 @@ export default function ShopPage() {
         await supabase.from('discount_codes').update({ uses_count: (codeRow?.uses_count || 0) + 1 }).eq('id', discountApplied.codeId);
       }
 
-      // Decrement the correct stock pool(s)
-      const stockUpdate: any = v.isBuilt
-        ? { built_stock: Math.max(0, (selected.built_stock ?? 1) - 1) }
-        : { unbuilt_stock: Math.max(0, (selected.unbuilt_stock ?? 1) - 1) };
-      await supabase.from('products').update(stockUpdate).eq('id', selected.id);
-      setProducts(prev => prev.map(p => p.id === selected.id ? { ...p, ...stockUpdate } : p));
+      if (isCar) {
+        const stockUpdate: any = v!.isBuilt
+          ? { built_stock: Math.max(0, (selected.built_stock ?? 1) - 1) }
+          : { unbuilt_stock: Math.max(0, (selected.unbuilt_stock ?? 1) - 1) };
+        await supabase.from('products').update(stockUpdate).eq('id', selected.id);
+        setProducts(prev => prev.map(p => p.id === selected.id ? { ...p, ...stockUpdate } : p));
 
-      if (v.needsCase) {
-        const newCaseStock = Math.max(0, (globalCaseStock ?? 0) - 1);
-        await supabase.from('shop_inventory').update({ case_stock: newCaseStock }).eq('id', 1);
-        setGlobalCaseStock(newCaseStock);
+        if (v!.needsCase) {
+          const newCaseStock = Math.max(0, (globalCaseStock ?? 0) - 1);
+          await supabase.from('shop_inventory').update({ case_stock: newCaseStock }).eq('id', 1);
+          setGlobalCaseStock(newCaseStock);
+        }
+      } else {
+        const newStock = Math.max(0, (selected.stock_qty ?? 1) - 1);
+        await supabase.from('products').update({ stock_qty: newStock }).eq('id', selected.id);
+        setProducts(prev => prev.map(p => p.id === selected.id ? { ...p, stock_qty: newStock } : p));
       }
 
       const ref = generatePaymentRef(data.id);
@@ -474,40 +534,44 @@ export default function ShopPage() {
   };
 
   const closeModal = () => setSelected(null);
-  const modalPricing = selected ? variantPricing(selected, selectedVariant) : { price: 0, original: null };
+  const isSelectedCar = selected ? isCarProduct(selected) : true;
+  const modalPricing = selected ? (isSelectedCar ? variantPricing(selected, selectedVariant) : simplePricing(selected)) : { price: 0, original: null };
   const rawModalPrice = modalPricing.price;
   const modalPrice = discountApplied ? Math.round(rawModalPrice * (1 - discountApplied.percent / 100)) : rawModalPrice;
+
+  const filterBtn = (active: boolean) => ({
+    ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '8px 14px', borderRadius: 8,
+    whiteSpace: 'nowrap' as const, flexShrink: 0, background: active ? '#DC2626' : '#071426',
+    color: active ? '#fff' : '#B8C1CC', border: active ? 'none' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
+  });
+  const searchInputStyle = { width: '100%', maxWidth: 360, background: '#071426', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 14px', color: '#F5F5F5', ...FB, fontSize: 13, outline: 'none' } as const;
 
   return (
     <>
       <Navbar />
       <main style={{ background: '#050505', color: '#F5F5F5', paddingTop: 60 }}>
 
-        {/* Header */}
         <section style={{ background: '#071426', borderBottom: '1px solid rgba(220,38,38,0.15)', padding: '48px 24px 40px' }}>
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>PREORDER SHOP</div>
-            <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px, 8vw, 72px)', color: '#F5F5F5', margin: '0 0 10px', lineHeight: 0.95 }}>MINI 4WD CARS & KITS</h1>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>CLUB SHOP</div>
+            <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px, 8vw, 72px)', color: '#F5F5F5', margin: '0 0 10px', lineHeight: 0.95 }}>CARS · PARTS · MERCH</h1>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', margin: '0 0 10px', maxWidth: 560 }}>Preorder only — no online payment. Pay via MobilePay after reserving. Pickup in Nuuk, Greenland.</p>
-            <div style={{ ...FB, fontSize: 12, color: '#6B7280' }}>📦 Display cases in stock: <strong style={{ color: globalCaseStock > 0 ? '#22C55E' : '#DC2626' }}>{globalCaseStock}</strong> (shared across all models)</div>
+            <div style={{ ...FB, fontSize: 12, color: '#6B7280' }}>📦 Display cases in stock: <strong style={{ color: globalCaseStock > 0 ? '#22C55E' : '#DC2626' }}>{globalCaseStock}</strong> (shared across all car models)</div>
           </div>
         </section>
 
-        {/* CARS / PARTS TAB SWITCHER */}
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 0' }}>
           <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-            <button onClick={() => setShopTab('cars')}
-              style={{ ...F, fontSize: 16, fontWeight: 900, letterSpacing: 1, color: shopTab === 'cars' ? '#DC2626' : '#B8C1CC', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px 12px', borderBottom: shopTab === 'cars' ? '3px solid #DC2626' : '3px solid transparent' }}>
-              CARS
-            </button>
-            <button onClick={() => setShopTab('parts')}
-              style={{ ...F, fontSize: 16, fontWeight: 900, letterSpacing: 1, color: shopTab === 'parts' ? '#DC2626' : '#B8C1CC', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px 12px', borderBottom: shopTab === 'parts' ? '3px solid #DC2626' : '3px solid transparent' }}>
-              PARTS
-            </button>
+            {(['cars', 'parts', 'merchandise'] as ShopTab[]).map(t => (
+              <button key={t} onClick={() => setShopTab(t)}
+                style={{ ...F, fontSize: 16, fontWeight: 900, letterSpacing: 1, color: shopTab === t ? '#DC2626' : '#B8C1CC', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px 12px', borderBottom: shopTab === t ? '3px solid #DC2626' : '3px solid transparent' }}>
+                {t.toUpperCase()}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Collector's Vault — CARS tab only */}
+        {/* ── CARS TAB ───────────────────────────────────────────── */}
         {shopTab === 'cars' && collectors.length > 0 && (
           <section style={{ background: 'linear-gradient(135deg, #050505 0%, #0a0f1a 50%, #050505 100%)', borderBottom: '1px solid rgba(250,204,21,0.1)', padding: '40px 24px' }}>
             <div style={{ maxWidth: 1100, margin: '0 auto' }}>
@@ -519,17 +583,11 @@ export default function ShopPage() {
                 {collectors.map(p => {
                   const best = cheapestAvailableVariant(p, globalCaseStock);
                   return (
-                    <div key={p.id} id={`product-${p.id}`} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.3s', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}>
+                    <div key={p.id} id={`product-${p.id}`} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
                       <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', gap: 6 }}>
-                        <button onClick={() => toggleWishlist(p)} title="Save to wishlist"
-                          style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 9px', fontSize: 12, color: wishlistIds.has(p.id) ? '#DC2626' : '#fff', cursor: 'pointer' }}>
-                          {wishlistIds.has(p.id) ? '♥' : '♡'}
-                        </button>
-                        <button onClick={() => shareProduct(p)} title="Copy share link"
-                          style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer' }}>
-                          {copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}
-                        </button>
+                        <button onClick={() => toggleWishlist(p)} style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 9px', fontSize: 12, color: wishlistIds.has(p.id) ? '#DC2626' : '#fff', cursor: 'pointer' }}>{wishlistIds.has(p.id) ? '♥' : '♡'}</button>
+                        <button onClick={() => shareProduct(p)} style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer' }}>{copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}</button>
                       </div>
                       <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15', marginBottom: 4 }}>✦ COLLECTOR · LIMITED</div>
                       <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
@@ -559,25 +617,17 @@ export default function ShopPage() {
           </section>
         )}
 
-        {/* Main catalog — CARS tab only */}
         {shopTab === 'cars' && (
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
+            <input value={carsSearch} onChange={e => setCarsSearch(e.target.value)} placeholder="Search cars..." style={{ ...searchInputStyle, marginBottom: 20 }} />
 
-            {/* Chassis filters (new) */}
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 16 }}>
-              <button onClick={() => setChassisFilter('')}
-                style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '8px 14px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0, background: !chassisFilter ? '#DC2626' : '#071426', color: !chassisFilter ? '#fff' : '#B8C1CC', border: !chassisFilter ? 'none' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
-                ALL CHASSIS
-              </button>
+              <button onClick={() => setChassisFilter('')} style={filterBtn(!chassisFilter)}>ALL CHASSIS</button>
               {CHASSIS_FILTERS.map(c => (
-                <button key={c} onClick={() => setChassisFilter(c)}
-                  style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '8px 14px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0, background: chassisFilter === c ? '#DC2626' : '#071426', color: chassisFilter === c ? '#fff' : '#B8C1CC', border: chassisFilter === c ? 'none' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
-                  {c}
-                </button>
+                <button key={c} onClick={() => setChassisFilter(c)} style={filterBtn(chassisFilter === c)}>{c}</button>
               ))}
             </div>
 
-            {/* Status filters (existing) */}
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 32 }}>
               {FILTER_TABS.map(tab => (
                 <button key={tab.key} onClick={() => setFilter(tab.key)}
@@ -589,14 +639,14 @@ export default function ShopPage() {
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280', ...FB, fontSize: 14 }}>Loading products...</div>
-            ) : filtered.length === 0 ? (
+            ) : carsFiltered.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280' }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🏎️</div>
-                <div style={{ ...FB, fontSize: 14 }}>No products in this category yet.</div>
+                <div style={{ ...FB, fontSize: 14 }}>No cars match your search/filters.</div>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
-                {filtered.map(p => {
+                {carsFiltered.map(p => {
                   const sc = STOCK_COLORS[p.status] || '#6B7280';
                   const isCollector = p.status === 'limited';
                   return (
@@ -608,14 +658,8 @@ export default function ShopPage() {
                       {p.status === 'preorder only' && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>PREORDER</div>}
                       {isCollector && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#FACC1522', color: '#FACC15', border: '1px solid #FACC1544' }}>COLLECTOR</div>}
                       <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', gap: 6 }}>
-                        <button onClick={() => toggleWishlist(p)} title="Save to wishlist"
-                          style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 9px', fontSize: 12, color: wishlistIds.has(p.id) ? '#DC2626' : '#fff', cursor: 'pointer' }}>
-                          {wishlistIds.has(p.id) ? '♥' : '♡'}
-                        </button>
-                        <button onClick={() => shareProduct(p)} title="Copy share link"
-                          style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          {copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}
-                        </button>
+                        <button onClick={() => toggleWishlist(p)} style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 9px', fontSize: 12, color: wishlistIds.has(p.id) ? '#DC2626' : '#fff', cursor: 'pointer' }}>{wishlistIds.has(p.id) ? '♥' : '♡'}</button>
+                        <button onClick={() => shareProduct(p)} style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>{copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}</button>
                       </div>
 
                       <div style={{ height: 180, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', position: 'relative' }}>
@@ -630,7 +674,6 @@ export default function ShopPage() {
                         <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
                         <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, margin: '0 0 14px' }}>{p.description}</p>
 
-                        {/* 4 variant pools — Unbuilt / Unbuilt+Case / Built / Built+Case */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                           {VARIANTS.map(v => {
                             const available = isVariantAvailable(p, v.key, globalCaseStock);
@@ -668,36 +711,75 @@ export default function ShopPage() {
           </div>
         )}
 
-        {/* Main catalog — PARTS tab only */}
+        {/* ── PARTS TAB ──────────────────────────────────────────── */}
         {shopTab === 'parts' && (
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>PARTS & UPGRADES</div>
-            <h2 style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', margin: '0 0 12px' }}>SHOP BY CATEGORY</h2>
-            <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 28, maxWidth: 560 }}>Parts are sourced through our partner store, lil's Hobby Center. Tap a category to browse and order directly from them.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
-              {PARTS_CATEGORIES.map(cat => (
-                <a key={cat.name} href={cat.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-                  <div
-                    style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 110, cursor: 'pointer', transition: 'all 0.2s', textAlign: 'center' }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.4)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.transform = 'translateY(0)'; }}
-                  >
-                    <div>
-                      <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5', marginBottom: 6 }}>{cat.name}</div>
-                      <div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>Visit lil's Hobby Center →</div>
-                    </div>
-                  </div>
-                </a>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', margin: '0 0 20px' }}>SHOP PARTS</h2>
+
+            <input value={partsSearch} onChange={e => setPartsSearch(e.target.value)} placeholder="Search parts..." style={{ ...searchInputStyle, marginBottom: 20 }} />
+
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 28 }}>
+              <button onClick={() => setPartsFilter('')} style={filterBtn(!partsFilter)}>ALL PARTS</button>
+              {PARTS_SUBCATEGORIES.map(c => (
+                <button key={c} onClick={() => setPartsFilter(c)} style={filterBtn(partsFilter === c)}>{c}</button>
               ))}
             </div>
+
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280', ...FB, fontSize: 14 }}>Loading products...</div>
+            ) : partsFiltered.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280' }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🔧</div>
+                <div style={{ ...FB, fontSize: 14 }}>No parts match your search/filters yet.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20 }}>
+                {partsFiltered.map(p => (
+                  <SimpleProductCard key={p.id} p={p} wishlistIds={wishlistIds} toggleWishlist={toggleWishlist} shareProduct={shareProduct} copiedId={copiedId} openModal={openModal} openPreorder={openPreorder} setLightbox={setLightbox} highlightId={highlightId} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── MERCHANDISE TAB ────────────────────────────────────── */}
+        {shopTab === 'merchandise' && (
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>CLUB MERCH</div>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', margin: '0 0 20px' }}>APPAREL & MERCHANDISE</h2>
+
+            <input value={merchSearch} onChange={e => setMerchSearch(e.target.value)} placeholder="Search merchandise..." style={{ ...searchInputStyle, marginBottom: 20 }} />
+
+            {merchSubcats.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 28 }}>
+                <button onClick={() => setMerchFilter('')} style={filterBtn(!merchFilter)}>ALL MERCH</button>
+                {merchSubcats.map(c => (
+                  <button key={c} onClick={() => setMerchFilter(c)} style={filterBtn(merchFilter === c)}>{c}</button>
+                ))}
+              </div>
+            )}
+
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280', ...FB, fontSize: 14 }}>Loading products...</div>
+            ) : merchFiltered.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280' }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>👕</div>
+                <div style={{ ...FB, fontSize: 14 }}>No merchandise available yet.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20 }}>
+                {merchFiltered.map(p => (
+                  <SimpleProductCard key={p.id} p={p} wishlistIds={wishlistIds} toggleWishlist={toggleWishlist} shareProduct={shareProduct} copiedId={copiedId} openModal={openModal} openPreorder={openPreorder} setLightbox={setLightbox} highlightId={highlightId} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
 
-      {/* LIGHTBOX */}
       {lightbox && <Lightbox product={lightbox} onClose={() => setLightbox(null)} />}
 
-      {/* RESERVE MODAL */}
       {selected && (
         <div onClick={closeModal} style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, maxHeight: '92vh', overflowY: 'auto' }}>
@@ -716,7 +798,7 @@ export default function ShopPage() {
                   <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 18 }}>
                     <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5' }}>{selected.name}</div>
                     <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#B8C1CC', margin: '4px 0 12px' }}>
-                      {VARIANTS.find(v => v.key === selectedVariant)?.shortLabel} · {selected.chassis}
+                      {isSelectedCar ? `${VARIANTS.find(v => v.key === selectedVariant)?.shortLabel} · ${selected.chassis}` : (selected.subcategory || selected.category)}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                       {modalPricing.original && <span style={{ ...FB, fontSize: 16, color: '#6B7280', textDecoration: 'line-through' }}>{modalPricing.original.toLocaleString()} DKK</span>}
@@ -747,13 +829,12 @@ export default function ShopPage() {
                       </div>
                     </div>
                   </div>
-                  {VARIANTS.find(v => v.key === selectedVariant)?.isBuilt && (
+                  {isSelectedCar && VARIANTS.find(v => v.key === selectedVariant)?.isBuilt && (
                     <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#FCA5A5', lineHeight: 1.6 }}>
                       ⚡ <strong style={{ color: '#fff' }}>Race-Ready Car:</strong> This is a fully assembled and tuned Mini 4WD — no building required. Open the box and race immediately.
                     </div>
                   )}
 
-                  {/* Discount code */}
                   <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 14 }}>
                     {discountApplied ? (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -844,7 +925,6 @@ export default function ShopPage() {
         </div>
       )}
 
-      {/* QUICK PREORDER MODAL (sold-out variant) */}
       {preorderTarget && (
         <div onClick={() => setPreorderTarget(null)} style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#071426', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 440, padding: '28px 24px 36px' }}>
@@ -852,7 +932,7 @@ export default function ShopPage() {
               <>
                 <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#3B82F6', marginBottom: 6 }}>PREORDER REQUEST</div>
                 <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#F5F5F5', marginBottom: 4 }}>{preorderTarget.product.name}</div>
-                <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 20 }}>{VARIANTS.find(v => v.key === preorderTarget.variantKey)?.label} — currently sold out</div>
+                <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 20 }}>currently sold out</div>
                 <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#93C5FD', marginBottom: 20 }}>
                   We'll notify you the moment this is back in stock. No payment needed now.
                 </div>
