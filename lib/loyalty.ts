@@ -44,7 +44,8 @@ interface AwardResult {
 export async function awardForPayment(memberEmail: string, spendDkk: number): Promise<AwardResult | null> {
   if (!memberEmail || spendDkk <= 0) return null;
 
-  const { data: member } = await supabase.from('members').select('*').eq('email', memberEmail).single();
+  const { data: member, error: fetchErr } = await supabase.from('members').select('*').eq('email', memberEmail).single();
+  if (fetchErr) throw new Error(`Failed to fetch member: ${fetchErr.message}`);
   if (!member) return null;
 
   const rate = getTierRate(member.loyalty_tier);
@@ -60,17 +61,20 @@ export async function awardForPayment(memberEmail: string, spendDkk: number): Pr
   const newTotalPoints = (Number(member.total_points) || 0) + points;
   const newRank = getRankFromPoints(newTotalPoints);
 
-  await supabase.from('members').update({
+  const { error: updateErr } = await supabase.from('members').update({
     membership_expires_at: newExpiresAt,
     lifetime_spending: newLifetimeSpending,
     total_points: newTotalPoints,
     rank: newRank,
     is_active_member: true,
   }).eq('id', member.id);
+  if (updateErr) throw new Error(`Failed to update member: ${updateErr.message}`);
 
   // Mirror into loyalty_points so admin/loyalty's existing balance/earned display stays accurate
-  const { data: lp } = await supabase.from('loyalty_points').select('*').eq('member_id', member.id).single();
-  await supabase.from('loyalty_points').upsert({
+  const { data: lp, error: lpFetchErr } = await supabase.from('loyalty_points').select('*').eq('member_id', member.id).single();
+  if (lpFetchErr && lpFetchErr.code !== 'PGRST116') throw new Error(`Failed to fetch loyalty_points: ${lpFetchErr.message}`);
+
+  const { error: lpUpsertErr } = await supabase.from('loyalty_points').upsert({
     member_id: member.id,
     member_name: `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email,
     points_balance: (Number(lp?.points_balance) || 0) + points,
@@ -78,13 +82,15 @@ export async function awardForPayment(memberEmail: string, spendDkk: number): Pr
     tier: member.loyalty_tier || 'member',
     points_rate: rate,
   }, { onConflict: 'member_id' });
+  if (lpUpsertErr) throw new Error(`Failed to upsert loyalty_points: ${lpUpsertErr.message}`);
 
-  await supabase.from('points_transactions').insert({
+  const { error: txErr } = await supabase.from('points_transactions').insert({
     member_id: member.id,
     type: 'earn',
     amount: points,
     description: `Auto-earned from ${spendDkk} kr payment (membership +${days.toFixed(1)} days)`,
   });
+  if (txErr) throw new Error(`Failed to insert points_transactions: ${txErr.message}`);
 
   return { points, days, newExpiresAt };
 }
@@ -94,7 +100,8 @@ export async function awardForPayment(memberEmail: string, spendDkk: number): Pr
 export async function clawbackForPayment(memberEmail: string, pointsToRemove: number, daysToRemove: number): Promise<void> {
   if (!memberEmail || (pointsToRemove <= 0 && daysToRemove <= 0)) return;
 
-  const { data: member } = await supabase.from('members').select('*').eq('email', memberEmail).single();
+  const { data: member, error: fetchErr } = await supabase.from('members').select('*').eq('email', memberEmail).single();
+  if (fetchErr) throw new Error(`Failed to fetch member: ${fetchErr.message}`);
   if (!member) return;
 
   const newTotalPoints = Math.max(0, (Number(member.total_points) || 0) - pointsToRemove);
@@ -103,25 +110,30 @@ export async function clawbackForPayment(memberEmail: string, pointsToRemove: nu
   const newExpiresAt = new Date(Math.max(Date.now(), currentExpiry - daysToRemove * 24 * 60 * 60 * 1000)).toISOString();
   const newRank = getRankFromPoints(newTotalPoints);
 
-  await supabase.from('members').update({
+  const { error: updateErr } = await supabase.from('members').update({
     membership_expires_at: newExpiresAt,
     lifetime_spending: newLifetimeSpending,
     total_points: newTotalPoints,
     rank: newRank,
   }).eq('id', member.id);
+  if (updateErr) throw new Error(`Failed to update member: ${updateErr.message}`);
 
-  const { data: lp } = await supabase.from('loyalty_points').select('*').eq('member_id', member.id).single();
+  const { data: lp, error: lpFetchErr } = await supabase.from('loyalty_points').select('*').eq('member_id', member.id).single();
+  if (lpFetchErr && lpFetchErr.code !== 'PGRST116') throw new Error(`Failed to fetch loyalty_points: ${lpFetchErr.message}`);
+
   if (lp) {
-    await supabase.from('loyalty_points').update({
+    const { error: lpUpdateErr } = await supabase.from('loyalty_points').update({
       points_balance: Math.max(0, (Number(lp.points_balance) || 0) - pointsToRemove),
       total_earned: Math.max(0, (Number(lp.total_earned) || 0) - pointsToRemove),
     }).eq('member_id', member.id);
+    if (lpUpdateErr) throw new Error(`Failed to update loyalty_points: ${lpUpdateErr.message}`);
   }
 
-  await supabase.from('points_transactions').insert({
+  const { error: txErr } = await supabase.from('points_transactions').insert({
     member_id: member.id,
     type: 'redeem',
     amount: pointsToRemove,
     description: `Clawback: order cancelled/rejected (-${daysToRemove.toFixed(1)} membership days)`,
   });
+  if (txErr) throw new Error(`Failed to insert points_transactions: ${txErr.message}`);
 }
