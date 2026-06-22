@@ -22,10 +22,11 @@ export function MemberProfileModal({ member, onClose }: { member: Member | null;
 
   useEffect(() => {
     if (!member) return;
+    const m = member;
     setLoading(true);
     async function load() {
-      const { data: c } = await supabase.from('cars').select('*').eq('member_email', member.email);
-      const { data: o } = await supabase.from('orders').select('*').eq('member_email', member.email).order('created_at', { ascending: false });
+      const { data: c } = await supabase.from('cars').select('*').eq('member_email', m.email);
+      const { data: o } = await supabase.from('orders').select('*').eq('member_email', m.email).order('created_at', { ascending: false });
       setCars(c || []);
       setOrders(o || []);
       setLoading(false);
