@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { label: "Gallery",     href: "/gallery" },
   { label: "Shop",        href: "/shop" },
   { label: "Blog",        href: "/blog" },
+  { label: "How to Join", href: "/how-to-join" },
   { label: "About",       href: "/about" },
 ];
 
@@ -33,7 +34,6 @@ export default function Navbar() {
     setMember(getMemberData());
   }, []);
 
-  // Lock body scroll while mobile menu is open so the page behind it can't scroll
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
@@ -49,7 +49,6 @@ export default function Navbar() {
     <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, background: "rgba(5,5,5,0.97)", borderBottom: "1px solid rgba(220,38,38,0.3)" }}>
       <div style={{ maxWidth: 1152, margin: "0 auto", padding: "0 16px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
 
-        {/* Logo */}
         <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
           <div style={{ width: 34, height: 34, background: "#DC2626", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, color: "#fff", fontSize: 14 }}>4W</div>
           <div>
@@ -58,7 +57,6 @@ export default function Navbar() {
           </div>
         </a>
 
-        {/* Desktop nav */}
         <div className="hidden md:flex" style={{ alignItems: "center", gap: 20 }}>
           {NAV_LINKS.map(link => (
             <a key={link.label} href={link.href}
@@ -109,7 +107,6 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile hamburger */}
         <button onClick={() => setOpen(!open)} className="md:hidden"
           style={{ display: "flex", flexDirection: "column", gap: 5, padding: 8, background: "transparent", border: "none", cursor: "pointer" }}>
           <span style={{ display: "block", height: 3, width: 26, background: open ? "#DC2626" : "#F5F5F5", borderRadius: 2, transition: "all 0.2s", transform: open ? "rotate(45deg) translate(5px, 8px)" : "none" }} />
@@ -118,7 +115,6 @@ export default function Navbar() {
         </button>
       </div>
 
-      {/* Mobile menu — own fixed scroll container, independent of the page behind it */}
       {open && (
         <div style={{ position: "fixed", top: 60, left: 0, right: 0, bottom: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", background: "#050505", borderTop: "1px solid rgba(255,255,255,0.05)", padding: "8px 16px 24px", zIndex: 49 }}>
           {NAV_LINKS.map(link => (

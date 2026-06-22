@@ -80,6 +80,23 @@ const FILTER_TABS = [
   { key: 'limited', label: 'Limited / Rare' },
 ];
 
+// 10 chassis filters for the CARS tab
+const CHASSIS_FILTERS = ['AR', 'EZ', 'FM-A', 'MA', 'ME', 'MS', 'Super II', 'Super XX', 'VS', 'VZ'];
+
+// PARTS tab — external categories linking to lil's Hobby Center
+const PARTS_CATEGORIES = [
+  { name: 'Bearings', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Bearings' },
+  { name: 'Brakes/Dampers', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Brakes-and-Dampers' },
+  { name: 'Chassis', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Chassis' },
+  { name: 'Shafts/Gears', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Shafts-and-Gears' },
+  { name: 'Motors', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Mini-4WD-Motors' },
+  { name: 'Plates', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Plate-Sets' },
+  { name: 'Rollers/Stabilizers', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Rollers' },
+  { name: 'Screws/Nuts', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Screws-Nuts' },
+  { name: 'Wheels/Tires', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Wheels-and-Tires' },
+  { name: 'Accessories', url: 'https://www.lilshobbycenter.com.ph/collections/mini-4wd-parts/Mini-4WD-Accessories' },
+];
+
 // Cloudinary console "drilldown" search-view links — generated when you copy a link from
 // inside the Cloudinary web app's media library. These return an HTML page, not the image
 // itself, so they always fail in an <img> tag regardless of browser/login state.
@@ -217,6 +234,10 @@ export default function ShopPage() {
   const [filter, setFilter] = useState('all');
   const [globalCaseStock, setGlobalCaseStock] = useState(0);
 
+  // CARS / PARTS top-level tab + chassis filter (new)
+  const [shopTab, setShopTab] = useState<'cars' | 'parts'>('cars');
+  const [chassisFilter, setChassisFilter] = useState('');
+
   const [selected, setSelected] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<string>('unbuilt');
   const [step, setStep] = useState<ModalStep>('confirm');
@@ -339,7 +360,12 @@ export default function ShopPage() {
     if (data) setGlobalCaseStock(data.case_stock ?? 0);
   }
 
-  const filtered = filter === 'all' ? products : products.filter(p => p.status === filter);
+  // Status filter + new chassis filter combined
+  const filtered = products.filter(p => {
+    const matchesStatus = filter === 'all' || p.status === filter;
+    const matchesChassis = !chassisFilter || p.chassis === chassisFilter;
+    return matchesStatus && matchesChassis;
+  });
   const collectors = products.filter(p => p.status === 'limited');
 
   const openModal = (p: Product, variantKey: string) => {
@@ -467,8 +493,22 @@ export default function ShopPage() {
           </div>
         </section>
 
-        {/* Collector's Vault */}
-        {collectors.length > 0 && (
+        {/* CARS / PARTS TAB SWITCHER */}
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 0' }}>
+          <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <button onClick={() => setShopTab('cars')}
+              style={{ ...F, fontSize: 16, fontWeight: 900, letterSpacing: 1, color: shopTab === 'cars' ? '#DC2626' : '#B8C1CC', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px 12px', borderBottom: shopTab === 'cars' ? '3px solid #DC2626' : '3px solid transparent' }}>
+              CARS
+            </button>
+            <button onClick={() => setShopTab('parts')}
+              style={{ ...F, fontSize: 16, fontWeight: 900, letterSpacing: 1, color: shopTab === 'parts' ? '#DC2626' : '#B8C1CC', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px 12px', borderBottom: shopTab === 'parts' ? '3px solid #DC2626' : '3px solid transparent' }}>
+              PARTS
+            </button>
+          </div>
+        </div>
+
+        {/* Collector's Vault — CARS tab only */}
+        {shopTab === 'cars' && collectors.length > 0 && (
           <section style={{ background: 'linear-gradient(135deg, #050505 0%, #0a0f1a 50%, #050505 100%)', borderBottom: '1px solid rgba(250,204,21,0.1)', padding: '40px 24px' }}>
             <div style={{ maxWidth: 1100, margin: '0 auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
@@ -519,96 +559,139 @@ export default function ShopPage() {
           </section>
         )}
 
-        {/* Main catalog */}
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 32 }}>
-            {FILTER_TABS.map(tab => (
-              <button key={tab.key} onClick={() => setFilter(tab.key)}
-                style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, padding: '10px 18px', border: filter === tab.key ? 'none' : '1px solid rgba(255,255,255,0.08)', borderRadius: 10, background: filter === tab.key ? '#DC2626' : '#071426', color: filter === tab.key ? '#fff' : '#B8C1CC', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                {tab.label}
+        {/* Main catalog — CARS tab only */}
+        {shopTab === 'cars' && (
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
+
+            {/* Chassis filters (new) */}
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 16 }}>
+              <button onClick={() => setChassisFilter('')}
+                style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '8px 14px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0, background: !chassisFilter ? '#DC2626' : '#071426', color: !chassisFilter ? '#fff' : '#B8C1CC', border: !chassisFilter ? 'none' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+                ALL CHASSIS
               </button>
-            ))}
-          </div>
-
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280', ...FB, fontSize: 14 }}>Loading products...</div>
-          ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🏎️</div>
-              <div style={{ ...FB, fontSize: 14 }}>No products in this category yet.</div>
+              {CHASSIS_FILTERS.map(c => (
+                <button key={c} onClick={() => setChassisFilter(c)}
+                  style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, padding: '8px 14px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0, background: chassisFilter === c ? '#DC2626' : '#071426', color: chassisFilter === c ? '#fff' : '#B8C1CC', border: chassisFilter === c ? 'none' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+                  {c}
+                </button>
+              ))}
             </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
-              {filtered.map(p => {
-                const sc = STOCK_COLORS[p.status] || '#6B7280';
-                const isCollector = p.status === 'limited';
-                return (
-                  <div key={p.id} id={`product-${p.id}`}
-                    style={{ background: isCollector ? 'linear-gradient(135deg, #0a0f1a, #071426)' : '#071426', border: `1px solid ${isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.3s', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.5)' : 'rgba(220,38,38,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
-                    {isCollector && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)', zIndex: 1 }} />}
-                    {p.status === 'preorder only' && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>PREORDER</div>}
-                    {isCollector && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#FACC1522', color: '#FACC15', border: '1px solid #FACC1544' }}>COLLECTOR</div>}
-                    <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', gap: 6 }}>
-                      <button onClick={() => toggleWishlist(p)} title="Save to wishlist"
-                        style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 9px', fontSize: 12, color: wishlistIds.has(p.id) ? '#DC2626' : '#fff', cursor: 'pointer' }}>
-                        {wishlistIds.has(p.id) ? '♥' : '♡'}
-                      </button>
-                      <button onClick={() => shareProduct(p)} title="Copy share link"
-                        style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}
-                      </button>
-                    </div>
 
-                    <div style={{ height: 180, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', position: 'relative' }}>
-                      <ProductImage product={p} onClick={() => parseImages(p.image_url).length > 0 && setLightbox(p)} />
-                    </div>
+            {/* Status filters (existing) */}
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 32 }}>
+              {FILTER_TABS.map(tab => (
+                <button key={tab.key} onClick={() => setFilter(tab.key)}
+                  style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, padding: '10px 18px', border: filter === tab.key ? 'none' : '1px solid rgba(255,255,255,0.08)', borderRadius: 10, background: filter === tab.key ? '#DC2626' : '#071426', color: filter === tab.key ? '#fff' : '#B8C1CC', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-                    <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-                        <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#B8C1CC' }}>{p.chassis}</span>
-                        <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: sc + '18', color: sc }}>● {p.status?.toUpperCase()}</span>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280', ...FB, fontSize: 14 }}>Loading products...</div>
+            ) : filtered.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280' }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🏎️</div>
+                <div style={{ ...FB, fontSize: 14 }}>No products in this category yet.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
+                {filtered.map(p => {
+                  const sc = STOCK_COLORS[p.status] || '#6B7280';
+                  const isCollector = p.status === 'limited';
+                  return (
+                    <div key={p.id} id={`product-${p.id}`}
+                      style={{ background: isCollector ? 'linear-gradient(135deg, #0a0f1a, #071426)' : '#071426', border: `1px solid ${isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.3s', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.5)' : 'rgba(220,38,38,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
+                      {isCollector && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)', zIndex: 1 }} />}
+                      {p.status === 'preorder only' && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>PREORDER</div>}
+                      {isCollector && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#FACC1522', color: '#FACC15', border: '1px solid #FACC1544' }}>COLLECTOR</div>}
+                      <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', gap: 6 }}>
+                        <button onClick={() => toggleWishlist(p)} title="Save to wishlist"
+                          style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 9px', fontSize: 12, color: wishlistIds.has(p.id) ? '#DC2626' : '#fff', cursor: 'pointer' }}>
+                          {wishlistIds.has(p.id) ? '♥' : '♡'}
+                        </button>
+                        <button onClick={() => shareProduct(p)} title="Copy share link"
+                          style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}
+                        </button>
                       </div>
-                      <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
-                      <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, margin: '0 0 14px' }}>{p.description}</p>
 
-                      {/* 4 variant pools — Unbuilt / Unbuilt+Case / Built / Built+Case */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        {VARIANTS.map(v => {
-                          const available = isVariantAvailable(p, v.key, globalCaseStock);
-                          const { price, original } = variantPricing(p, v.key);
-                          return (
-                            <div key={v.key} style={{ background: '#050505', border: `1px solid ${available ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.25)'}`, borderRadius: 8, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#B8C1CC' }}>{v.icon} {v.label.toUpperCase()}</div>
-                              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
-                                {original && <span style={{ ...FB, fontSize: 11, color: '#6B7280', textDecoration: 'line-through' }}>{original.toLocaleString()}</span>}
-                                <div style={{ ...F, fontWeight: 900, fontSize: 15, color: available ? (original ? '#22C55E' : (isCollector ? '#FACC15' : '#F5F5F5')) : '#6B7280' }}>{price.toLocaleString()} kr</div>
+                      <div style={{ height: 180, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', position: 'relative' }}>
+                        <ProductImage product={p} onClick={() => parseImages(p.image_url).length > 0 && setLightbox(p)} />
+                      </div>
+
+                      <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                          <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#B8C1CC' }}>{p.chassis}</span>
+                          <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: sc + '18', color: sc }}>● {p.status?.toUpperCase()}</span>
+                        </div>
+                        <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
+                        <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, margin: '0 0 14px' }}>{p.description}</p>
+
+                        {/* 4 variant pools — Unbuilt / Unbuilt+Case / Built / Built+Case */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          {VARIANTS.map(v => {
+                            const available = isVariantAvailable(p, v.key, globalCaseStock);
+                            const { price, original } = variantPricing(p, v.key);
+                            return (
+                              <div key={v.key} style={{ background: '#050505', border: `1px solid ${available ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.25)'}`, borderRadius: 8, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#B8C1CC' }}>{v.icon} {v.label.toUpperCase()}</div>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                                  {original && <span style={{ ...FB, fontSize: 11, color: '#6B7280', textDecoration: 'line-through' }}>{original.toLocaleString()}</span>}
+                                  <div style={{ ...F, fontWeight: 900, fontSize: 15, color: available ? (original ? '#22C55E' : (isCollector ? '#FACC15' : '#F5F5F5')) : '#6B7280' }}>{price.toLocaleString()} kr</div>
+                                </div>
+                                {available ? (
+                                  <button onClick={() => openModal(p, v.key)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                                ) : (
+                                  <>
+                                    <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>SOLD OUT</div>
+                                    <button onClick={() => openPreorder(p, v.key)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                                  </>
+                                )}
                               </div>
-                              {available ? (
-                                <button onClick={() => openModal(p, v.key)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
-                              ) : (
-                                <>
-                                  <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>SOLD OUT</div>
-                                  <button onClick={() => openPreorder(p, v.key)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
-                                </>
-                              )}
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ marginTop: 48, background: '#071426', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 14, padding: '20px 24px', ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.7 }}>
+              <strong style={{ color: '#F5F5F5', ...F, fontSize: 15, letterSpacing: 1 }}>📋 PREORDER NOTICE</strong><br />
+              All orders are reservation-based. No online payment required. After reserving you will receive a MobilePay reference — send payment, upload your proof, and we will confirm your order and arrange pickup in Nuuk.
+            </div>
+          </div>
+        )}
+
+        {/* Main catalog — PARTS tab only */}
+        {shopTab === 'parts' && (
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>PARTS & UPGRADES</div>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', margin: '0 0 12px' }}>SHOP BY CATEGORY</h2>
+            <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 28, maxWidth: 560 }}>Parts are sourced through our partner store, lil's Hobby Center. Tap a category to browse and order directly from them.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+              {PARTS_CATEGORIES.map(cat => (
+                <a key={cat.name} href={cat.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                  <div
+                    style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 110, cursor: 'pointer', transition: 'all 0.2s', textAlign: 'center' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.4)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                  >
+                    <div>
+                      <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5', marginBottom: 6 }}>{cat.name}</div>
+                      <div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>Visit lil's Hobby Center →</div>
                     </div>
                   </div>
-                );
-              })}
+                </a>
+              ))}
             </div>
-          )}
-
-          <div style={{ marginTop: 48, background: '#071426', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 14, padding: '20px 24px', ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.7 }}>
-            <strong style={{ color: '#F5F5F5', ...F, fontSize: 15, letterSpacing: 1 }}>📋 PREORDER NOTICE</strong><br />
-            All orders are reservation-based. No online payment required. After reserving you will receive a MobilePay reference — send payment, upload your proof, and we will confirm your order and arrange pickup in Nuuk.
           </div>
-        </div>
+        )}
       </main>
 
       {/* LIGHTBOX */}

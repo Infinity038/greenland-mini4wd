@@ -6,10 +6,10 @@ const LINKS = {
     { label: "Blog", href: "/blog" },
   ],
   Join: [
+    { label: "How to Join", href: "/how-to-join" },
     { label: "Register", href: "/register" },
     { label: "Membership", href: "/register" },
     { label: "Shop", href: "/shop" },
-    { label: "Contact", href: "#" },
   ],
 };
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { MemberProfileModal } from '@/components/admin/MemberProfileModal';
 
 const ADMIN_PASSWORD = 'mini4wd2026';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
@@ -73,6 +74,7 @@ export default function AdminOrdersPage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState('all');
   const [tab, setTab] = useState<'orders' | 'members'>('orders');
+  const [selectedMember, setSelectedMember] = useState<any>(null);
 
   useEffect(() => { const ok = checkAuth(); setAuthed(ok); setChecked(true); if (ok) fetchData(); }, []);
 
@@ -219,10 +221,10 @@ export default function AdminOrdersPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {members.map(m => (
               <div key={m.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <div>
+                <button onClick={() => setSelectedMember(m)} style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', flex: 1, minWidth: 0 }}>
                   <div style={{ ...F, fontWeight: 700, fontSize: 17, color: '#F5F5F5' }}>{m.name}</div>
                   <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>{m.email} · {m.nationality}</div>
-                </div>
+                </button>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 4, background: m.member_status === 'official' ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)', color: m.member_status === 'official' ? '#FACC15' : '#B8C1CC' }}>{(m.member_status || 'registered').toUpperCase()}</span>
                   {m.member_status !== 'official' && (
@@ -234,6 +236,8 @@ export default function AdminOrdersPage() {
           </div>
         )}
       </div>
+
+      <MemberProfileModal member={selectedMember} onClose={() => setSelectedMember(null)} />
     </div>
   );
 }
