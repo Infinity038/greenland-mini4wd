@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { getMemberData, getMemberDataFromSupabase, getTicketWallet, getReferralStats, RANK_COLORS, RANK_NEXT_POINTS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, getMemberOrdersFromSupabase, logout } from '@/lib/member';
 import { isMemberActive, daysRemaining } from '@/lib/loyalty';
 import type { Member, TicketWallet, ReferralStats } from '@/lib/member';
@@ -39,6 +39,7 @@ export default function ProfilePage() {
   const [addingCar, setAddingCar] = useState(false);
   const [carForm, setCarForm] = useState({ name: '', chassis: 'AR', series: '', color: '', image_url: '', bought_from: 'outside', notes: '' });
   const [carSaving, setCarSaving] = useState(false);
+  const carFileRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<Tab>(
     () => {
       if (typeof window !== "undefined") {
@@ -97,6 +98,13 @@ export default function ProfilePage() {
     navigator.clipboard.writeText(referral.referral_link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const r = new FileReader();
+    r.onloadend = () => setCarForm(p => ({ ...p, image_url: r.result as string }));
+    r.readAsDataURL(file);
   };
 
   const rank = (member?.rank || 'Rookie') as keyof typeof RANK_COLORS;
@@ -158,9 +166,8 @@ export default function ProfilePage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                     <span style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#6B7280' }}>RANK PROGRESS</span>
                     <button
+                      type="button"
                       onClick={() => setShowRankInfo(v => !v)}
-                      onMouseEnter={() => setShowRankInfo(true)}
-                      onMouseLeave={() => setShowRankInfo(false)}
                       aria-label="What is rank progress?"
                       style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 }}
                     >
@@ -490,8 +497,6 @@ export default function ProfilePage() {
                       { label: 'CAR NAME / NICKNAME', key: 'name', placeholder: 'e.g. Shadow Shark, Flame Astute...' },
                       { label: 'SERIES / MODEL', key: 'series', placeholder: 'e.g. Flame Astute, Geo Glider...' },
                       { label: 'COLOR / BODY', key: 'color', placeholder: 'e.g. Blue/Silver, Stock body...' },
-                      { label: 'IMAGE URL (optional)', key: 'image_url', placeholder: 'https://...' },
-                      { label: 'NOTES (optional)', key: 'notes', placeholder: 'Any modifications, tuning notes...' },
                     ].map(f => (
                       <div key={f.key}>
                         <label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 5 }}>{f.label}</label>
@@ -499,6 +504,32 @@ export default function ProfilePage() {
                           style={{ width: '100%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 14px', color: '#F5F5F5', ...FB, fontSize: 14, outline: 'none', boxSizing: 'border-box' as const }} />
                       </div>
                     ))}
+
+                    <div>
+                      <label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 5 }}>CAR PHOTO (OPTIONAL)</label>
+                      <div onClick={() => carFileRef.current?.click()} style={{ border: '2px dashed rgba(255,255,255,0.12)', borderRadius: 10, padding: carForm.image_url ? 10 : '28px 16px', textAlign: 'center', cursor: 'pointer', background: '#050505' }}>
+                        {carForm.image_url ? (
+                          <img src={carForm.image_url} alt="Car preview" style={{ maxHeight: 140, maxWidth: '100%', borderRadius: 8, margin: '0 auto', display: 'block' }} />
+                        ) : (
+                          <>
+                            <div style={{ fontSize: 30, marginBottom: 6 }}>📷</div>
+                            <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5' }}>Tap to upload a photo</div>
+                            <div style={{ ...FB, fontSize: 11, color: '#6B7280', marginTop: 4 }}>JPG, PNG, HEIC</div>
+                          </>
+                        )}
+                      </div>
+                      <input ref={carFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleCarFile} />
+                      {carForm.image_url && (
+                        <button type="button" onClick={() => setCarForm(p => ({ ...p, image_url: '' }))} style={{ ...FB, fontSize: 11, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', marginTop: 6, padding: 0 }}>Remove photo</button>
+                      )}
+                    </div>
+
+                    <div>
+                      <label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 5 }}>NOTES (OPTIONAL)</label>
+                      <input value={carForm.notes} onChange={e => setCarForm(p => ({ ...p, notes: e.target.value }))} placeholder="Any modifications, tuning notes..."
+                        style={{ width: '100%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 14px', color: '#F5F5F5', ...FB, fontSize: 14, outline: 'none', boxSizing: 'border-box' as const }} />
+                    </div>
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
                         <label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 5 }}>CHASSIS</label>
