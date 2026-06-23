@@ -18,6 +18,14 @@ const RACE_CLASSES = [
   { id: 'open',          label: 'Open Class',     color: '#DC2626', icon: '🔥', short: 'Unlimited builds — anything goes.', desc: 'No restrictions on mods, motors, or parts. Full performance tuning. Most competitive class on track.' },
 ];
 
+// Never show a raw email as a public-facing display name (privacy) — falls back
+// to a generic label instead. Also used to clean up any legacy entries where
+// member_name was accidentally stored as an email address.
+function safeName(name: string | null | undefined, fallback = 'Racer'): string {
+  if (!name || typeof name !== 'string') return fallback;
+  return name.includes('@') ? fallback : name;
+}
+
 function PrizeCalculator() {
   const [paid, setPaid]   = useState(20);
   const [bonus, setBonus] = useState(0);
@@ -60,6 +68,7 @@ export default function TournamentPage() {
   const [member, setMember]             = useState(null);
   const [tournaments, setTournaments]   = useState([]);
   const [allEntries, setAllEntries]     = useState([]);
+  const [carImages, setCarImages]       = useState<Record<string, string>>({});
   const [myCars, setMyCars]             = useState([]);
   const [myTickets, setMyTickets]       = useState([]);
   const [myEntries, setMyEntries]       = useState([]);
@@ -83,6 +92,17 @@ export default function TournamentPage() {
   const [fighter, setFighter]           = useState(null);
   const [fighterCars, setFighterCars]   = useState([]);
 
+  // Pulls the photo for every car referenced by the given entries (one batched
+  // query) so entrant rows / fighter cards can show the actual car, not just text.
+  async function loadCarImages(entries: any[]) {
+    const ids = Array.from(new Set(entries.map((e: any) => e.car_id).filter(Boolean)));
+    if (ids.length === 0) { setCarImages({}); return; }
+    const { data } = await supabase.from('cars').select('id,image_url').in('id', ids);
+    const map: Record<string, string> = {};
+    (data || []).forEach((c: any) => { if (c.image_url) map[c.id] = c.image_url; });
+    setCarImages(map);
+  }
+
   useEffect(() => {
     const reg = isRegistered();
     setLoggedIn(reg);
@@ -93,6 +113,7 @@ export default function TournamentPage() {
       setTournaments(tData || []);
       const { data: eData } = await supabase.from('race_entries').select('*').order('created_at',{ascending:true});
       setAllEntries(eData || []);
+      loadCarImages(eData || []);
       if (local?.email) {
         const { data: cData } = await supabase.from('cars').select('*').eq('member_email',local.email).eq('status','approved');
         setMyCars(cData || []);
@@ -118,7 +139,7 @@ export default function TournamentPage() {
   const allEntriesFor   = (tid) => allEntries.filter(e=>e.tournament_id===tid);
 
   const openRegModal = (t) => { setRegTournament(t); setRegCar(''); setRegCategory(''); setRegError(''); setRegSuccess(''); setRegModal(true); };
-  const openEntrantsModal = (t) => { setEntrantsTournament(t); setEntrantsModal(true); };
+  const openEntrantsModal = (t) => { setEntrantsModal(true); setEntrantsTournament(t); };
 
   const openFighter = async (e) => {
     setFighter(e);
@@ -139,9 +160,11 @@ export default function TournamentPage() {
     setRegSaving(true); setRegError('');
     const usedIds = myEntries.map(e=>e.ticket_id).filter(Boolean);
     const availTicket = eligibleTickets.find(t=>!usedIds.includes(t.id));
+    // Public-facing name only — never falls back to the member's email (privacy).
+    const memberDisplayName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || 'Racer';
     const { error } = await supabase.from('race_entries').insert({
       tournament_id: regTournament.id, member_email: member.email,
-      member_name: member.name || member.email, car_id: regCar,
+      member_name: memberDisplayName, car_id: regCar,
       car_name: car.name, chassis: car.chassis, race_category: regCategory,
       ticket_id: availTicket?.id || null, status: 'confirmed',
     });
@@ -150,6 +173,7 @@ export default function TournamentPage() {
     setMyEntries(me||[]);
     const { data: ae } = await supabase.from('race_entries').select('*').order('created_at',{ascending:true});
     setAllEntries(ae||[]);
+    loadCarImages(ae||[]);
     setRegSuccess(`✅ ${car.name} entered in ${RACE_CLASSES.find(c=>c.id===regCategory)?.label}!`);
     setRegSaving(false);
     setTimeout(()=>{ setRegModal(false); setRegSuccess(''); },1800);
@@ -162,6 +186,7 @@ export default function TournamentPage() {
     setMyEntries(me||[]);
     const { data: ae } = await supabase.from('race_entries').select('*').order('created_at',{ascending:true});
     setAllEntries(ae||[]);
+    loadCarImages(ae||[]);
   };
 
   return (
@@ -425,18 +450,21 @@ export default function TournamentPage() {
                     const cls    = RACE_CLASSES.find(c=>c.id===e.race_category);
                     const isTop3 = i < 3;
                     const crown  = i===0 ? '👑' : i===1 ? '🥈' : '🥉';
+                    const carImg = carImages[e.car_id];
                     return (
                       <button key={e.id} onClick={()=>{ openFighter(e); setEntrantsModal(false); }}
-                        style={{ background: isTop3 ? 'rgba(250,204,21,0.05)' : 'rgba(255,255,255,0.03)', border:`1px solid ${isTop3 ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)'}`, borderRadius:10, padding:'14px 16px', display:'flex', alignItems:'center', gap:12, cursor:'pointer', textAlign:'left', width:'100%' }}>
-                        <div style={{ width:30, height:30, borderRadius:'50%', background: isTop3 ? '#FACC15' : '#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', ...F, fontWeight:900, fontSize:13, color: isTop3 ? '#111' : '#B8C1CC', flexShrink:0 }}>
+                        style={{ background: isTop3 ? 'rgba(250,204,21,0.05)' : 'rgba(255,255,255,0.03)', border:`1px solid ${isTop3 ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)'}`, borderRadius:10, padding:'12px 14px', display:'flex', alignItems:'center', gap:10, cursor:'pointer', textAlign:'left', width:'100%' }}>
+                        <div style={{ width:26, height:26, borderRadius:'50%', background: isTop3 ? '#FACC15' : '#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', ...F, fontWeight:900, fontSize:12, color: isTop3 ? '#111' : '#B8C1CC', flexShrink:0 }}>
                           {isTop3 ? crown : i+1}
                         </div>
+                        <div style={{ width:38, height:38, borderRadius:8, background:'#050505', border:'1px solid rgba(255,255,255,0.08)', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          {carImg ? <img src={carImg} alt={e.car_name} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:16 }}>🏎️</span>}
+                        </div>
                         <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ ...F, fontWeight:700, fontSize:16, color:'#F5F5F5' }}>{e.member_name || e.member_email?.split('@')[0]}</div>
-                          <div style={{ ...FB, fontSize:11, color:'#B8C1CC' }}>🏎️ {e.car_name} · {e.chassis}</div>
+                          <div style={{ ...F, fontWeight:700, fontSize:15, color:'#F5F5F5', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{safeName(e.member_name)}</div>
+                          <div style={{ ...FB, fontSize:11, color:'#B8C1CC', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>🏎️ {e.car_name} · {e.chassis}</div>
                         </div>
                         {cls && <span style={{ ...F, fontSize:9, letterSpacing:1, padding:'3px 9px', borderRadius:20, background:cls.color+'22', color:cls.color, border:`1px solid ${cls.color}44`, flexShrink:0 }}>{cls.icon} {cls.label.toUpperCase()}</span>}
-                        <span style={{ ...FB, fontSize:11, color:'#6B7280' }}>→</span>
                       </button>
                     );
                   })}
@@ -470,12 +498,14 @@ export default function TournamentPage() {
               ) : myCars.map(car => (
                 <button key={car.id} onClick={()=>setRegCar(car.id)}
                   style={{ background: regCar===car.id ? 'rgba(220,38,38,0.15)' : 'rgba(255,255,255,0.03)', border:`1.5px solid ${regCar===car.id?'#DC2626':'rgba(255,255,255,0.08)'}`, borderRadius:10, padding:'12px 16px', display:'flex', alignItems:'center', gap:12, cursor:'pointer', textAlign:'left', width:'100%', marginBottom:8 }}>
-                  <span style={{ fontSize:20 }}>🏎️</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ ...F, fontWeight:700, fontSize:16, color:'#F5F5F5' }}>{car.name}</div>
+                  <div style={{ width:36, height:36, borderRadius:8, background:'#050505', border:'1px solid rgba(255,255,255,0.08)', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    {car.image_url ? <img src={car.image_url} alt={car.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:18 }}>🏎️</span>}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ ...F, fontWeight:700, fontSize:16, color:'#F5F5F5', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{car.name}</div>
                     <div style={{ ...FB, fontSize:12, color:'#B8C1CC' }}>{car.chassis} · {car.series||'No series'}</div>
                   </div>
-                  {regCar===car.id && <span style={{ color:'#DC2626', fontSize:18 }}>✓</span>}
+                  {regCar===car.id && <span style={{ color:'#DC2626', fontSize:18, flexShrink:0 }}>✓</span>}
                 </button>
               ))}
             </div>
@@ -526,15 +556,22 @@ export default function TournamentPage() {
           <div style={{ background:'#071426', border:'1px solid rgba(220,38,38,0.3)', borderRadius:16, width:'100%', maxWidth:400, overflow:'hidden' }}>
             <div style={{ height:4, background: RACE_CLASSES.find(c=>c.id===fighter.race_category)?.color||'#DC2626' }}/>
             <div style={{ padding:'28px 24px' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:24 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
                 <div style={{ width:64, height:64, borderRadius:'50%', background:'#DC2626', display:'flex', alignItems:'center', justifyContent:'center', ...F, fontWeight:900, fontSize:28, color:'#fff', flexShrink:0 }}>
-                  {(fighter.member_name||fighter.member_email||'R')[0].toUpperCase()}
+                  {safeName(fighter.member_name)[0].toUpperCase()}
                 </div>
-                <div>
-                  <div style={{ ...F, fontWeight:900, fontSize:26, color:'#F5F5F5', lineHeight:1 }}>{fighter.member_name||fighter.member_email?.split('@')[0]}</div>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ ...F, fontWeight:900, fontSize:26, color:'#F5F5F5', lineHeight:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{safeName(fighter.member_name)}</div>
                   <div style={{ ...FB, fontSize:13, color:'#B8C1CC', marginTop:4 }}>Confirmed Entrant</div>
                 </div>
               </div>
+
+              {carImages[fighter.car_id] && (
+                <div style={{ marginBottom:18, borderRadius:10, overflow:'hidden', border:'1px solid rgba(255,255,255,0.08)', background:'#050505' }}>
+                  <img src={carImages[fighter.car_id]} alt={fighter.car_name} style={{ width:'100%', maxHeight:170, objectFit:'contain', display:'block' }} />
+                </div>
+              )}
+
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
                 {[
                   { label:'CAR',      val:fighter.car_name||'—',   color:'#F5F5F5' },
@@ -555,9 +592,11 @@ export default function TournamentPage() {
                   <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                     {fighterCars.map(car => (
                       <div key={car.id} style={{ background:'rgba(255,255,255,0.04)', borderRadius:8, padding:'10px 14px', display:'flex', alignItems:'center', gap:10 }}>
-                        <span style={{ fontSize:18 }}>🏎️</span>
-                        <div>
-                          <div style={{ ...F, fontWeight:700, fontSize:14, color:'#F5F5F5' }}>{car.name}</div>
+                        <div style={{ width:30, height:30, borderRadius:6, background:'#050505', border:'1px solid rgba(255,255,255,0.06)', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          {car.image_url ? <img src={car.image_url} alt={car.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:16 }}>🏎️</span>}
+                        </div>
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ ...F, fontWeight:700, fontSize:14, color:'#F5F5F5', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{car.name}</div>
                           <div style={{ ...FB, fontSize:11, color:'#B8C1CC' }}>{car.chassis}{car.series ? ` · ${car.series}` : ''}</div>
                         </div>
                       </div>
