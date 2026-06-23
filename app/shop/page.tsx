@@ -16,6 +16,7 @@ type ShopTab = 'cars' | 'parts' | 'merchandise';
 interface Product {
   id: string;
   name: string;
+  item_no?: string;
   category: string;
   subcategory?: string;
   chassis: string;
@@ -223,7 +224,10 @@ function SimpleProductCard({ p, wishlistIds, toggleWishlist, shareProduct, copie
         <ProductImage product={p} onClick={() => parseImages(p.image_url).length > 0 && setLightbox(p)} />
       </div>
       <div style={{ padding: '16px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {p.subcategory && <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#B8C1CC', alignSelf: 'flex-start', marginBottom: 8 }}>{p.subcategory}</span>}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+          {p.subcategory && <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#B8C1CC' }}>{p.subcategory}</span>}
+          {p.item_no && <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#FACC15' }}>#{p.item_no}</span>}
+        </div>
         <h3 style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5', margin: '0 0 6px' }}>{p.name}</h3>
         <p style={{ ...FB, fontSize: 12, color: '#B8C1CC', lineHeight: 1.5, margin: '0 0 14px', flex: 1 }}>{p.description}</p>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
@@ -397,7 +401,8 @@ export default function ShopPage() {
     if (!isCarProduct(p)) return false;
     const matchesStatus = filter === 'all' || p.status === filter;
     const matchesChassis = !chassisFilter || p.chassis === chassisFilter;
-    const matchesSearch = !carsSearch.trim() || p.name.toLowerCase().includes(carsSearch.trim().toLowerCase());
+    const q = carsSearch.trim().toLowerCase();
+    const matchesSearch = !q || p.name.toLowerCase().includes(q) || (p.item_no || '').toLowerCase().includes(q);
     return matchesStatus && matchesChassis && matchesSearch;
   });
   const collectors = products.filter(p => isCarProduct(p) && p.status === 'limited');
@@ -405,7 +410,8 @@ export default function ShopPage() {
   const partsFiltered = products.filter(p => {
     if (p.category !== 'parts') return false;
     const matchesSub = !partsFilter || p.subcategory === partsFilter;
-    const matchesSearch = !partsSearch.trim() || p.name.toLowerCase().includes(partsSearch.trim().toLowerCase());
+    const q = partsSearch.trim().toLowerCase();
+    const matchesSearch = !q || p.name.toLowerCase().includes(q) || (p.item_no || '').toLowerCase().includes(q);
     return matchesSub && matchesSearch;
   });
 
@@ -413,7 +419,8 @@ export default function ShopPage() {
   const merchSubcats = Array.from(new Set(merchProducts.map(p => p.subcategory).filter(Boolean))) as string[];
   const merchFiltered = merchProducts.filter(p => {
     const matchesSub = !merchFilter || p.subcategory === merchFilter;
-    const matchesSearch = !merchSearch.trim() || p.name.toLowerCase().includes(merchSearch.trim().toLowerCase());
+    const q = merchSearch.trim().toLowerCase();
+    const matchesSearch = !q || p.name.toLowerCase().includes(q) || (p.item_no || '').toLowerCase().includes(q);
     return matchesSub && matchesSearch;
   });
 
@@ -594,7 +601,7 @@ export default function ShopPage() {
                         <ProductImage product={p} onClick={() => setLightbox(p)} />
                       </div>
                       <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 4, lineHeight: 1.1 }}>{p.name}</div>
-                      <div style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC', marginBottom: 12 }}>{p.chassis} CHASSIS</div>
+                      <div style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC', marginBottom: 12 }}>{p.chassis} CHASSIS{p.item_no ? ` · #${p.item_no}` : ''}</div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#FACC15' }}>FROM</div>
@@ -619,7 +626,7 @@ export default function ShopPage() {
 
         {shopTab === 'cars' && (
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
-            <input value={carsSearch} onChange={e => setCarsSearch(e.target.value)} placeholder="Search cars..." style={{ ...searchInputStyle, marginBottom: 20 }} />
+            <input value={carsSearch} onChange={e => setCarsSearch(e.target.value)} placeholder="Search by name or item no..." style={{ ...searchInputStyle, marginBottom: 20 }} />
 
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 16 }}>
               <button onClick={() => setChassisFilter('')} style={filterBtn(!chassisFilter)}>ALL CHASSIS</button>
@@ -669,6 +676,7 @@ export default function ShopPage() {
                       <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
                           <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#B8C1CC' }}>{p.chassis}</span>
+                          {p.item_no && <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#FACC15' }}>#{p.item_no}</span>}
                           <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: sc + '18', color: sc }}>● {p.status?.toUpperCase()}</span>
                         </div>
                         <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
@@ -717,7 +725,7 @@ export default function ShopPage() {
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>PARTS & UPGRADES</div>
             <h2 style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', margin: '0 0 20px' }}>SHOP PARTS</h2>
 
-            <input value={partsSearch} onChange={e => setPartsSearch(e.target.value)} placeholder="Search parts..." style={{ ...searchInputStyle, marginBottom: 20 }} />
+            <input value={partsSearch} onChange={e => setPartsSearch(e.target.value)} placeholder="Search by name or item no..." style={{ ...searchInputStyle, marginBottom: 20 }} />
 
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 28 }}>
               <button onClick={() => setPartsFilter('')} style={filterBtn(!partsFilter)}>ALL PARTS</button>
@@ -749,7 +757,7 @@ export default function ShopPage() {
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>CLUB MERCH</div>
             <h2 style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', margin: '0 0 20px' }}>APPAREL & MERCHANDISE</h2>
 
-            <input value={merchSearch} onChange={e => setMerchSearch(e.target.value)} placeholder="Search merchandise..." style={{ ...searchInputStyle, marginBottom: 20 }} />
+            <input value={merchSearch} onChange={e => setMerchSearch(e.target.value)} placeholder="Search by name or item no..." style={{ ...searchInputStyle, marginBottom: 20 }} />
 
             {merchSubcats.length > 0 && (
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 28 }}>
@@ -799,6 +807,7 @@ export default function ShopPage() {
                     <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5' }}>{selected.name}</div>
                     <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#B8C1CC', margin: '4px 0 12px' }}>
                       {isSelectedCar ? `${VARIANTS.find(v => v.key === selectedVariant)?.shortLabel} · ${selected.chassis}` : (selected.subcategory || selected.category)}
+                      {selected.item_no ? ` · #${selected.item_no}` : ''}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                       {modalPricing.original && <span style={{ ...FB, fontSize: 16, color: '#6B7280', textDecoration: 'line-through' }}>{modalPricing.original.toLocaleString()} DKK</span>}

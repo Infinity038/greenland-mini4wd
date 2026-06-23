@@ -109,7 +109,7 @@ export default function AdminProductsPage() {
   const [preorders, setPreorders] = useState<any[]>([]);
 
   const EMPTY = {
-    name:'', category:'cars', subcategory:'', chassis:'AR', type:'boxed', status:'in stock', description:'', image_url:'', available:true,
+    name:'', item_no:'', category:'cars', subcategory:'', chassis:'AR', type:'boxed', status:'in stock', description:'', image_url:'', available:true,
     unbuilt_stock:1, built_stock:1,
     unbuilt_price_dkk:0, unbuilt_original_price_dkk:0,
     unbuilt_case_price_dkk:0, unbuilt_case_original_price_dkk:0,
@@ -190,7 +190,8 @@ export default function AdminProductsPage() {
 
   const filteredProducts = products.filter(p => {
     const catMatch = categoryFilter === 'all' || (p.category || 'cars') === categoryFilter;
-    const searchMatch = !search.trim() || p.name?.toLowerCase().includes(search.trim().toLowerCase());
+    const q = search.trim().toLowerCase();
+    const searchMatch = !q || p.name?.toLowerCase().includes(q) || p.item_no?.toLowerCase().includes(q);
     return catMatch && searchMatch;
   });
 
@@ -229,7 +230,7 @@ export default function AdminProductsPage() {
 
             <div style={{ display:'flex', gap:12, flexWrap:'wrap', alignItems:'center', marginBottom:16 }}>
               <button onClick={() => { setEditing({...EMPTY}); setImgPreviewFailed(false); setSaveError(''); }} style={{ background:'#DC2626', color:'#fff', border:'none', borderRadius:8, padding:'10px 20px', ...F, fontWeight:700, fontSize:15, letterSpacing:1, cursor:'pointer' }}>+ ADD PRODUCT</button>
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search products..." style={{ ...inp(), maxWidth:240 }} />
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or item no..." style={{ ...inp(), maxWidth:260 }} />
             </div>
 
             <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
@@ -253,6 +254,7 @@ export default function AdminProductsPage() {
                         <div style={{ flex:1 }}>
                           <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
                             <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:4, background:'rgba(220,38,38,0.12)', color:'#FCA5A5' }}>{cat.toUpperCase()}</span>
+                            {p.item_no && <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:4, background:'rgba(255,255,255,0.06)', color:'#FACC15' }}>#{p.item_no}</span>}
                             {cat === 'cars' ? (
                               <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:4, background:'rgba(255,255,255,0.06)', color:'#B8C1CC' }}>{p.chassis}</span>
                             ) : p.subcategory && (
@@ -329,6 +331,8 @@ export default function AdminProductsPage() {
             </div>
             <div style={{ padding:22, display:'flex', flexDirection:'column', gap:14 }}>
               <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>NAME *</label><input value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})} style={inp()} /></div>
+
+              <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>ITEM NO.</label><input value={editing.item_no || ''} onChange={e=>setEditing({...editing,item_no:e.target.value})} placeholder="e.g. 18628, AR-2024" style={inp()} /></div>
 
               <div>
                 <label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>CATEGORY</label>
