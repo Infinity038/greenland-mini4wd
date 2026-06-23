@@ -18,6 +18,16 @@ const DEMO_REFERRAL: ReferralStats = { referral_code: 'DEMO1234', referral_link:
 const TIER_LABELS: Record<string, string> = { non_member: 'Non-Member', member: 'Member', season_3rd: '🥉 Season 3rd', season_2nd: '🥈 Season 2nd', season_1st: '👑 Season 1st', hall_of_fame: '🏆 Hall of Fame' };
 const TIER_COLORS: Record<string, string> = { non_member: '#6B7280', member: '#3B82F6', season_3rd: '#B45309', season_2nd: '#9CA3AF', season_1st: '#FACC15', hall_of_fame: '#DC2626' };
 
+const RANK_LADDER: { name: string; min: number }[] = [
+  { name: 'Rookie', min: 0 },
+  { name: 'Builder', min: 15 },
+  { name: 'Racer', min: 60 },
+  { name: 'Tuner', min: 150 },
+  { name: 'Contender', min: 300 },
+  { name: 'Champion', min: 750 },
+  { name: 'Legend', min: 1500 },
+];
+
 type Tab = 'overview' | 'orders' | 'tickets' | 'garage' | 'referral' | 'wishlist';
 
 export default function ProfilePage() {
@@ -43,6 +53,7 @@ export default function ProfilePage() {
   const [ticketHistory, setTicketHistory] = useState<any[]>([]);
   const [raceEntries, setRaceEntries] = useState<any[]>([]);
   const [wishlist, setWishlist] = useState<any[]>([]);
+  const [showRankInfo, setShowRankInfo] = useState(false);
 
   useEffect(() => {
     const local = getMemberData();
@@ -141,14 +152,58 @@ export default function ProfilePage() {
                   )}
                 </div>
                 <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', marginBottom: 10 }}>{member?.email}</div>
+
                 {/* Rank progress */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ flex: 1, maxWidth: 200, height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${progressPct}%`, background: rankColor, borderRadius: 2 }} />
+                <div style={{ position: 'relative', maxWidth: 280 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <span style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#6B7280' }}>RANK PROGRESS</span>
+                    <button
+                      onClick={() => setShowRankInfo(v => !v)}
+                      onMouseEnter={() => setShowRankInfo(true)}
+                      onMouseLeave={() => setShowRankInfo(false)}
+                      aria-label="What is rank progress?"
+                      style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+                    >
+                      <span style={{ ...F, fontSize: 10, fontWeight: 900, color: '#B8C1CC', lineHeight: 1 }}>i</span>
+                    </button>
                   </div>
-                  <span style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>
-                    {rank === 'Legend' ? '🏆 Max Rank' : `${points}/${nextPoints} pts`}
-                  </span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ flex: 1, height: 10, background: 'rgba(255,255,255,0.06)', borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div style={{ height: '100%', width: `${progressPct}%`, background: `linear-gradient(90deg, ${rankColor}99, ${rankColor})`, borderRadius: 6, boxShadow: `0 0 10px ${rankColor}99`, transition: 'width 0.4s ease' }} />
+                    </div>
+                    <span style={{ ...FB, fontSize: 12, color: '#B8C1CC', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {rank === 'Legend' ? '🏆 Max Rank' : `${points}/${nextPoints} pts`}
+                    </span>
+                  </div>
+
+                  {showRankInfo && (
+                    <>
+                      <div onClick={() => setShowRankInfo(false)} style={{ position: 'fixed', inset: 0, zIndex: 25 }} />
+                      <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '100%', left: 0, marginTop: 10, zIndex: 30, width: 290, background: '#0d1420', border: `1px solid ${rankColor}55`, borderRadius: 12, padding: 16, boxShadow: '0 12px 32px rgba(0,0,0,0.55)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <div style={{ ...F, fontWeight: 900, fontSize: 14, color: rankColor, letterSpacing: 1 }}>RANK PROGRESS</div>
+                          <button onClick={() => setShowRankInfo(false)} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: 16, cursor: 'pointer', lineHeight: 1, padding: 0 }}>✕</button>
+                        </div>
+                        <p style={{ ...FB, fontSize: 12, color: '#B8C1CC', lineHeight: 1.6, margin: '0 0 10px' }}>
+                          Your rank is a lifetime badge that grows with your total club points. Points are earned automatically every time a race ticket or shop order gets payment-confirmed — the more active you are, the faster you climb.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+                          {RANK_LADDER.map(r => (
+                            <div key={r.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', opacity: r.name === rank ? 1 : 0.55 }}>
+                              <span style={{ ...F, fontSize: 11, letterSpacing: 1, color: r.name === rank ? (RANK_COLORS as any)[r.name] : '#B8C1CC', fontWeight: r.name === rank ? 900 : 600 }}>
+                                {r.name === rank ? '▶ ' : ''}{r.name.toUpperCase()}
+                              </span>
+                              <span style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{r.min}+ pts</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ ...FB, fontSize: 11, color: '#6B7280', lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8 }}>
+                          💡 Rank shows your overall club status. Your season tier badge (shown next to it) is separate — that one comes from race results and unlocks tier-gated discounts.
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
               <button onClick={logout} style={{ ...FB, fontSize: 13, color: '#B8C1CC', background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 16px', cursor: 'pointer' }}>
