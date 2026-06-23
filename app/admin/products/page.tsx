@@ -6,8 +6,8 @@ import { supabase } from '@/lib/supabase';
 const ADMIN_PASSWORD = 'mini4wd2026';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
-const STATUS_COLORS: Record<string,string> = {'in stock':'#22C55E','preorder only':'#3B82F6','limited':'#FACC15','sold out':'#DC2626','coming soon':'#6B7280'};
-const STATUSES = ['in stock','preorder only','limited','sold out','coming soon'];
+const STATUS_COLORS: Record<string,string> = {'in stock':'#22C55E','preorder only':'#3B82F6','sold out':'#DC2626','coming soon':'#6B7280'};
+const STATUSES = ['in stock','preorder only','sold out','coming soon'];
 const CHASSIS = ['AR','MA','MS','VS','FM-A','S2','ME','Super FM','FM','VZ','Super TZ-X','Super TZ','Super XX','Super X','Super-1','Zero','Type 5','Type 4','Type 3','Type 2','Type 1','Other'];
 const CATEGORIES = [{ key:'cars', label:'CARS' }, { key:'parts', label:'PARTS' }, { key:'merchandise', label:'MERCHANDISE' }];
 const PARTS_SUBCATEGORIES = ['Bearings','Brakes/Dampers','Chassis','Shafts/Gears','Motors','Plates','Rollers/Stabilizers','Screws/Nuts','Wheels/Tires','Accessories'];
@@ -110,6 +110,7 @@ export default function AdminProductsPage() {
 
   const EMPTY = {
     name:'', item_no:'', category:'cars', subcategory:'', chassis:'AR', type:'boxed', status:'in stock', description:'', image_url:'', available:true,
+    is_collectors_vault:false,
     unbuilt_stock:1, built_stock:1,
     unbuilt_price_dkk:0, unbuilt_original_price_dkk:0,
     unbuilt_case_price_dkk:0, unbuilt_case_original_price_dkk:0,
@@ -255,6 +256,7 @@ export default function AdminProductsPage() {
                           <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
                             <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:4, background:'rgba(220,38,38,0.12)', color:'#FCA5A5' }}>{cat.toUpperCase()}</span>
                             {p.item_no && <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:4, background:'rgba(255,255,255,0.06)', color:'#FACC15' }}>#{p.item_no}</span>}
+                            {p.is_collectors_vault && <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:4, background:'rgba(250,204,21,0.15)', color:'#FACC15' }}>🏆 VAULT</span>}
                             {cat === 'cars' ? (
                               <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:4, background:'rgba(255,255,255,0.06)', color:'#B8C1CC' }}>{p.chassis}</span>
                             ) : p.subcategory && (
@@ -344,6 +346,14 @@ export default function AdminProductsPage() {
               {isCarEditing ? (
                 <>
                   <div><label style={{ ...F, fontSize:11, letterSpacing:3, color:'#B8C1CC', display:'block', marginBottom:6 }}>CHASSIS</label><select value={editing.chassis} onChange={e=>setEditing({...editing,chassis:e.target.value})} style={inp()}>{CHASSIS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+
+                  <div onClick={()=>setEditing({...editing, is_collectors_vault: !editing.is_collectors_vault})} style={{ display:'flex', alignItems:'center', gap:10, background:'#050505', border:`1px solid ${editing.is_collectors_vault ? 'rgba(250,204,21,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius:10, padding:'12px 14px', cursor:'pointer' }}>
+                    <input type="checkbox" checked={!!editing.is_collectors_vault} onChange={e=>setEditing({...editing, is_collectors_vault: e.target.checked})} onClick={e=>e.stopPropagation()} style={{ width:18, height:18, cursor:'pointer', flexShrink:0 }} />
+                    <div>
+                      <div style={{ ...F, fontSize:13, color:'#FACC15', letterSpacing:1 }}>🏆 FEATURE IN COLLECTOR'S VAULT</div>
+                      <div style={{ ...FB, fontSize:11, color:'#6B7280', marginTop:2 }}>Shows this car in the spotlighted Vault section at the top of the shop's CARS tab.</div>
+                    </div>
+                  </div>
 
                   <div style={{ background:'#050505', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:14 }}>
                     <div style={{ ...F, fontSize:10, letterSpacing:3, color:'#FACC15', marginBottom:10 }}>STOCK POOLS</div>

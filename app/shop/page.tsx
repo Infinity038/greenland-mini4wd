@@ -26,6 +26,7 @@ interface Product {
   unbuilt_stock?: number;
   built_stock?: number;
   status: string;
+  is_collectors_vault?: boolean;
   description: string;
   image_url: string;
 }
@@ -82,7 +83,6 @@ function simplePricing(p: Product): { price: number; original: number | null } {
 const STOCK_COLORS: Record<string, string> = {
   'in stock': '#22C55E',
   'preorder only': '#3B82F6',
-  'limited': '#FACC15',
   'sold out': '#6B7280',
   'coming soon': '#A855F7',
 };
@@ -91,7 +91,6 @@ const FILTER_TABS = [
   { key: 'all', label: 'All Products' },
   { key: 'in stock', label: 'In Stock' },
   { key: 'preorder only', label: 'Preorder' },
-  { key: 'limited', label: 'Limited / Rare' },
 ];
 
 const CHASSIS_FILTERS = ['AR', 'EZ', 'FM-A', 'MA', 'ME', 'MS', 'Super II', 'Super XX', 'VS', 'VZ'];
@@ -405,7 +404,7 @@ export default function ShopPage() {
     const matchesSearch = !q || p.name.toLowerCase().includes(q) || (p.item_no || '').toLowerCase().includes(q);
     return matchesStatus && matchesChassis && matchesSearch;
   });
-  const collectors = products.filter(p => isCarProduct(p) && p.status === 'limited');
+  const collectors = products.filter(p => isCarProduct(p) && p.is_collectors_vault);
 
   const partsFiltered = products.filter(p => {
     if (p.category !== 'parts') return false;
@@ -655,7 +654,7 @@ export default function ShopPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
                 {carsFiltered.map(p => {
                   const sc = STOCK_COLORS[p.status] || '#6B7280';
-                  const isCollector = p.status === 'limited';
+                  const isCollector = !!p.is_collectors_vault;
                   return (
                     <div key={p.id} id={`product-${p.id}`}
                       style={{ background: isCollector ? 'linear-gradient(135deg, #0a0f1a, #071426)' : '#071426', border: `1px solid ${isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.3s', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}
