@@ -63,12 +63,6 @@ function variantPricing(p: any, key: string): { price: number; original: number 
   return { price, original: original && original > price ? original : null };
 }
 
-function cheapestAvailableVariant(p: Product, caseStock: number) {
-  const opts = VARIANTS.filter(v => isVariantAvailable(p, v.key, caseStock)).map(v => ({ key: v.key, ...variantPricing(p, v.key) }));
-  if (opts.length === 0) return null;
-  return opts.sort((a, b) => a.price - b.price)[0];
-}
-
 // Simple (non-car) availability + pricing — parts & merchandise use a flat price_dkk
 // and a single stock_qty pool instead of the 4-variant unbuilt/built system.
 function isSimpleAvailable(p: Product): boolean {
@@ -587,7 +581,11 @@ export default function ShopPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
                 {collectors.map(p => {
-                  const best = cheapestAvailableVariant(p, globalCaseStock);
+                  // Vault spotlight always quotes the UNBUILT price/availability — keeps it
+                  // consistent with the UNBUILT row in the full variant grid further down,
+                  // instead of jumping to whichever variant happens to be cheapest/in stock.
+                  const unbuiltAvailable = isVariantAvailable(p, 'unbuilt', globalCaseStock);
+                  const { price: unbuiltPrice, original: unbuiltOriginal } = variantPricing(p, 'unbuilt');
                   return (
                     <div key={p.id} id={`product-${p.id}`} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
@@ -605,12 +603,12 @@ export default function ShopPage() {
                         <div>
                           <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#FACC15' }}>FROM</div>
                           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                            {best?.original && <span style={{ ...FB, fontSize: 13, color: '#6B7280', textDecoration: 'line-through' }}>{best.original.toLocaleString()}</span>}
-                            <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{(best ? best.price : variantPricing(p, 'unbuilt').price).toLocaleString()} kr</div>
+                            {unbuiltOriginal && <span style={{ ...FB, fontSize: 13, color: '#6B7280', textDecoration: 'line-through' }}>{unbuiltOriginal.toLocaleString()}</span>}
+                            <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{unbuiltPrice.toLocaleString()} kr</div>
                           </div>
                         </div>
-                        {best ? (
-                          <button onClick={() => openModal(p, best.key)} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                        {unbuiltAvailable ? (
+                          <button onClick={() => openModal(p, 'unbuilt')} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
                         ) : (
                           <button onClick={() => openPreorder(p, 'unbuilt')} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
                         )}
