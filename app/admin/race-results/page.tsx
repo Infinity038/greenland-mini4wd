@@ -22,6 +22,15 @@ function saveAuth() {
   localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + 8 * 60 * 60 * 1000 }));
 }
 
+// 1st = 5, 2nd = 3, 3rd = 2, everyone else who finished (4th+) = 1 participation point.
+function pointsForPosition(pos: number): number {
+  if (pos === 1) return 5;
+  if (pos === 2) return 3;
+  if (pos === 3) return 2;
+  if (pos >= 4) return 1;
+  return 0;
+}
+
 const TIER_ORDER: Record<string, number> = { non_member: 0, member: 1, season_3rd: 2, season_2nd: 3, season_1st: 4, hall_of_fame: 5 };
 const RANK_TIER: Record<number, string> = { 1: 'season_1st', 2: 'season_2nd', 3: 'season_3rd' };
 
@@ -58,8 +67,9 @@ export default function AdminRaceResults() {
   const [pwError, setPwError] = useState('');
   const [seasons, setSeasons] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const [tournaments, setTournaments] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
-  const [form, setForm] = useState({ season_id: '', member_id: '', member_name: '', race_date: '', position: '', lap_time_seconds: '', qualifying_time_1: '', qualifying_time_2: '', round_2_result: '', wins: '0', points_earned: '0', notes: '' });
+  const [form, setForm] = useState({ season_id: '', member_id: '', member_name: '', selected_tournament: '', race_date: '', position: '', lap_time_seconds: '', qualifying_time_1: '', qualifying_time_2: '', round_2_result: '', wins: '0', points_earned: '0', notes: '' });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [minRaces, setMinRaces] = useState(3);
@@ -68,14 +78,16 @@ export default function AdminRaceResults() {
   useEffect(() => { if (checkAuth()) { setAuthed(true); loadData(); } }, []);
 
   async function loadData() {
-    const [s, m, r, cfg] = await Promise.all([
+    const [s, m, t, r, cfg] = await Promise.all([
       supabase.from('seasons').select('*').order('created_at', { ascending: false }),
       supabase.from('members').select('id, name').order('name'),
+      supabase.from('tournaments').select('id, name, date').order('date', { ascending: false }),
       supabase.from('race_results').select('*').order('created_at', { ascending: false }).limit(50),
       supabase.from('admin_config').select('value').eq('key', 'min_races_for_ranking').single(),
     ]);
     setSeasons(s.data || []);
     setMembers(m.data || []);
+    setTournaments(t.data || []);
     setResults(r.data || []);
     if (cfg.data) setMinRaces(parseInt(cfg.data.value));
     const active = s.data?.find((x: any) => x.is_active);
@@ -100,8 +112,27 @@ export default function AdminRaceResults() {
     setForm(f => ({ ...f, member_id: id, member_name: m ? m.name : '' }));
   }
 
+  function handleTournamentSelect(value: string) {
+    if (value === '__custom__') {
+      setForm(f => ({ ...f, selected_tournament: value }));
+      return;
+    }
+    const t = tournaments.find((x: any) => x.id === value);
+    const dateOnly = t?.date ? String(t.date).split('T')[0] : '';
+    setForm(f => ({ ...f, selected_tournament: value, race_date: dateOnly || f.race_date }));
+  }
+
+  function handlePositionChange(value: string) {
+    const posNum = parseInt(value);
+    setForm(f => ({
+      ...f,
+      position: value,
+      points_earned: value && !isNaN(posNum) ? String(pointsForPosition(posNum)) : f.points_earned,
+    }));
+  }
+
   async function handleSubmit() {
-    if (!form.season_id || !form.member_id || !form.race_date) { setMsg('Fill in season, member, and date.'); return; }
+    if (!form.season_id || !form.member_id || !form.race_date) { setMsg('Fill in season, member, and race date.'); return; }
     setSaving(true);
 
     const q1 = form.qualifying_time_1 ? parseFloat(form.qualifying_time_1) : null;
@@ -149,7 +180,11 @@ export default function AdminRaceResults() {
     }
 
     if (error) { setMsg('Error: ' + error.message); }
-    else { setMsg('✅ Result saved!' + hofMsg); setForm(f => ({ ...f, member_id: '', member_name: '', position: '', lap_time_seconds: '', qualifying_time_1: '', qualifying_time_2: '', round_2_result: '', wins: '0', points_earned: '0', notes: '' })); loadData(); }
+    else {
+      setMsg('✅ Result saved!' + hofMsg);
+      setForm(f => ({ ...f, member_id: '', member_name: '', selected_tournament: '', position: '', lap_time_seconds: '', qualifying_time_1: '', qualifying_time_2: '', round_2_result: '', wins: '0', points_earned: '0', notes: '' }));
+      loadData();
+    }
     setSaving(false);
     setTimeout(() => setMsg(''), 6000);
   }
@@ -174,6 +209,7 @@ export default function AdminRaceResults() {
     btn: { marginTop: '20px', padding: '12px 28px', background: '#DC2626', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', letterSpacing: '1px' },
     msg: { marginTop: '12px', fontSize: '13px', color: '#FACC15' },
     row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
+    hint: { fontSize: '11px', color: '#6B7280', marginTop: '4px' },
     table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: '13px' },
     th: { textAlign: 'left' as const, padding: '10px', fontSize: '11px', letterSpacing: '1px', color: '#6B7280', borderBottom: '1px solid rgba(255,255,255,0.06)', textTransform: 'uppercase' as const },
     td: { padding: '10px', borderBottom: '1px solid rgba(255,255,255,0.04)' },
@@ -227,13 +263,27 @@ export default function AdminRaceResults() {
             {members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
 
-          <label style={s.label}>Race Date</label>
-          <input style={s.input} type="date" value={form.race_date} onChange={e => setForm(f => ({ ...f, race_date: e.target.value }))} />
+          <label style={s.label}>Race / Event</label>
+          <select style={s.select} value={form.selected_tournament} onChange={e => handleTournamentSelect(e.target.value)}>
+            <option value="">Select race...</option>
+            {tournaments.map((t: any) => (
+              <option key={t.id} value={t.id}>{t.name}{t.date ? ` — ${new Date(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}</option>
+            ))}
+            <option value="__custom__">Other / Custom date...</option>
+          </select>
+          {form.selected_tournament === '__custom__' ? (
+            <>
+              <label style={s.label}>Race Date</label>
+              <input style={s.input} type="date" value={form.race_date} onChange={e => setForm(f => ({ ...f, race_date: e.target.value }))} />
+            </>
+          ) : form.selected_tournament && (
+            <div style={s.hint}>Date: {form.race_date ? new Date(form.race_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</div>
+          )}
 
           <div style={s.row}>
             <div>
               <label style={s.label}>Position</label>
-              <input style={s.input} type="number" placeholder="1" value={form.position} onChange={e => setForm(f => ({ ...f, position: e.target.value }))} />
+              <input style={s.input} type="number" placeholder="1" value={form.position} onChange={e => handlePositionChange(e.target.value)} />
             </div>
             <div>
               <label style={s.label}>Fastest Lap (seconds)</label>
@@ -265,6 +315,7 @@ export default function AdminRaceResults() {
             <div>
               <label style={s.label}>Points Earned</label>
               <input style={s.input} type="number" value={form.points_earned} onChange={e => setForm(f => ({ ...f, points_earned: e.target.value }))} />
+              <div style={s.hint}>Auto-fills from Position: 1st=5 · 2nd=3 · 3rd=2 · 4th+=1 — still editable for overrides.</div>
             </div>
           </div>
 
