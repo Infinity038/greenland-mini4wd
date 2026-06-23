@@ -20,6 +20,14 @@ function saveAuth() {
   localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + 8 * 60 * 60 * 1000 }));
 }
 
+// Never render an email address as the member's "name" — shows the email
+// alone (no duplicate "email · email") if no real name is on file.
+function identityLine(name: string | null | undefined, email: string | null | undefined): string {
+  const hasName = !!name && typeof name === 'string' && !name.includes('@');
+  if (hasName) return `${name} · ${email || ''}`;
+  return email || '—';
+}
+
 const STATUSES = ['awaiting_payment', 'proof_uploaded', 'payment_confirmed', 'reserved', 'awaiting_stock', 'in_transit', 'ready_for_pickup', 'completed', 'cancelled'];
 const STATUS_LABELS: Record<string, string> = {
   awaiting_payment: 'Awaiting Payment',
@@ -74,7 +82,7 @@ export default function AdminOrders() {
   async function loadData() {
     const [{ data: o }, { data: m }, { data: p }] = await Promise.all([
       supabase.from('orders').select('*').order('created_at', { ascending: false }),
-      supabase.from('members').select('id, first_name, last_name, email, member_status, created_at').order('created_at', { ascending: false }),
+      supabase.from('members').select('id, name, first_name, last_name, email, member_status, created_at').order('created_at', { ascending: false }),
       supabase.from('products').select('id, name, image_url'),
     ]);
     const ordersData = o || [];
@@ -255,7 +263,7 @@ export default function AdminOrders() {
                       <ProductThumb url={imgUrl} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '18px' }}>{order.product_name}</div>
-                        <div style={s.meta}>{order.member_name} · {order.email || order.member_email}</div>
+                        <div style={s.meta}>{identityLine(order.member_name, order.email || order.member_email)}</div>
                         <div style={s.meta}>Ref: <span style={{ color: '#FACC15', fontFamily: 'monospace' }}>{order.payment_reference || order.reference_code || order.id?.slice(0, 8)}</span> · {new Date(order.created_at).toLocaleDateString('en-GB')}</div>
                         {order.notes && <div style={s.meta}>{order.notes}</div>}
                       </div>
@@ -296,15 +304,18 @@ export default function AdminOrders() {
           <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '20px' }}>
             {members.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: '#4B5563' }}>No members yet.</div>
-            ) : members.map((m: any) => (
+            ) : members.map((m: any) => {
+              const fullName = m.name || `${m.first_name || ''} ${m.last_name || ''}`.trim();
+              return (
               <div key={m.id} style={s.memberRow}>
                 <div>
-                  <div style={s.memberName}>{m.first_name} {m.last_name}</div>
+                  <div style={s.memberName}>{fullName || '—'}</div>
                   <div style={s.memberEmail}>{m.email} · Joined {new Date(m.created_at).toLocaleDateString('en-GB')}</div>
                 </div>
                 <span style={s.memberBadge(m.member_status || 'registered')}>{m.member_status || 'registered'}</span>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

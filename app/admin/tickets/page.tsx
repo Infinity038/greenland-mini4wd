@@ -18,6 +18,12 @@ function saveAuth() {
   localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + 8 * 60 * 60 * 1000 }));
 }
 
+// Never render an email address as the member's "name" line — falls back to
+// showing the email alone (no duplicate) if no real name is on file.
+function hasRealName(name: string | null | undefined): boolean {
+  return !!name && typeof name === 'string' && !name.includes('@');
+}
+
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
@@ -93,7 +99,7 @@ export default function AdminTicketsPage() {
         const newVal = (current + qty) % 10;
         const grantFree = (current + qty) >= 10;
         await supabase.from('members').update({ [col]: newVal }).eq('email', ticket.member_email);
-        if (grantFree) setMsg(`✅ Updated · 🎁 ${ticket.member_name} earned a FREE ticket!`);
+        if (grantFree) setMsg(`✅ Updated · 🎁 ${hasRealName(ticket.member_name) ? ticket.member_name : ticket.member_email} earned a FREE ticket!`);
         else setMsg('✅ Updated');
       } else {
         setMsg('✅ Updated');
@@ -245,7 +251,9 @@ export default function AdminTicketsPage() {
 
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', ...FB, color: '#6B7280' }}>No tickets found.</div>
-        ) : filtered.map(ticket => (
+        ) : filtered.map(ticket => {
+          const nameIsReal = hasRealName(ticket.member_name);
+          return (
           <div key={ticket.id} style={s.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
               <div>
@@ -253,8 +261,8 @@ export default function AdminTicketsPage() {
                   <span style={s.badge(TYPE_COLORS[ticket.ticket_type] || '#6B7280')}>{TYPE_LABELS[ticket.ticket_type] || ticket.ticket_type}</span>
                   <span style={s.badge(STATUS_COLORS[ticket.payment_status] || '#6B7280')}>{STATUS_LABELS[ticket.payment_status] || ticket.payment_status}</span>
                 </div>
-                <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5' }}>{ticket.member_name}</div>
-                <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 2 }}>{ticket.member_email}</div>
+                <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5' }}>{nameIsReal ? ticket.member_name : ticket.member_email}</div>
+                {nameIsReal && <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 2 }}>{ticket.member_email}</div>}
                 <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 2 }}>
                   Ref: <span style={{ color: '#FACC15', fontFamily: 'monospace' }}>{ticket.payment_reference}</span> · {new Date(ticket.created_at).toLocaleDateString('en-GB')}
                 </div>
@@ -289,7 +297,8 @@ export default function AdminTicketsPage() {
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
