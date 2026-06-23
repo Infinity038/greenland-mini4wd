@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const ADMIN_PASSWORD = 'mini4wd2026';
@@ -10,6 +10,8 @@ const STATUSES = ['upcoming','ongoing','completed','cancelled'];
 const RACE_CLASSES = ['Box Stock','Open Box Stock','B-Max','Open Class'];
 const CLASS_COLORS: Record<string,string> = {'Box Stock':'#22C55E','Open Box Stock':'#3B82F6','B-Max':'#F97316','Open Class':'#DC2626'};
 const CLASS_ICONS: Record<string,string> = {'Box Stock':'📦','Open Box Stock':'🔓','B-Max':'⚡','Open Class':'🔥'};
+// Must match the public /blog page's filter tabs exactly (no "All" — that's a UI-only filter, not a real category).
+const NEWS_CATEGORIES = ['Community','Racing','Guide','Event','News'];
 const inp = (x?:any) => ({width:'100%',background:'#050505',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'11px 14px',color:'#F5F5F5',fontFamily:"'DM Sans',sans-serif",fontSize:14,outline:'none',boxSizing:'border-box' as const,...x});
 
 function checkAuth(){if(typeof window==='undefined')return false;const s=localStorage.getItem('adminSession');if(!s)return false;try{const{expires}=JSON.parse(s);return Date.now()<expires;}catch{return false;}}
@@ -24,13 +26,71 @@ function LoginScreen({title,onLogin}:{title:string;onLogin:()=>void}){
 export default function AdminTournamentsPage() {
   const [authed,setAuthed]=useState(false);const [checked,setChecked]=useState(false);
   const [tournaments,setTournaments]=useState<any[]>([]);const [editing,setEditing]=useState<any>(null);const [saving,setSaving]=useState(false);
-  const EMPTY={name:'',date:'',location:'Nuuk Community Hall',race_categories:['Box Stock'],ticket_type:'weekly',ticket_price_dkk:150,max_participants:16,status:'upcoming',description:''};
+  const imageFileRef = useRef<HTMLInputElement>(null);
+  const EMPTY={name:'',date:'',location:'Nuuk Community Hall',race_categories:['Box Stock'],ticket_type:'weekly',ticket_price_dkk:150,max_participants:16,status:'upcoming',description:'',image_url:'',auto_publish_news:true,news_category:'Event'};
 
   useEffect(()=>{const ok=checkAuth();setAuthed(ok);setChecked(true);if(ok)loadData();},[]);
   const loadData=async()=>{const{data}=await supabase.from('tournaments').select('*').order('date',{ascending:true});setTournaments(data||[]);};
-  const save=async()=>{if(!editing)return;setSaving(true);if(editing.id)await supabase.from('tournaments').update(editing).eq('id',editing.id);else await supabase.from('tournaments').insert({...editing});await loadData();setEditing(null);setSaving(false);};
+
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const r = new FileReader();
+    r.onloadend = () => setEditing((prev: any) => ({ ...prev, image_url: r.result as string }));
+    r.readAsDataURL(file);
+  };
+
+  const save = async () => {
+    if (!editing) return;
+    setSaving(true);
+    const { auto_publish_news, news_category, ...tournamentFields } = editing;
+    let tournamentId = editing.id;
+    let err: any = null;
+
+    if (tournamentId) {
+      const { error } = await supabase.from('tournaments').update(tournamentFields).eq('id', tournamentId);
+      err = error;
+    } else {
+      const { data, error } = await supabase.from('tournaments').insert({ ...tournamentFields }).select().single();
+      err = error;
+      if (!error && data) tournamentId = data.id;
+    }
+
+    // Auto-publish/sync the matching News & Updates post for this race event.
+    if (!err && auto_publish_news && tournamentId) {
+      const { data: existingPost } = await supabase.from('news_posts').select('id').eq('tournament_id', tournamentId).maybeSingle();
+      const dateLabel = tournamentFields.date ? new Date(tournamentFields.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+      const postPayload: any = {
+        title: tournamentFields.name,
+        summary: `${tournamentFields.name}${dateLabel ? ` — ${dateLabel}` : ''}${tournamentFields.location ? ` at ${tournamentFields.location}` : ''}.`,
+        body: tournamentFields.description || `Race categories: ${(tournamentFields.race_categories || []).join(', ') || 'TBA'}. Ticket: ${tournamentFields.ticket_price_dkk} DKK.`,
+        image_url: tournamentFields.image_url || '',
+        category: news_category || 'Event',
+        published: true,
+        tournament_id: tournamentId,
+      };
+      if (existingPost) {
+        await supabase.from('news_posts').update(postPayload).eq('id', existingPost.id);
+      } else {
+        await supabase.from('news_posts').insert({ ...postPayload, created_at: new Date().toISOString() });
+      }
+    }
+
+    await loadData();
+    setEditing(null);
+    setSaving(false);
+  };
+
   const del=async(id:string)=>{if(!confirm('Delete?'))return;await supabase.from('tournaments').delete().eq('id',id);await loadData();};
   const qs=async(id:string,status:string)=>{await supabase.from('tournaments').update({status}).eq('id',id);await loadData();};
+
+  const openEdit = async (t: any) => {
+    let d = t.date || '';
+    if (d && d.length > 16) d = d.slice(0, 16);
+    let newsCategory = 'Event';
+    const { data: linkedPost } = await supabase.from('news_posts').select('category').eq('tournament_id', t.id).maybeSingle();
+    if (linkedPost?.category) newsCategory = linkedPost.category;
+    setEditing({ ...EMPTY, ...t, date: d, race_categories: t.race_categories || ['Box Stock'], auto_publish_news: true, news_category: newsCategory });
+  };
 
   const toggleCategory = (cat: string) => {
     const current: string[] = editing.race_categories || [];
@@ -57,7 +117,13 @@ export default function AdminTournamentsPage() {
             const c=SC[t.status]||'#6B7280';
             const cats: string[] = t.race_categories || [];
             return(
-              <div key={t.id} style={{background:'#071426',border:'1px solid rgba(255,255,255,0.07)',borderRadius:14,padding:'20px'}}>
+              <div key={t.id} style={{background:'#071426',border:'1px solid rgba(255,255,255,0.07)',borderRadius:14,overflow:'hidden'}}>
+                {t.image_url && (
+                  <div style={{ height: 120, overflow: 'hidden' }}>
+                    <img src={t.image_url} alt={t.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                )}
+                <div style={{padding:'20px'}}>
                 <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',marginBottom:12}}>
                   <div style={{flex:1}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap'}}>
@@ -76,17 +142,13 @@ export default function AdminTournamentsPage() {
                     {t.description && <div style={{...FB,fontSize:12,color:'#6B7280',marginTop:8}}>{t.description}</div>}
                   </div>
                   <div style={{display:'flex',gap:6}}>
-                    <button onClick={()=>{
-                      // Format date for datetime-local input (remove seconds)
-                      let d = t.date || '';
-                      if (d && d.length > 16) d = d.slice(0, 16);
-                      setEditing({...EMPTY,...t, date: d, race_categories:t.race_categories||['Box Stock']});
-                    }} style={{...F,fontSize:12,letterSpacing:1,padding:'8px 14px',borderRadius:6,background:'transparent',border:'1px solid rgba(255,255,255,0.15)',color:'#F5F5F5',cursor:'pointer'}}>EDIT</button>
+                    <button onClick={()=>openEdit(t)} style={{...F,fontSize:12,letterSpacing:1,padding:'8px 14px',borderRadius:6,background:'transparent',border:'1px solid rgba(255,255,255,0.15)',color:'#F5F5F5',cursor:'pointer'}}>EDIT</button>
                     <button onClick={()=>del(t.id)} style={{...F,fontSize:12,letterSpacing:1,padding:'8px 14px',borderRadius:6,background:'transparent',border:'1px solid rgba(220,38,38,0.3)',color:'#DC2626',cursor:'pointer'}}>DEL</button>
                   </div>
                 </div>
                 <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                   {STATUSES.map(s=><button key={s} onClick={()=>qs(t.id,s)} style={{...F,fontWeight:700,fontSize:11,letterSpacing:1,padding:'5px 12px',borderRadius:6,border:`1px solid ${SC[s]}55`,background:t.status===s?SC[s]+'22':'transparent',color:SC[s],cursor:'pointer'}}>{s.toUpperCase()}</button>)}
+                </div>
                 </div>
               </div>
             );
@@ -106,6 +168,26 @@ export default function AdminTournamentsPage() {
               <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>NAME</label><input value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})} style={inp()}/></div>
               <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>DATE & TIME</label><input type="datetime-local" value={editing.date} onChange={e=>setEditing({...editing,date:e.target.value})} style={inp()}/></div>
               <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>LOCATION</label><input value={editing.location} onChange={e=>setEditing({...editing,location:e.target.value})} style={inp()}/></div>
+
+              <div>
+                <label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>RACE TRACK / EVENT PHOTO</label>
+                <div onClick={() => imageFileRef.current?.click()} style={{ border: '2px dashed rgba(255,255,255,0.12)', borderRadius: 10, padding: editing.image_url ? 10 : '28px 16px', textAlign: 'center', cursor: 'pointer', background: '#050505' }}>
+                  {editing.image_url ? (
+                    <img src={editing.image_url} alt="Event preview" style={{ maxHeight: 140, maxWidth: '100%', borderRadius: 8, margin: '0 auto', display: 'block' }} />
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 30, marginBottom: 6 }}>📷</div>
+                      <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5' }}>Tap to upload a photo</div>
+                      <div style={{ ...FB, fontSize: 11, color: '#6B7280', marginTop: 4 }}>JPG, PNG, HEIC</div>
+                    </>
+                  )}
+                </div>
+                <input ref={imageFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageFile} />
+                {editing.image_url && (
+                  <button type="button" onClick={() => setEditing({ ...editing, image_url: '' })} style={{ ...FB, fontSize: 11, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', marginTop: 6, padding: 0 }}>Remove photo</button>
+                )}
+              </div>
+
               <div>
                 <label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:10}}>RACE CATEGORIES</label>
                 <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
@@ -136,6 +218,25 @@ export default function AdminTournamentsPage() {
               <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>MAX SPOTS</label><input type="number" value={editing.max_participants} onChange={e=>setEditing({...editing,max_participants:Number(e.target.value)})} style={inp()}/></div>
               <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>DESCRIPTION (optional)</label><textarea value={editing.description||''} onChange={e=>setEditing({...editing,description:e.target.value})} rows={2} style={inp({resize:'vertical'})}/></div>
               <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>STATUS</label><select value={editing.status} onChange={e=>setEditing({...editing,status:e.target.value})} style={inp()}>{STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+
+              <div style={{ background:'#050505', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:14 }}>
+                <div onClick={()=>setEditing({...editing, auto_publish_news: !editing.auto_publish_news})} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', marginBottom: editing.auto_publish_news ? 14 : 0 }}>
+                  <input type="checkbox" checked={!!editing.auto_publish_news} onChange={e=>setEditing({...editing, auto_publish_news: e.target.checked})} onClick={e=>e.stopPropagation()} style={{ width:18, height:18, cursor:'pointer', flexShrink:0 }} />
+                  <div>
+                    <div style={{ ...F, fontSize:13, color:'#FACC15', letterSpacing:1 }}>📰 ALSO PUBLISH TO NEWS & UPDATES</div>
+                    <div style={{ ...FB, fontSize:11, color:'#6B7280', marginTop:2 }}>Auto-creates (or updates) a matching public post using this event's name, date, and photo.</div>
+                  </div>
+                </div>
+                {editing.auto_publish_news && (
+                  <div>
+                    <label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>POST CATEGORY</label>
+                    <select value={editing.news_category||'Event'} onChange={e=>setEditing({...editing,news_category:e.target.value})} style={inp()}>
+                      {NEWS_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+
               <button onClick={save} disabled={saving} style={{background:'#DC2626',color:'#fff',border:'none',borderRadius:10,padding:'13px',...F,fontWeight:900,fontSize:17,letterSpacing:2,cursor:'pointer',opacity:saving?0.6:1}}>{saving?'SAVING...':'SAVE TOURNAMENT'}</button>
             </div>
           </div>

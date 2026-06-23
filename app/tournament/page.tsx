@@ -15,7 +15,7 @@ const RACE_CLASSES = [
   { id: 'boxstock',      label: 'Box Stock',      color: '#22C55E', icon: '📦', short: 'Pure stock — box contents only.', desc: 'Contents inside the box are fixed. What comes in the box is what you use — no modifications allowed.' },
   { id: 'open_boxstock', label: 'Open Box Stock', color: '#3B82F6', icon: '🔓', short: 'Box stock with limited cosmetic replacements.', desc: 'Same as Box Stock, but mag/cowl/chassis color replacements allowed. Cannot change type — only color.' },
   { id: 'bmax',          label: 'B-Max',          color: '#F97316', icon: '⚡', short: 'Carbon + slide damper gimmicks.', desc: 'Carbon allowed, gimmicks allowed. Slide damper systems permitted. Competitive tuning for experienced builders.' },
-  { id: 'open',          label: 'Open Class',     color: '#DC2626', icon: '🔥', short: 'Unlimited builds — anything goes.', desc: 'No restrictions on mods, motors, or parts. Full performance tuning. Most competitive class on track.' },
+  { id: 'open',          label: 'Open Class',     color: '#DC2626', icon: '🔥', short: 'Unlimited builds — anything goes.', desc: 'No restrictions on mods, motors, or parts. Most competitive class on track.' },
 ];
 
 // Never show a raw email as a public-facing display name (privacy) — falls back
@@ -243,6 +243,11 @@ export default function TournamentPage() {
                   return (
                     <div key={t.id} style={{ background: isLive ? 'linear-gradient(135deg,#071426,#0a1f0a)' : '#071426', border:`1.5px solid ${isLive ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius:14, overflow:'hidden' }}>
                       {isLive && <div style={{ height:3, background:'#22C55E' }}/>}
+                      {t.image_url && (
+                        <div style={{ height: 160, overflow: 'hidden' }}>
+                          <img src={t.image_url} alt={t.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      )}
                       <div style={{ padding:'20px 24px' }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap' }}>
                           <div style={{ flex:1 }}>

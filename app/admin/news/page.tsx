@@ -5,9 +5,12 @@ import { supabase } from '@/lib/supabase';
 const ADMIN_PASSWORD = 'mini4wd2026';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
-const CATS = ['announcement','race recap','community','tips & tricks','event'];
+// Must match the public /blog page's filter tabs exactly (minus "All", which is
+// a UI-only filter, not a real category) — otherwise posts never show up under
+// any filter the visitor clicks.
+const CATS = ['Community','Racing','Guide','Event','News'];
 const inp = (x?:any) => ({width:'100%',background:'#050505',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'11px 14px',color:'#F5F5F5',fontFamily:"'DM Sans',sans-serif",fontSize:14,outline:'none',boxSizing:'border-box' as const,...x});
-const DEMO = [{id:'1',title:'Welcome to Greenland Mini 4WD Club',summary:'The first Tamiya Mini 4WD community in Greenland is officially open!',body:'',image_url:'',category:'announcement',published:true,created_at:new Date().toISOString()},{id:'2',title:'What is Box Stock Racing?',summary:'Everything you need to know about box stock rules.',body:'',image_url:'',category:'tips & tricks',published:true,created_at:new Date().toISOString()}];
+const DEMO = [{id:'1',title:'Welcome to Greenland Mini 4WD Club',summary:'The first Tamiya Mini 4WD community in Greenland is officially open!',body:'',image_url:'',category:'News',published:true,created_at:new Date().toISOString()},{id:'2',title:'What is Box Stock Racing?',summary:'Everything you need to know about box stock rules.',body:'',image_url:'',category:'Guide',published:true,created_at:new Date().toISOString()}];
 
 function checkAuth(){if(typeof window==='undefined')return false;const s=localStorage.getItem('adminSession');if(!s)return false;try{const{expires}=JSON.parse(s);return Date.now()<expires;}catch{return false;}}
 function saveAuth(){localStorage.setItem('adminSession',JSON.stringify({expires:Date.now()+8*60*60*1000}));}
@@ -44,7 +47,7 @@ export default function AdminNewsPage() {
           <div style={{...F,fontWeight:900,fontSize:18,color:'#F5F5F5',letterSpacing:1}}>MANAGE NEWS</div>
         </div>
         <div style={{display:'flex',gap:8}}>
-          <button onClick={()=>setEditing({title:'',summary:'',body:'',image_url:'',category:'announcement',published:false})} style={{background:'#DC2626',color:'#fff',border:'none',borderRadius:8,padding:'8px 16px',...F,fontWeight:700,fontSize:14,letterSpacing:1,cursor:'pointer'}}>+ NEW POST</button>
+          <button onClick={()=>setEditing({title:'',summary:'',body:'',image_url:'',category:'News',published:false})} style={{background:'#DC2626',color:'#fff',border:'none',borderRadius:8,padding:'8px 16px',...F,fontWeight:700,fontSize:14,letterSpacing:1,cursor:'pointer'}}>+ NEW POST</button>
           <a href="/admin" style={{...FB,fontSize:12,color:'#B8C1CC',textDecoration:'none',border:'1px solid rgba(255,255,255,0.08)',borderRadius:6,padding:'6px 12px'}}>← Dashboard</a>
         </div>
       </div>
@@ -55,9 +58,10 @@ export default function AdminNewsPage() {
             <div key={post.id} style={{background:'#071426',border:'1px solid rgba(255,255,255,0.07)',borderRadius:12,padding:'16px 20px'}}>
               <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
                 <div style={{flex:1}}>
-                  <div style={{display:'flex',gap:6,marginBottom:6}}>
+                  <div style={{display:'flex',gap:6,marginBottom:6,flexWrap:'wrap'}}>
                     <span style={{...F,fontSize:10,letterSpacing:2,padding:'2px 8px',borderRadius:4,background:'rgba(255,255,255,0.06)',color:'#B8C1CC'}}>{post.category}</span>
                     <span style={{...F,fontSize:10,letterSpacing:2,padding:'2px 8px',borderRadius:4,background:post.published?'rgba(34,197,94,0.15)':'rgba(255,255,255,0.06)',color:post.published?'#22C55E':'#6B7280'}}>{post.published?'● PUBLISHED':'○ DRAFT'}</span>
+                    {post.tournament_id && <span style={{...F,fontSize:10,letterSpacing:2,padding:'2px 8px',borderRadius:4,background:'rgba(220,38,38,0.12)',color:'#FCA5A5'}}>🏁 LINKED TO RACE</span>}
                   </div>
                   <div style={{...F,fontWeight:900,fontSize:18,color:'#F5F5F5',marginBottom:3}}>{post.title}</div>
                   <div style={{...FB,fontSize:13,color:'#B8C1CC'}}>{post.summary}</div>
@@ -80,6 +84,11 @@ export default function AdminNewsPage() {
               <button onClick={()=>setEditing(null)} style={{background:'none',border:'none',color:'#B8C1CC',fontSize:20,cursor:'pointer'}}>✕</button>
             </div>
             <div style={{padding:22,display:'flex',flexDirection:'column',gap:14}}>
+              {editing.tournament_id && (
+                <div style={{ background:'rgba(220,38,38,0.08)', border:'1px solid rgba(220,38,38,0.2)', borderRadius:8, padding:'10px 14px', ...FB, fontSize:12, color:'#FCA5A5' }}>
+                  🏁 This post is linked to a race event — editing the tournament in Manage Tournaments will overwrite the title/summary/photo here automatically.
+                </div>
+              )}
               <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>TITLE</label><input value={editing.title} onChange={e=>setEditing({...editing,title:e.target.value})} style={inp()}/></div>
               <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>SUMMARY</label><input value={editing.summary} onChange={e=>setEditing({...editing,summary:e.target.value})} style={inp()}/></div>
               <div><label style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',display:'block',marginBottom:6}}>BODY</label><textarea value={editing.body} onChange={e=>setEditing({...editing,body:e.target.value})} rows={5} style={inp({resize:'vertical'})}/></div>
