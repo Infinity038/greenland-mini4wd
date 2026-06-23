@@ -24,7 +24,7 @@ function saveAuth() {
 }
 
 const NAV = [
-  { href: '/admin/orders',       icon: '📦', label: 'Orders',        desc: 'Payments & proofs' },
+  { href: '/admin/orders',       icon: '📦', label: 'Orders',        desc: 'Payments & proofs', alertKey: 'pendingProofs' },
   { href: '/admin/products',     icon: '🛒', label: 'Products',      desc: 'Shop catalog' },
   { href: '/admin/members',      icon: '👥', label: 'Members',       desc: 'Accounts & status' },
   { href: '/admin/tournaments',  icon: '🏁', label: 'Tournaments',   desc: 'Race events' },
@@ -140,17 +140,6 @@ export default function AdminPage() {
     { label: 'HoF Records',      value: stats.hofRecords,        color: '#FACC15', icon: '🏛️', href: '/admin/hall-of-fame' },
   ];
 
-  const QUICK_ACTIONS = [
-    { label: 'Confirm Payments',  icon: '✅', href: '/admin/orders',       color: '#22C55E', badge: stats.pendingProofs > 0 ? stats.pendingProofs : null },
-    { label: 'Add Product',       icon: '➕', href: '/admin/products',     color: '#3B82F6', badge: null },
-    { label: 'Enter Race Result', icon: '🏎️', href: '/admin/race-results', color: '#DC2626', badge: null },
-    { label: 'Manage Members',    icon: '👥', href: '/admin/members',      color: '#A855F7', badge: null },
-    { label: 'Hall of Fame',      icon: '🏛️', href: '/admin/hall-of-fame', color: '#FACC15', badge: null },
-    { label: 'Loyalty Points',    icon: '⭐', href: '/admin/loyalty',      color: '#F97316', badge: null },
-    { label: 'Post News',         icon: '📰', href: '/admin/news',         color: '#6B7280', badge: null },
-    { label: 'Upload Gallery',    icon: '🖼️', href: '/admin/gallery',      color: '#6B7280', badge: null },
-  ];
-
   return (
     <div style={{ minHeight: '100vh', background: '#050505', color: '#F5F5F5' }}>
       {/* TOP NAV */}
@@ -215,49 +204,29 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* QUICK ACTIONS + RECENT ORDERS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 28 }}>
-          <div>
-            <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>QUICK ACTIONS</div>
-            <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden' }}>
-              {QUICK_ACTIONS.map((a, i) => (
-                <a key={a.label} href={a.href} style={{ textDecoration: 'none' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < QUICK_ACTIONS.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: a.color + '18', border: `1px solid ${a.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{a.icon}</div>
-                    <span style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', letterSpacing: 1, flex: 1 }}>{a.label}</span>
-                    {a.badge ? <span style={{ background: a.color, color: '#050505', ...F, fontWeight: 900, fontSize: 11, padding: '2px 8px', borderRadius: 10 }}>{a.badge}</span> : null}
-                    <span style={{ color: '#6B7280', fontSize: 13 }}>→</span>
+        {/* RECENT ORDERS */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>RECENT ORDERS</div>
+          <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden' }}>
+            {loading ? (
+              <div style={{ padding: '32px 18px', textAlign: 'center', ...FB, fontSize: 13, color: '#6B7280' }}>Loading...</div>
+            ) : recentOrders.length === 0 ? (
+              <div style={{ padding: '32px 18px', textAlign: 'center', ...FB, fontSize: 13, color: '#6B7280' }}>No orders yet.</div>
+            ) : recentOrders.map((o: any, i: number) => {
+              const dot = o.payment_status === 'proof_uploaded' ? '#F97316' : o.payment_status === 'payment_confirmed' ? '#22C55E' : '#6B7280';
+              return (
+                <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderBottom: i < recentOrders.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.product_name}</div>
+                    <div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{o.member_name}</div>
                   </div>
-                </a>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>RECENT ORDERS</div>
-            <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden' }}>
-              {loading ? (
-                <div style={{ padding: '32px 18px', textAlign: 'center', ...FB, fontSize: 13, color: '#6B7280' }}>Loading...</div>
-              ) : recentOrders.length === 0 ? (
-                <div style={{ padding: '32px 18px', textAlign: 'center', ...FB, fontSize: 13, color: '#6B7280' }}>No orders yet.</div>
-              ) : recentOrders.map((o: any, i: number) => {
-                const dot = o.payment_status === 'proof_uploaded' ? '#F97316' : o.payment_status === 'payment_confirmed' ? '#22C55E' : '#6B7280';
-                return (
-                  <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderBottom: i < recentOrders.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.product_name}</div>
-                      <div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{o.member_name}</div>
-                    </div>
-                    <div style={{ ...FB, fontSize: 11, color: '#6B7280', flexShrink: 0 }}>{new Date(o.created_at).toLocaleDateString()}</div>
-                  </div>
-                );
-              })}
-              <div style={{ padding: '10px 18px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                <a href="/admin/orders" style={{ ...F, fontSize: 12, letterSpacing: 2, color: '#DC2626', textDecoration: 'none' }}>VIEW ALL ORDERS →</a>
-              </div>
+                  <div style={{ ...FB, fontSize: 11, color: '#6B7280', flexShrink: 0 }}>{new Date(o.created_at).toLocaleDateString()}</div>
+                </div>
+              );
+            })}
+            <div style={{ padding: '10px 18px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+              <a href="/admin/orders" style={{ ...F, fontSize: 12, letterSpacing: 2, color: '#DC2626', textDecoration: 'none' }}>VIEW ALL ORDERS →</a>
             </div>
           </div>
         </div>
@@ -265,17 +234,23 @@ export default function AdminPage() {
         {/* ALL MODULES */}
         <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>ALL MODULES</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-          {NAV.map(m => (
+          {NAV.map(m => {
+            const alertCount = m.alertKey ? (stats as any)[m.alertKey] : 0;
+            return (
             <a key={m.href} href={m.href} style={{ textDecoration: 'none' }}>
-              <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px 14px', cursor: 'pointer' }}
+              <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px 14px', cursor: 'pointer', position: 'relative' }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.35)'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; }}>
+                {alertCount > 0 && (
+                  <span style={{ position: 'absolute', top: 12, right: 12, background: '#DC2626', color: '#fff', ...F, fontWeight: 900, fontSize: 11, minWidth: 18, height: 18, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{alertCount}</span>
+                )}
                 <div style={{ fontSize: 22, marginBottom: 8 }}>{m.icon}</div>
                 <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', letterSpacing: 1, marginBottom: 2 }}>{m.label}</div>
                 <div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{m.desc}</div>
               </div>
             </a>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

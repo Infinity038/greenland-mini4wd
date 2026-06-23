@@ -18,6 +18,16 @@ function saveAuth() {
   localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + 8 * 60 * 60 * 1000 }));
 }
 
+// Date-only strings (e.g. "2026-07-01" from a <input type="date">) get parsed
+// as UTC midnight by the JS Date constructor. Displaying that in a negative
+// UTC-offset timezone (Greenland is UTC-2/-3) rolls it back a day. Parsing
+// with an explicit local time component avoids the UTC interpretation entirely.
+function parseLocalDate(dateStr: string): Date {
+  if (!dateStr) return new Date(NaN);
+  const datePart = dateStr.split('T')[0];
+  return new Date(datePart + 'T00:00:00');
+}
+
 export default function AdminSeasons() {
   const [authed, setAuthed] = useState(false);
   const [pw, setPw] = useState('');
@@ -144,7 +154,7 @@ export default function AdminSeasons() {
               <div>
                 <div style={{ fontWeight: 600, marginBottom: '4px' }}>{season.name}</div>
                 <div style={{ fontSize: '12px', color: '#6B7280' }}>
-                  {new Date(season.start_date).toLocaleDateString('en-GB')} → {new Date(season.end_date).toLocaleDateString('en-GB')}
+                  {parseLocalDate(season.start_date).toLocaleDateString('en-GB')} → {parseLocalDate(season.end_date).toLocaleDateString('en-GB')}
                 </div>
                 {season.is_active && <div style={{ ...s.activeBadge, display: 'inline-block', marginTop: '6px' }}>● ACTIVE</div>}
               </div>
