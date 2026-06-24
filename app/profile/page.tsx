@@ -180,7 +180,7 @@ export default function ProfilePage() {
                       <div style={{ height: '100%', width: `${progressPct}%`, background: `linear-gradient(90deg, ${rankColor}99, ${rankColor})`, borderRadius: 6, boxShadow: `0 0 10px ${rankColor}99`, transition: 'width 0.4s ease' }} />
                     </div>
                     <span style={{ ...FB, fontSize: 12, color: '#B8C1CC', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      {rank === 'Legend' ? '🏆 Max Rank' : `${points}/${nextPoints} pts`}
+                      {rank === 'Legend' ? '🏆 Max Rank' : `${points}/${nextPoints} coins`}
                     </span>
                   </div>
 
@@ -193,7 +193,7 @@ export default function ProfilePage() {
                           <button onClick={() => setShowRankInfo(false)} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: 16, cursor: 'pointer', lineHeight: 1, padding: 0 }}>✕</button>
                         </div>
                         <p style={{ ...FB, fontSize: 12, color: '#B8C1CC', lineHeight: 1.6, margin: '0 0 10px' }}>
-                          Your rank is a lifetime badge that grows with your total club points. Points are earned automatically every time a race ticket or shop order gets payment-confirmed — the more active you are, the faster you climb.
+                          Your rank is a lifetime badge that grows with your total club coins. Coins are earned automatically every time a race ticket or shop order gets payment-confirmed — the more active you are, the faster you climb.
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
                           {RANK_LADDER.map(r => (
@@ -201,7 +201,7 @@ export default function ProfilePage() {
                               <span style={{ ...F, fontSize: 11, letterSpacing: 1, color: r.name === rank ? (RANK_COLORS as any)[r.name] : '#B8C1CC', fontWeight: r.name === rank ? 900 : 600 }}>
                                 {r.name === rank ? '▶ ' : ''}{r.name.toUpperCase()}
                               </span>
-                              <span style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{r.min}+ pts</span>
+                              <span style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{r.min}+ coins</span>
                             </div>
                           ))}
                         </div>
@@ -241,7 +241,7 @@ export default function ProfilePage() {
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }}>
                 {[
-                  { label: 'Total Points', value: points, color: '#FACC15' },
+                  { label: 'Total Coins', value: points, color: '#FACC15' },
                   { label: 'Lifetime Spend', value: `${(member as any)?.lifetime_spending || 0} kr`, color: '#A855F7' },
                   { label: 'Tickets Available', value: wallet.paid_available + wallet.bonus_available, color: '#22C55E' },
                   { label: 'Orders', value: orders.length, color: '#3B82F6' },

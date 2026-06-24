@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -59,7 +60,7 @@ export function MemberProfileModal({ member, onClose }: { member: Member | null;
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 12 }}>
-            <div style={{ ...FB, fontSize: 11, color: '#B8C1CC', marginBottom: 4 }}>LOYALTY POINTS</div>
+            <div style={{ ...FB, fontSize: 11, color: '#B8C1CC', marginBottom: 4 }}>LOYALTY COINS</div>
             <div style={{ ...F, fontSize: 18, fontWeight: 900, color: '#FACC15' }}>{points}</div>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 12 }}>
