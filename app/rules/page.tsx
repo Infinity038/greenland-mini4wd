@@ -74,6 +74,55 @@ const GENERAL_RULES = [
   { icon: '👤', title: 'Official Members Only', desc: 'Tournament entry requires Official Member status. Complete a qualifying purchase to unlock race entry.' },
 ];
 
+const SINGLE_FORMAT_STEPS = [
+  { n: 1, label: 'QUALIFYING', desc: 'Every entrant gets 2 timed runs. Best time counts.', color: '#3B82F6' },
+  { n: 2, label: 'ELIMINATION BRACKET', desc: 'Top qualifiers face off head-to-head. Win and advance, lose and you\u2019re out.', color: '#F97316' },
+  { n: 3, label: 'FINAL', desc: 'Last two standing race once more. Winner takes the category.', color: '#DC2626' },
+];
+
+const TEAM_FORMAT_STEPS = [
+  { n: 1, label: 'GROUP STAGE', desc: 'Teams split into groups of 3. Each member races their own round \u2014 the team\u2019s scores get added together. Highest combined score in the group advances.', color: '#3B82F6', note: 'Tied scores trigger a tiebreaker round.' },
+  { n: 2, label: '3 PARALLEL FINALS', desc: 'Group winners race the Championship Final (1st\u20133rd). Runners-up race the Consolation Final (4th\u20136th). Third-placers race the Placement Final (7th+).', color: '#FACC15' },
+  { n: 3, label: 'FINAL STANDINGS', desc: 'Placement is set by each team\u2019s final-round result \u2014 nobody is ranked on leftover group-stage scores.', color: '#22C55E' },
+];
+
+function FormatFlow({ steps }: { steps: typeof SINGLE_FORMAT_STEPS }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      {steps.map((s, i) => (
+        <div key={s.n}>
+          <div style={{ background: '#0A0F1C', border: `1px solid ${s.color}44`, borderRadius: 12, padding: '16px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+            <div style={{ ...F, fontWeight: 900, fontSize: 20, color: s.color, flexShrink: 0, width: 26 }}>{s.n}</div>
+            <div>
+              <div style={{ ...F, fontWeight: 800, fontSize: 14, letterSpacing: 1, color: s.color, marginBottom: 4 }}>{s.label}</div>
+              <div style={{ ...FB, fontSize: 13.5, color: '#B8C1CC', lineHeight: 1.6 }}>{s.desc}</div>
+              {('note' in s) && s.note && <div style={{ ...FB, fontSize: 12, color: '#6B7280', marginTop: 6, fontStyle: 'italic' }}>{s.note}</div>}
+            </div>
+          </div>
+          {i < steps.length - 1 && (
+            <div style={{ textAlign: 'center', color: '#374151', fontSize: 16, padding: '4px 0' }}>↓</div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniTeamBox({ label, score, win }: { label: string; score: string; win?: boolean }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: '7px 10px', borderRadius: 7, marginBottom: 5, fontSize: 12.5,
+      background: win ? 'rgba(220,38,38,0.15)' : 'rgba(255,255,255,0.03)',
+      border: win ? '1px solid rgba(220,38,38,0.35)' : '1px solid transparent',
+      fontWeight: win ? 700 : 500,
+    }}>
+      <span>{label}</span>
+      <span style={{ color: '#FACC15', fontWeight: 800 }}>{score}</span>
+    </div>
+  );
+}
+
 export default function RulesPage() {
   return (
     <>
@@ -134,6 +183,89 @@ export default function RulesPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* HOW RACE DAY WORKS — visual formats */}
+          <section style={{ marginBottom: 64 }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>FORMATS</div>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 'clamp(32px, 6vw, 52px)', margin: '0 0 12px' }}>HOW RACE DAY WORKS</h2>
+            <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', marginBottom: 36, maxWidth: 600, lineHeight: 1.6 }}>
+              Two formats run at the club. Here's how each one decides a winner — step by step, with a worked example.
+            </p>
+
+            {/* Single Race Format */}
+            <div style={{ marginBottom: 48 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <span style={{ fontSize: 22 }}>🏁</span>
+                <span style={{ ...F, fontWeight: 800, fontSize: 20 }}>SINGLE RACE FORMAT</span>
+              </div>
+              <FormatFlow steps={SINGLE_FORMAT_STEPS} />
+
+              {/* Worked example */}
+              <div style={{ marginTop: 18, background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 16 }}>
+                <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#6B7280', marginBottom: 10 }}>EXAMPLE — 4 RACERS</div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 140px', minWidth: 130 }}>
+                    <MiniTeamBox label="Racer A" score="WIN" win />
+                    <MiniTeamBox label="Racer B" score="OUT" />
+                  </div>
+                  <div style={{ flex: '1 1 140px', minWidth: 130 }}>
+                    <MiniTeamBox label="Racer C" score="WIN" win />
+                    <MiniTeamBox label="Racer D" score="OUT" />
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center', color: '#374151', fontSize: 14, padding: '6px 0' }}>↓ winners meet in the final ↓</div>
+                <div style={{ maxWidth: 200, margin: '0 auto' }}>
+                  <MiniTeamBox label="🏆 Racer A — Champion" score="" win />
+                </div>
+              </div>
+            </div>
+
+            {/* Coop & Team Battle Format */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <span style={{ fontSize: 22 }}>👥</span>
+                <span style={{ ...F, fontWeight: 800, fontSize: 20 }}>COOP & TEAM BATTLE FORMAT</span>
+              </div>
+              <p style={{ ...FB, fontSize: 13, color: '#6B7280', marginBottom: 16, lineHeight: 1.6 }}>
+                Coop = 2-member teams. Team Battle = same idea, up to 5 members. Every member races their own round — the team's combined score decides the result.
+              </p>
+              <FormatFlow steps={TEAM_FORMAT_STEPS} />
+
+              {/* Worked example */}
+              <div style={{ marginTop: 18, background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 16 }}>
+                <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#6B7280', marginBottom: 10 }}>EXAMPLE — 9 TEAMS, 3 GROUPS</div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+                  <div style={{ flex: '1 1 150px', minWidth: 140 }}>
+                    <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#6B7280', marginBottom: 6 }}>GROUP 1</div>
+                    <MiniTeamBox label="Team B" score="6" win />
+                    <MiniTeamBox label="Team A" score="5" />
+                    <MiniTeamBox label="Team C" score="2" />
+                  </div>
+                  <div style={{ flex: '1 1 150px', minWidth: 140 }}>
+                    <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#6B7280', marginBottom: 6 }}>GROUP 2 — tied, tiebreaker run</div>
+                    <MiniTeamBox label="Team E" score="6*" win />
+                    <MiniTeamBox label="Team F" score="6*" />
+                    <MiniTeamBox label="Team D" score="1" />
+                  </div>
+                  <div style={{ flex: '1 1 150px', minWidth: 140 }}>
+                    <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#6B7280', marginBottom: 6 }}>GROUP 3</div>
+                    <MiniTeamBox label="Team G" score="5" win />
+                    <MiniTeamBox label="Team I" score="4" />
+                    <MiniTeamBox label="Team H" score="3" />
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center', color: '#374151', fontSize: 14, padding: '6px 0' }}>↓ group winners advance to the Championship Final ↓</div>
+                <div style={{ maxWidth: 220, margin: '0 auto' }}>
+                  <MiniTeamBox label="🏆 Team E — Champion" score="6" win />
+                  <MiniTeamBox label="🥈 Team B — 2nd" score="5" />
+                  <MiniTeamBox label="🥉 Team G — 3rd" score="3" />
+                </div>
+                <div style={{ ...FB, fontSize: 11.5, color: '#6B7280', marginTop: 10, textAlign: 'center', lineHeight: 1.5 }}>
+                  Runners-up (Team A, F, I) and third-placers (Team C, D, H) race their own finals for 4th–9th — nobody gets ranked without racing for it.
+                </div>
+              </div>
             </div>
           </section>
 
