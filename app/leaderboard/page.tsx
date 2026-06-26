@@ -11,6 +11,8 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+const CATEGORIES = ['Box Stock', 'Open Box Stock', 'B-Max', 'Open Class'];
+
 const TIER_COLORS: Record<string, string> = {
   hall_of_fame: '#FFD700',
   season_1st: '#DC2626',
@@ -30,10 +32,11 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 const HOF_LABELS: Record<string, string> = {
-  fastest_lap: '⚡ Fastest Lap',
-  most_wins: '🏆 Most Race Wins',
+  fastest_lap: '⚡ Fastest Official Time',
+  most_wins: '🏆 Most Wins',
+  most_races: '🏁 Most Races',
   most_championships: '👑 Most Championships',
-  most_points: '⭐ Most Points Earned',
+  most_points: '⭐ Top Scorer',
 };
 
 export default function LeaderboardPage() {
@@ -43,6 +46,7 @@ export default function LeaderboardPage() {
   const [seasons, setSeasons] = useState<any[]>([]);
   const [activeSeason, setActiveSeason] = useState<any>(null);
   const [selectedSeason, setSelectedSeason] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>(CATEGORIES[0]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
 
@@ -57,8 +61,8 @@ export default function LeaderboardPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedSeason) fetchStandings(selectedSeason);
-  }, [selectedSeason]);
+    if (selectedSeason && selectedCategory) fetchStandings(selectedSeason, selectedCategory);
+  }, [selectedSeason, selectedCategory]);
 
   async function fetchSeasons() {
     const { data } = await supabase.from('seasons').select('*').order('created_at', { ascending: false });
@@ -74,12 +78,13 @@ export default function LeaderboardPage() {
     }
   }
 
-  async function fetchStandings(seasonId: string) {
+  async function fetchStandings(seasonId: string, category: string) {
     setLoading(true);
     const { data } = await supabase
       .from('season_standings')
       .select('*')
       .eq('season_id', seasonId)
+      .eq('race_category', category)
       .order('season_rank', { ascending: true });
     setStandings(data || []);
     setLoading(false);
@@ -122,14 +127,22 @@ export default function LeaderboardPage() {
       background: active ? '#DC2626' : 'rgba(255,255,255,0.05)',
       color: active ? '#fff' : '#B8C1CC',
     }),
+    catTabs: { display: 'flex', gap: '6px', marginBottom: '18px', flexWrap: 'wrap' as const },
+    catTab: (active: boolean) => ({
+      padding: '7px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
+      letterSpacing: '0.5px', cursor: 'pointer', border: active ? '1px solid rgba(220,38,38,0.4)' : '1px solid rgba(255,255,255,0.1)',
+      background: active ? 'rgba(220,38,38,0.15)' : 'transparent',
+      color: active ? '#DC2626' : '#B8C1CC', whiteSpace: 'nowrap' as const,
+    }),
     body: { maxWidth: '900px', margin: '0 auto', padding: '32px 24px' },
-    seasonBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap' as const, gap: '12px' },
+    seasonBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap' as const, gap: '12px' },
     select: { background: '#071426', border: '1px solid rgba(255,255,255,0.1)', color: '#F5F5F5', padding: '8px 14px', borderRadius: '6px', fontSize: '13px' },
     activeBadge: { background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', color: '#DC2626', padding: '4px 12px', borderRadius: '20px', fontSize: '11px', letterSpacing: '2px' },
-    table: { width: '100%', borderCollapse: 'collapse' as const },
-    th: { textAlign: 'left' as const, padding: '10px 14px', fontSize: '11px', letterSpacing: '2px', color: '#6B7280', borderBottom: '1px solid rgba(255,255,255,0.06)', textTransform: 'uppercase' as const },
+    tableWrap: { overflowX: 'auto' as const, WebkitOverflowScrolling: 'touch' as const },
+    table: { width: '100%', borderCollapse: 'collapse' as const, minWidth: '720px' },
+    th: { textAlign: 'left' as const, padding: '10px 14px', fontSize: '11px', letterSpacing: '2px', color: '#6B7280', borderBottom: '1px solid rgba(255,255,255,0.06)', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const },
     tr: (i: number) => ({ background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }),
-    td: { padding: '14px', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '14px' },
+    td: { padding: '14px', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '14px', whiteSpace: 'nowrap' as const },
     hofGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' },
     hofCard: { background: '#071426', border: '1px solid rgba(255,215,0,0.15)', borderRadius: '12px', padding: '24px' },
     hofCategory: { fontSize: '11px', letterSpacing: '3px', color: '#FACC15', textTransform: 'uppercase' as const, marginBottom: '12px' },
@@ -173,53 +186,67 @@ export default function LeaderboardPage() {
               )}
             </div>
 
+            <div style={s.catTabs}>
+              {CATEGORIES.map(cat => (
+                <button key={cat} style={s.catTab(selectedCategory === cat)} onClick={() => setSelectedCategory(cat)}>{cat}</button>
+              ))}
+            </div>
+
             {loading ? (
               <div style={s.empty}>Loading standings...</div>
             ) : standings.length === 0 ? (
               <div style={s.empty}>
                 <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏁</div>
-                <div>No race results yet for this season.</div>
-                <div style={{ fontSize: '12px', marginTop: '8px', color: '#374151' }}>Results will appear after the first race.</div>
+                <div>No {selectedCategory} results yet for this season.</div>
+                <div style={{ fontSize: '12px', marginTop: '8px', color: '#374151' }}>Results will appear after the first race in this category.</div>
               </div>
             ) : (
-              <table style={s.table}>
-                <thead>
-                  <tr>
-                    <th style={s.th}>Rank</th>
-                    <th style={s.th}>Racer</th>
-                    <th style={s.th}>Wins</th>
-                    <th style={s.th}>Best Lap</th>
-                    <th style={s.th}>Races</th>
-                    <th style={s.th}>Coins Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {standings.map((r: any, i: number) => (
-                    <tr key={r.member_id} style={s.tr(i)}>
-                      <td style={{ ...s.td, ...getRankStyle(r.season_rank), fontWeight: 900, fontFamily: "'Barlow Condensed', sans-serif" }}>
-                        {r.season_rank === 1 ? '🏆' : r.season_rank === 2 ? '🥈' : r.season_rank === 3 ? '🥉' : `#${r.season_rank}`}
-                      </td>
-                      <td style={{ ...s.td, fontWeight: 600 }}>{r.member_name}</td>
-                      <td style={{ ...s.td, color: '#FACC15', fontWeight: 700 }}>{r.total_wins}</td>
-                      <td style={{ ...s.td, color: '#60A5FA' }}>{r.best_lap ? `${r.best_lap}s` : '—'}</td>
-                      <td style={{ ...s.td, color: '#B8C1CC' }}>{r.races_attended}</td>
-                      <td style={s.td}>
-                        <span style={{
-                          background: r.season_rank === 1 ? 'rgba(220,38,38,0.15)' : r.season_rank === 2 ? 'rgba(156,163,175,0.15)' : r.season_rank === 3 ? 'rgba(205,124,47,0.15)' : 'rgba(59,130,246,0.1)',
-                          color: r.season_rank === 1 ? '#DC2626' : r.season_rank === 2 ? '#9CA3AF' : r.season_rank === 3 ? '#CD7C2F' : '#3B82F6',
-                          padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700
-                        }}>
-                          {r.season_rank === 1 ? '5%' : r.season_rank === 2 ? '4%' : r.season_rank === 3 ? '3%' : '2%'}
-                        </span>
-                      </td>
+              <div style={s.tableWrap}>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      <th style={s.th}>Rank</th>
+                      <th style={s.th}>Racer</th>
+                      <th style={s.th}>Races</th>
+                      <th style={s.th}>Wins</th>
+                      <th style={s.th}>Podiums</th>
+                      <th style={s.th}>Win %</th>
+                      <th style={s.th}>Points</th>
+                      <th style={s.th}>Best Lap</th>
+                      <th style={s.th}>Coins Rate</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {standings.map((r: any, i: number) => (
+                      <tr key={r.member_id} style={s.tr(i)}>
+                        <td style={{ ...s.td, ...getRankStyle(r.season_rank), fontWeight: 900, fontFamily: "'Barlow Condensed', sans-serif" }}>
+                          {r.season_rank === 1 ? '🏆' : r.season_rank === 2 ? '🥈' : r.season_rank === 3 ? '🥉' : `#${r.season_rank}`}
+                        </td>
+                        <td style={{ ...s.td, fontWeight: 600 }}>{r.member_name}</td>
+                        <td style={{ ...s.td, color: '#B8C1CC' }}>{r.races_attended}</td>
+                        <td style={{ ...s.td, color: '#FACC15', fontWeight: 700 }}>{r.total_wins}</td>
+                        <td style={{ ...s.td, color: '#B8C1CC' }}>{r.podiums ?? '—'}</td>
+                        <td style={{ ...s.td, color: '#B8C1CC' }}>{r.win_pct != null ? `${r.win_pct}%` : '—'}</td>
+                        <td style={{ ...s.td, color: '#B8C1CC' }}>{r.total_points ?? 0}</td>
+                        <td style={{ ...s.td, color: '#60A5FA' }}>{r.best_lap ? `${r.best_lap}s` : '—'}</td>
+                        <td style={s.td}>
+                          <span style={{
+                            background: r.season_rank === 1 ? 'rgba(220,38,38,0.15)' : r.season_rank === 2 ? 'rgba(156,163,175,0.15)' : r.season_rank === 3 ? 'rgba(205,124,47,0.15)' : 'rgba(59,130,246,0.1)',
+                            color: r.season_rank === 1 ? '#DC2626' : r.season_rank === 2 ? '#9CA3AF' : r.season_rank === 3 ? '#CD7C2F' : '#3B82F6',
+                            padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700
+                          }}>
+                            {r.season_rank === 1 ? '5%' : r.season_rank === 2 ? '4%' : r.season_rank === 3 ? '3%' : '2%'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
 
             <div style={{ marginTop: '24px', padding: '16px', background: '#071426', borderRadius: '8px', fontSize: '12px', color: '#6B7280', lineHeight: 1.8 }}>
-              <span style={{ color: '#FACC15' }}>Coins rates are awarded to active members only.</span> Non-members earn 0%. Seasons reset every 2 months. Hall of Fame records never reset.
+              <span style={{ color: '#FACC15' }}>Coins rates are awarded to active members only.</span> Non-members earn 0%. Each race category ranks separately and resets every quarter. Hall of Fame records never reset.
             </div>
           </>
         )}
@@ -228,7 +255,7 @@ export default function LeaderboardPage() {
         {tab === 'hof' && (
           <>
             <div style={{ marginBottom: '24px', fontSize: '13px', color: '#6B7280' }}>
-              Records are permanent. Updated instantly when broken. 🏛️ Hall of Fame holders earn <span style={{ color: '#FACC15', fontWeight: 700 }}>8% coins rate</span>.
+              Records are permanent and tracked across all categories combined. Updated instantly when broken. 🏛️ Hall of Fame holders earn <span style={{ color: '#FACC15', fontWeight: 700 }}>8% coins rate</span>.
             </div>
             <div style={s.hofGrid}>
               {hof.map((record: any) => (

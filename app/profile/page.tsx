@@ -55,6 +55,12 @@ export default function ProfilePage() {
   const [raceEntries, setRaceEntries] = useState<any[]>([]);
   const [wishlist, setWishlist] = useState<any[]>([]);
   const [showRankInfo, setShowRankInfo] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', avatar_url: '' });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editMsg, setEditMsg] = useState('');
+  const [pendingRequest, setPendingRequest] = useState<any>(null);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const local = getMemberData();
@@ -69,6 +75,11 @@ export default function ProfilePage() {
           getReferralStats(local),
         ]);
         setMember(m || local);
+        setEditForm({ name: (m || local)?.name || '', avatar_url: (m || local)?.avatar_url || '' });
+        if (m?.id) {
+          const { data: pendingData } = await supabase.from('profile_edit_requests').select('*').eq('member_id', m.id).eq('status', 'pending').maybeSingle();
+          setPendingRequest(pendingData || null);
+        }
         setOrders(o);
         setWallet(w);
         setReferral(r);
@@ -99,6 +110,41 @@ export default function ProfilePage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onloadend = () => setEditForm(f => ({ ...f, avatar_url: r.result as string }));
+    r.readAsDataURL(file);
+  }
+
+  async function handleSubmitProfileEdit() {
+    if (!member?.id) return;
+    const nameChanged = editForm.name.trim() && editForm.name.trim() !== member.name;
+    const avatarChanged = editForm.avatar_url && editForm.avatar_url !== ((member as any)?.avatar_url || '');
+    if (!nameChanged && !avatarChanged) { setEditMsg('No changes to submit.'); return; }
+
+    setEditSaving(true);
+    const { data, error } = await supabase.from('profile_edit_requests').insert({
+      member_id: member.id,
+      member_email: member.email,
+      current_name: member.name,
+      requested_name: nameChanged ? editForm.name.trim() : null,
+      current_avatar_url: (member as any)?.avatar_url || null,
+      requested_avatar_url: avatarChanged ? editForm.avatar_url : null,
+      status: 'pending',
+    }).select().single();
+
+    if (error) {
+      setEditMsg('Error: ' + error.message);
+    } else {
+      setPendingRequest(data);
+      setEditMsg('✅ Submitted — awaiting admin approval.');
+      setTimeout(() => { setShowEditProfile(false); setEditMsg(''); }, 1800);
+    }
+    setEditSaving(false);
+  }
 
   const handleCarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -140,8 +186,22 @@ export default function ProfilePage() {
           <div style={{ maxWidth: 900, margin: '0 auto' }}>
             {/* Avatar + info */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-              <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', ...F, fontWeight: 900, fontSize: 28, color: '#fff', flexShrink: 0 }}>
-                {member?.name?.[0]?.toUpperCase() || 'M'}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', ...F, fontWeight: 900, fontSize: 28, color: '#fff' }}>
+                  {(member as any)?.avatar_url ? (
+                    <img src={(member as any).avatar_url} alt={member?.name || 'Member'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    member?.name?.[0]?.toUpperCase() || 'M'
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEditProfile(true)}
+                  aria-label="Edit profile"
+                  style={{ position: 'absolute', bottom: -2, right: -2, width: 24, height: 24, borderRadius: '50%', background: '#071426', border: '2px solid #050505', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, fontSize: 11 }}
+                >
+                  ✏️
+                </button>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
@@ -160,6 +220,12 @@ export default function ProfilePage() {
                   )}
                 </div>
                 <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', marginBottom: 10 }}>{member?.email}</div>
+
+                {pendingRequest && (
+                  <div style={{ ...FB, fontSize: 12, color: '#FACC15', background: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 8, padding: '6px 12px', marginBottom: 12, display: 'inline-block' }}>
+                    ⏳ Profile change pending admin approval
+                  </div>
+                )}
 
                 {/* Rank progress */}
                 <div style={{ position: 'relative', maxWidth: 280 }}>
@@ -217,6 +283,52 @@ export default function ProfilePage() {
                 Logout
               </button>
             </div>
+
+            {showEditProfile && (
+              <>
+                <div onClick={() => setShowEditProfile(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 40 }} />
+                <div onClick={e => e.stopPropagation()} style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 41, width: '90%', maxWidth: 380, background: '#0d1420', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: 22, boxShadow: '0 16px 40px rgba(0,0,0,0.6)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <div style={{ ...F, fontWeight: 900, fontSize: 18, letterSpacing: 1 }}>EDIT PROFILE</div>
+                    <button onClick={() => setShowEditProfile(false)} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: 0 }}>✕</button>
+                  </div>
+
+                  {pendingRequest ? (
+                    <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6 }}>
+                      You already have a change pending admin approval{pendingRequest.requested_name ? <> — new name: <strong style={{ color: '#FACC15' }}>{pendingRequest.requested_name}</strong></> : ''}{pendingRequest.requested_avatar_url ? ' (+ new photo)' : ''}.
+                      <br /><br />Submitted {new Date(pendingRequest.created_at).toLocaleDateString('en-GB')}. Check back later.
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                        <div onClick={() => avatarFileRef.current?.click()} style={{ width: 84, height: 84, borderRadius: '50%', background: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', cursor: 'pointer', border: '2px dashed rgba(255,255,255,0.2)', ...F, fontWeight: 900, fontSize: 32, color: '#fff' }}>
+                          {editForm.avatar_url ? (
+                            <img src={editForm.avatar_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            editForm.name?.[0]?.toUpperCase() || 'M'
+                          )}
+                        </div>
+                      </div>
+                      <input ref={avatarFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarFile} />
+                      <div style={{ textAlign: 'center', ...FB, fontSize: 11, color: '#6B7280', marginBottom: 18 }}>Tap photo to change</div>
+
+                      <label style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#6B7280', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Name</label>
+                      <input
+                        value={editForm.name}
+                        onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 14px', color: '#F5F5F5', fontSize: 14, marginBottom: 6, boxSizing: 'border-box' }}
+                      />
+                      <div style={{ ...FB, fontSize: 11, color: '#6B7280', marginBottom: 18 }}>Email can't be self-edited — contact an admin to change it.</div>
+
+                      <button onClick={handleSubmitProfileEdit} disabled={editSaving} style={{ width: '100%', background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '12px', fontWeight: 900, fontSize: 14, letterSpacing: 1, cursor: 'pointer', opacity: editSaving ? 0.6 : 1 }}>
+                        {editSaving ? 'SUBMITTING...' : 'SUBMIT FOR APPROVAL'}
+                      </button>
+                      {editMsg && <div style={{ ...FB, fontSize: 12, color: '#FACC15', marginTop: 10, textAlign: 'center' }}>{editMsg}</div>}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>

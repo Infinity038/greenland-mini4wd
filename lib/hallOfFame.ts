@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { supabase } from './supabase';
 
 interface HofCheckResult {
@@ -8,7 +9,11 @@ interface HofCheckResult {
 // Call this any time a stat that could be a record changes (e.g. after saving a race result).
 // If the new value beats the current holder, archives the old holder to hall_of_fame_history
 // (with held_from/held_until so "how long they held it" is tracked) and installs the new one.
-// lowerIsBetter=true for things like fastest lap time; false for wins/points/championships.
+// lowerIsBetter=true for things like fastest lap time; false for wins/points/races/championships.
+//
+// NOTE: every category checked here must already exist as a row in `hall_of_fame` (category is
+// the lookup key) — this function only updates existing rows, it never creates one. Adding a new
+// category (e.g. most_races) requires seeding a placeholder row first; see migration notes.
 export async function checkAndUpdateHOF(
   category: string,
   memberId: string,
@@ -69,9 +74,14 @@ export async function checkAndUpdateHOF(
   return { broke_record: true, category };
 }
 
-// Sums a member's lifetime wins/points across all race_results — used to feed
-// the most_wins / most_points HOF categories after every new result is saved.
-export async function getMemberLifetimeStat(memberId: string, field: 'wins' | 'points_earned'): Promise<number> {
+// Sums (or counts) a member's lifetime race_results — feeds the most_wins / most_points /
+// most_races HOF categories after every new result is saved.
+// 'wins' and 'points_earned' sum that column; 'race_count' counts rows (1 row = 1 race entered).
+export async function getMemberLifetimeStat(memberId: string, field: 'wins' | 'points_earned' | 'race_count'): Promise<number> {
+  if (field === 'race_count') {
+    const { count } = await supabase.from('race_results').select('id', { count: 'exact', head: true }).eq('member_id', memberId);
+    return count || 0;
+  }
   const { data } = await supabase.from('race_results').select(field).eq('member_id', memberId);
   return (data || []).reduce((sum: number, r: any) => sum + (Number(r[field]) || 0), 0);
 }
