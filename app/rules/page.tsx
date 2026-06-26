@@ -81,9 +81,9 @@ const SINGLE_FORMAT_STEPS = [
 ];
 
 const TEAM_FORMAT_STEPS = [
-  { n: 1, label: 'GROUP STAGE', desc: 'Teams split into groups of 3. Each member races their own round \u2014 the team\u2019s scores get added together. Highest combined score in the group advances.', color: '#3B82F6', note: 'Tied scores trigger a tiebreaker round.' },
-  { n: 2, label: '3 PARALLEL FINALS', desc: 'Group winners race the Championship Final (1st\u20133rd). Runners-up race the Consolation Final (4th\u20136th). Third-placers race the Placement Final (7th+).', color: '#FACC15' },
-  { n: 3, label: 'FINAL STANDINGS', desc: 'Placement is set by each team\u2019s final-round result \u2014 nobody is ranked on leftover group-stage scores.', color: '#22C55E' },
+  { n: 1, label: 'ROUND 1 \u2014 3-TEAM MATCH', desc: 'Every match is 3 teams. Each team secretly picks ONE member to drive \u2014 teammates don\u2019t race together. Highest finish wins the match and advances. The other 2 teams are eliminated and lose a life.', color: '#3B82F6' },
+  { n: 2, label: 'ROUND 2 \u2014 REGROUP & RACE', desc: 'Round 1 winners from across the ladder get pooled and reshuffled into new 3-team matches. Most points advances, lowest is eliminated. A tie at the top re-races Round 2 between the tied teams only.', color: '#FACC15', note: 'This repeats until enough teams have advanced to fill the Final.' },
+  { n: 3, label: 'ROUND 3 \u2014 THE FINAL', desc: 'The last 3 teams standing face off for the Podium. A tie for 1st/2nd re-races until it\u2019s clear. Podium only \u2014 this format doesn\u2019t rank 4th and below.', color: '#DC2626' },
 ];
 
 function FormatFlow({ steps }: { steps: typeof SINGLE_FORMAT_STEPS }) {
@@ -229,41 +229,35 @@ export default function RulesPage() {
                 <span style={{ ...F, fontWeight: 800, fontSize: 20 }}>COOP & TEAM BATTLE FORMAT</span>
               </div>
               <p style={{ ...FB, fontSize: 13, color: '#6B7280', marginBottom: 16, lineHeight: 1.6 }}>
-                Coop = 2-member teams. Team Battle = same idea, up to 5 members. Every member races their own round — the team's combined score decides the result.
+                Coop = 2-member teams. Team Battle = 5-member teams, same rules. Each round, your team secretly picks which one member drives — only one of you races at a time. Buy a ticket, run the ladder. Lose? Buy another ticket and try again — unlimited entries.
               </p>
               <FormatFlow steps={TEAM_FORMAT_STEPS} />
 
               {/* Worked example */}
               <div style={{ marginTop: 18, background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 16 }}>
-                <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#6B7280', marginBottom: 10 }}>EXAMPLE — 9 TEAMS, 3 GROUPS</div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-                  <div style={{ flex: '1 1 150px', minWidth: 140 }}>
-                    <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#6B7280', marginBottom: 6 }}>GROUP 1</div>
-                    <MiniTeamBox label="Team B" score="6" win />
-                    <MiniTeamBox label="Team A" score="5" />
-                    <MiniTeamBox label="Team C" score="2" />
-                  </div>
-                  <div style={{ flex: '1 1 150px', minWidth: 140 }}>
-                    <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#6B7280', marginBottom: 6 }}>GROUP 2 — tied, tiebreaker run</div>
-                    <MiniTeamBox label="Team E" score="6*" win />
-                    <MiniTeamBox label="Team F" score="6*" />
-                    <MiniTeamBox label="Team D" score="1" />
-                  </div>
-                  <div style={{ flex: '1 1 150px', minWidth: 140 }}>
-                    <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#6B7280', marginBottom: 6 }}>GROUP 3</div>
-                    <MiniTeamBox label="Team G" score="5" win />
-                    <MiniTeamBox label="Team I" score="4" />
-                    <MiniTeamBox label="Team H" score="3" />
-                  </div>
-                </div>
-                <div style={{ textAlign: 'center', color: '#374151', fontSize: 14, padding: '6px 0' }}>↓ group winners advance to the Championship Final ↓</div>
-                <div style={{ maxWidth: 220, margin: '0 auto' }}>
-                  <MiniTeamBox label="🏆 Team E — Champion" score="6" win />
-                  <MiniTeamBox label="🥈 Team B — 2nd" score="5" />
-                  <MiniTeamBox label="🥉 Team G — 3rd" score="3" />
-                </div>
+                <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#6B7280', marginBottom: 10 }}>FOLLOW ONE TEAM'S RUN THROUGH THE LADDER</div>
+
+                <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#3B82F6', marginBottom: 6 }}>ROUND 1 MATCH</div>
+                <MiniTeamBox label="Team Arctic (drove: Member A)" score="WIN" win />
+                <MiniTeamBox label="Team Frostbite" score="OUT \u2014 1 life lost" />
+                <MiniTeamBox label="Team Glacier" score="OUT \u2014 1 life lost" />
+
+                <div style={{ textAlign: 'center', color: '#374151', fontSize: 14, padding: '6px 0' }}>↓ regrouped with winners from other matches ↓</div>
+
+                <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#FACC15', marginBottom: 6 }}>ROUND 2 MATCH</div>
+                <MiniTeamBox label="Team Arctic (drove: Member B)" score="WIN" win />
+                <MiniTeamBox label="Team Aurora" score="OUT" />
+                <MiniTeamBox label="Team Northwind" score="OUT" />
+
+                <div style={{ textAlign: 'center', color: '#374151', fontSize: 14, padding: '6px 0' }}>↓ last 3 teams standing ↓</div>
+
+                <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#DC2626', marginBottom: 6 }}>ROUND 3 — THE FINAL</div>
+                <MiniTeamBox label="🏆 Team Arctic (drove: Member A) — Champion" score="" win />
+                <MiniTeamBox label="🥈 Team Polestar — 2nd" score="" />
+                <MiniTeamBox label="🥉 Team Midnight Sun — 3rd" score="" />
+
                 <div style={{ ...FB, fontSize: 11.5, color: '#6B7280', marginTop: 10, textAlign: 'center', lineHeight: 1.5 }}>
-                  Runners-up (Team A, F, I) and third-placers (Team C, D, H) race their own finals for 4th–9th — nobody gets ranked without racing for it.
+                  Podium only — teams eliminated in Round 1 or 2 aren't ranked further. They can buy another ticket and run the ladder again.
                 </div>
               </div>
             </div>
