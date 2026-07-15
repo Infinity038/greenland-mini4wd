@@ -2,6 +2,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { parseImages } from '@/lib/images';
+import CatalogImportPanel from '@/components/admin/CatalogImportPanel';
 
 const ADMIN_PASSWORD = 'mini4wd2026';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
@@ -26,25 +28,6 @@ function cheapestPrice(p: any): number {
   return vals.length ? Math.min(...vals) : (p.price_dkk || 0);
 }
 
-function fixImageUrl(url: string): string {
-  if (!url) return url;
-  return url.split(',').map(u => {
-    let trimmed = u.trim();
-    const drilldown = trimmed.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
-    if (drilldown) {
-      try { trimmed = drilldown[1] + atob(drilldown[2]); } catch { /* leave as-is */ }
-    }
-    trimmed = trimmed.replace(
-      /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
-      'res.cloudinary.com/$1/image/upload/'
-    );
-    if (/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/[^./]+$/.test(trimmed)) {
-      trimmed = trimmed + '.png';
-    }
-    return trimmed;
-  }).join(',');
-}
-
 function checkAuth() {
   if (typeof window === 'undefined') return false;
   const session = localStorage.getItem('adminSession');
@@ -58,7 +41,7 @@ function saveAuth() {
 
 function ProductThumb({ url, size = 56 }: { url: string; size?: number }) {
   const [failed, setFailed] = useState(false);
-  const first = fixImageUrl(url || '').split(',')[0]?.trim();
+  const first = parseImages(url)[0];
   if (!first || failed) return (
     <div style={{ width: size, height: size, borderRadius: 8, background: '#050505', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       <span style={{ ...F, fontSize: 10, color: 'rgba(255,255,255,0.15)' }}>NO IMG</span>
@@ -134,7 +117,7 @@ export default function AdminProductsPage() {
     if (!editing.name?.trim()) { setSaveError('Name is required.'); return; }
     setSaving(true); setSaveError('');
     try {
-      const payload = { ...editing, image_url: fixImageUrl(editing.image_url), price_dkk: cheapestPrice(editing) || editing.price_dkk || 0 };
+      const payload = { ...editing, image_url: parseImages(editing.image_url).join(','), price_dkk: cheapestPrice(editing) || editing.price_dkk || 0 };
       if (editing.id) {
         const { error } = await supabase.from('products').update(payload).eq('id', editing.id);
         if (error) throw error;
@@ -186,7 +169,7 @@ export default function AdminProductsPage() {
   if (!checked) return null;
   if (!authed) return <LoginScreen title="Manage Products" onLogin={() => { setAuthed(true); fetchProducts(); fetchInventory(); fetchPreorders(); }} />;
 
-  const editPreviewUrl = fixImageUrl(editing?.image_url || '').split(',')[0]?.trim();
+  const editPreviewUrl = parseImages(editing?.image_url)[0];
   const isCarEditing = !editing?.category || editing.category === 'cars';
 
   const filteredProducts = products.filter(p => {
@@ -217,6 +200,8 @@ export default function AdminProductsPage() {
 
         {tab === 'products' && (
           <>
+            <CatalogImportPanel existingProducts={products} />
+
             <div style={{ background:'#071426', border:'1px solid rgba(250,204,21,0.2)', borderRadius:14, padding:'18px 20px', marginBottom:20 }}>
               <div style={{ ...F, fontSize:11, letterSpacing:3, color:'#FACC15', marginBottom:4 }}>📦 GLOBAL CASE INVENTORY</div>
               <div style={{ ...FB, fontSize:12, color:'#6B7280', marginBottom:14 }}>Shared display-case STOCK used by EVERY model's "+ Case" listings. Case pricing is now set per-product below, not here.</div>

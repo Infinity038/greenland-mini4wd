@@ -1,20 +1,30 @@
 "use client";
 import { useState, useEffect } from "react";
 import { isRegistered, getMemberData, logout } from "@/lib/member";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
-const NAV_LINKS = [
-  { label: "Leaderboard", href: "/leaderboard" },
+// Beginner-first order: Start Here -> Cars -> Shop -> Race Rules take priority.
+// Tournament/Tickets only appear while NEXT_PUBLIC_OPEN_TOURNAMENT_ENABLED=true.
+const BASE_NAV_LINKS = [
+  { label: "Start Here",  href: "/how-to-join" },
   { label: "Cars",        href: "/cars" },
-  { label: "Tournament",  href: "/tournament" },
+  { label: "Shop",        href: "/shop" },
   { label: "Race Rules",  href: "/rules" },
-  { label: "Tickets",     href: "/tickets" },
+  { label: "Leaderboard", href: "/leaderboard" },
   { label: "Events",      href: "/events" },
   { label: "Gallery",     href: "/gallery" },
-  { label: "Shop",        href: "/shop" },
   { label: "Blog",        href: "/blog" },
-  { label: "How to Join", href: "/how-to-join" },
   { label: "About",       href: "/about" },
 ];
+
+const TOURNAMENT_NAV_LINKS = [
+  { label: "Tournament", href: "/tournament" },
+  { label: "Tickets",    href: "/tickets" },
+];
+
+const NAV_LINKS = FEATURE_FLAGS.openTournamentEnabled
+  ? [...BASE_NAV_LINKS.slice(0, 4), ...TOURNAMENT_NAV_LINKS, ...BASE_NAV_LINKS.slice(4)]
+  : BASE_NAV_LINKS;
 
 const MEMBER_LINKS = [
   { label: "👤 Profile",      href: "/profile" },

@@ -1,53 +1,69 @@
 'use client';
 import { useEffect, useState } from 'react';
+import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { readCachedProducts, writeCachedProducts } from '@/lib/productCache';
+import { parseImages } from '@/lib/images';
+
+const CATALOG_CACHE_KEY = 'home_shop_preview';
 
 const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
-const FALLBACK = [
+interface PreviewItem {
+  id: number | string;
+  name: string;
+  category?: string | null;
+  subcategory?: string | null;
+  chassis?: string | null;
+  price_dkk?: number;
+  unbuilt_price_dkk?: number;
+  unbuilt_case_price_dkk?: number;
+  built_price_dkk?: number;
+  built_case_price_dkk?: number;
+  image_url?: string | null;
+  emoji?: string;
+}
+
+const FALLBACK: PreviewItem[] = [
   { id: 1, name: 'Tamiya Avante',     category: 'cars',        subcategory: null,            price_dkk: 299, emoji: '🚗' },
   { id: 2, name: 'Club Racing Tires', category: 'parts',       subcategory: 'Wheels/Tires',  price_dkk: 89,  emoji: '🛞' },
   { id: 3, name: 'Motor Upgrade Set', category: 'parts',       subcategory: 'Motors',        price_dkk: 149, emoji: '⚡' },
   { id: 4, name: 'GM4WD Club Jersey', category: 'merchandise', subcategory: 'Jersey',        price_dkk: 199, emoji: '👕' },
 ];
 
-function fixImageUrl(url: string): string {
-  if (!url) return url;
-  const drilldown = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
-  if (drilldown) {
-    try { url = drilldown[1] + atob(drilldown[2]); } catch { /* leave as-is */ }
-  }
-  url = url.replace(
-    /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
-    'res.cloudinary.com/$1/image/upload/'
-  );
-  if (/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/[^./]+$/.test(url)) {
-    url = url + '.png';
-  }
-  return url;
-}
-
-function cheapestPrice(p: any): number {
+function cheapestPrice(p: PreviewItem): number {
   if (p.category !== 'cars') return p.price_dkk || 0;
-  const vals = [p.unbuilt_price_dkk, p.unbuilt_case_price_dkk, p.built_price_dkk, p.built_case_price_dkk].filter((v: any) => typeof v === 'number' && v > 0);
+  const vals = [p.unbuilt_price_dkk, p.unbuilt_case_price_dkk, p.built_price_dkk, p.built_case_price_dkk]
+    .filter((v): v is number => typeof v === 'number' && v > 0);
   return vals.length ? Math.min(...vals) : (p.price_dkk || 0);
 }
 
-function shopLink(item: any): string {
+function shopLink(item: PreviewItem): string {
   if (!item.category || item.category === 'cars') return '/shop';
   if (item.subcategory) return `/shop?tab=${item.category}&filter=${encodeURIComponent(item.subcategory)}`;
   return `/shop?tab=${item.category}`;
 }
 
 export default function ShopPreview() {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<PreviewItem[]>(() => readCachedProducts<PreviewItem>(CATALOG_CACHE_KEY)?.data ?? []);
 
   useEffect(() => {
     // Pull real, sellable products (cars, parts, merch) — prioritizes whatever's most
     // recently added, which right now means your Collector's Vault cars.
     supabase.from('products').select('*').in('status', ['in stock', 'limited', 'preorder only']).order('created_at', { ascending: false }).limit(4)
-      .then(({ data }: { data: any[] | null }) => setItems(data && data.length > 0 ? data : FALLBACK));
+      .then(({ data, error }: { data: PreviewItem[] | null; error: PostgrestError | null }) => {
+        if (error) {
+          // Keep whatever's already shown (cached or previous state) rather than
+          // masking a real fetch failure as if it were live data.
+          console.error('[home] shop preview refresh failed:', error.message);
+          return;
+        }
+        if (data && data.length > 0) {
+          setItems(data);
+          writeCachedProducts(CATALOG_CACHE_KEY, data);
+        }
+      });
   }, []);
 
   const display = items.length > 0 ? items : FALLBACK;
@@ -63,8 +79,7 @@ export default function ShopPreview() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 16, marginBottom: 40 }}>
           {display.map(item => {
-            const imgs = item.image_url ? item.image_url.split(',') : [];
-            const firstImg = imgs[0] ? fixImageUrl(imgs[0].trim()) : '';
+            const firstImg = parseImages(item.image_url)[0] || '';
             const label = item.subcategory || item.category || item.chassis || '';
             return (
               <a key={item.id} href={shopLink(item)} style={{ textDecoration: 'none', display: 'block', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, overflow: 'hidden', transition: 'border-color 0.2s' }}>

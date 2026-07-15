@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { awardForPayment, clawbackForPayment } from '@/lib/loyalty';
+import { parseImages } from '@/lib/images';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,7 +55,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 function ProductThumb({ url }: { url?: string }) {
   const [failed, setFailed] = useState(false);
-  const first = url?.split(',')[0]?.trim();
+  const first = parseImages(url)[0];
   if (!first || failed) return (
     <div style={{ width: 56, height: 56, borderRadius: 8, background: '#050505', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 9, color: 'rgba(255,255,255,0.15)', letterSpacing: 1 }}>NO IMG</span>

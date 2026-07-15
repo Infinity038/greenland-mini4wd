@@ -1,11 +1,23 @@
 // @ts-nocheck
 'use client';
 
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
+
+function TournamentPausedNotice() {
+  const searchParams = useSearchParams();
+  if (searchParams.get('notice') !== 'tournament-paused') return null;
+  return (
+    <div style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.3)', borderRadius: 10, padding: '14px 18px', marginBottom: 32, ...FB, fontSize: 14, color: '#FACC15', textAlign: 'center' }}>
+      ⏸ Open Tournament and race tickets are postponed for now. While you wait, this is how to get started with Box Stock racing and B-MAX.
+    </div>
+  );
+}
 
 export default function HowToJoin() {
   return (
@@ -13,6 +25,9 @@ export default function HowToJoin() {
       <Navbar />
       <main style={{ background: '#050505', color: '#F5F5F5', paddingTop: 60, paddingBottom: 60 }}>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '40px 20px' }}>
+          <Suspense fallback={null}>
+            <TournamentPausedNotice />
+          </Suspense>
           <h1 style={{ ...F, fontSize: 40, fontWeight: 900, marginBottom: 12, textAlign: 'center', color: '#DC2626' }}>HOW TO JOIN</h1>
           <p style={{ ...FB, fontSize: 16, color: '#B8C1CC', textAlign: 'center', marginBottom: 60 }}>Get started with The Arctic Hustle and unlock exclusive rewards, racing, and community.</p>
 

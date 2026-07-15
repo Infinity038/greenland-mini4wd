@@ -4,8 +4,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { getMemberData, isRegistered, generatePaymentRef } from '@/lib/member';
 import { supabase } from '@/lib/supabase';
+import { readCachedProducts, writeCachedProducts } from '@/lib/productCache';
+import { parseImages } from '@/lib/images';
+import { ProductImage as SharedProductImage } from '@/components/ProductImage';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+
+const CATALOG_CACHE_KEY = 'shop_products';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -90,68 +95,16 @@ const FILTER_TABS = [
 const CHASSIS_FILTERS = ['AR', 'EZ', 'FM-A', 'MA', 'ME', 'MS', 'Super II', 'Super XX', 'VS', 'VZ'];
 const PARTS_SUBCATEGORIES = ['Bearings', 'Brakes/Dampers', 'Chassis', 'Shafts/Gears', 'Motors', 'Plates', 'Rollers/Stabilizers', 'Screws/Nuts', 'Wheels/Tires', 'Accessories'];
 
-function fixImageUrl(url: string): string {
-  if (!url) return url;
-  const drilldown = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
-  if (drilldown) {
-    try { url = drilldown[1] + atob(drilldown[2]); } catch { /* leave as-is */ }
-  }
-  url = url.replace(
-    /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
-    'res.cloudinary.com/$1/image/upload/'
-  );
-  if (/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/[^./]+$/.test(url)) {
-    url = url + '.png';
-  }
-  return url;
-}
-
-function parseImages(url: string): string[] {
-  if (!url) return [];
-  return url.split(',').map(u => fixImageUrl(u.trim())).filter(Boolean);
-}
-
 function ProductImage({ product, onClick }: { product: Product; onClick?: () => void }) {
-  const images = parseImages(product.image_url);
-  const [idx, setIdx] = useState(0);
-  const [failed, setFailed] = useState<Record<number, boolean>>({});
-
-  const current = images[idx];
-  const isFailed = failed[idx];
-
-  if (!current || isFailed) return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-      <span style={{ ...F, fontWeight: 900, fontSize: 40, color: 'rgba(255,255,255,0.06)', letterSpacing: 2 }}>{product.chassis || product.subcategory || ''}</span>
-      <span style={{ ...FB, fontSize: 10, color: 'rgba(255,255,255,0.15)' }}>Image coming soon</span>
-    </div>
-  );
-
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <img
-        src={current}
-        alt={product.name}
-        onError={() => setFailed(f => ({ ...f, [idx]: true }))}
-        onClick={onClick}
-        style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', cursor: onClick ? 'zoom-in' : 'default' }}
-      />
-      {images.length > 1 && (
-        <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 4 }}>
-          {images.map((_, i) => (
-            <button key={i} onClick={e => { e.stopPropagation(); setIdx(i); }}
-              style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 3, border: 'none', background: i === idx ? '#DC2626' : 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, transition: 'all 0.2s' }} />
-          ))}
-        </div>
-      )}
-      {images.length > 1 && idx > 0 && (
-        <button onClick={e => { e.stopPropagation(); setIdx(i => i - 1); }}
-          style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
-      )}
-      {images.length > 1 && idx < images.length - 1 && (
-        <button onClick={e => { e.stopPropagation(); setIdx(i => i + 1); }}
-          style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
-      )}
-    </div>
+    <SharedProductImage
+      imageUrl={product.image_url}
+      name={product.name}
+      category={product.category}
+      itemNo={product.item_no}
+      chassis={product.chassis || product.subcategory}
+      onClick={onClick}
+    />
   );
 }
 
@@ -242,8 +195,10 @@ function SimpleProductCard({ p, wishlistIds, toggleWishlist, shareProduct, copie
 
 export default function ShopPage() {
   const [member, setMember] = useState<any>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>(() => readCachedProducts<Product>(CATALOG_CACHE_KEY)?.data ?? []);
+  const [loading, setLoading] = useState(() => readCachedProducts<Product>(CATALOG_CACHE_KEY) === null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogLoadedOnce, setCatalogLoadedOnce] = useState(false);
   const [filter, setFilter] = useState('all');
   const [globalCaseStock, setGlobalCaseStock] = useState(0);
 
@@ -377,9 +332,19 @@ export default function ShopPage() {
   };
 
   async function fetchProducts() {
-    setLoading(true);
-    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: true });
-    setProducts(data || []);
+    const cached = readCachedProducts<Product>(CATALOG_CACHE_KEY);
+    if (!cached) setLoading(true);
+    const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: true });
+    if (error) {
+      console.error('[shop] catalog refresh failed:', error.message);
+      setCatalogError('The catalog could not refresh. Showing the latest saved version.');
+      if (cached) setProducts(cached.data);
+    } else {
+      setProducts(data || []);
+      writeCachedProducts(CATALOG_CACHE_KEY, data || []);
+      setCatalogError(null);
+    }
+    setCatalogLoadedOnce(true);
     setLoading(false);
   }
 
@@ -559,6 +524,15 @@ export default function ShopPage() {
             <div style={{ ...FB, fontSize: 12, color: '#6B7280' }}>📦 Display cases in stock: <strong style={{ color: globalCaseStock > 0 ? '#22C55E' : '#DC2626' }}>{globalCaseStock}</strong> (shared across all car models)</div>
           </div>
         </section>
+
+        {catalogError && (
+          <div style={{ maxWidth: 1100, margin: '16px auto 0', padding: '0 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.3)', borderRadius: 10, padding: '12px 16px' }}>
+              <span style={{ ...FB, fontSize: 13, color: '#FACC15', flex: 1, minWidth: 200 }}>⚠ {catalogError}</span>
+              <button onClick={fetchProducts} style={{ ...F, fontSize: 12, letterSpacing: 1, fontWeight: 700, background: '#FACC15', color: '#050505', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer' }}>RETRY</button>
+            </div>
+          </div>
+        )}
 
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 0' }}>
           <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
