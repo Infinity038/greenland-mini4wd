@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -34,117 +35,88 @@ export default function HowToJoin() {
           <section style={{ marginBottom: 60 }}>
             <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>1. Register</h2>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              Create an account on the website. It's free and takes under 2 minutes. You'll immediately get access to your member profile, where you can:
+              Create an account on the website. It&apos;s free and takes under 2 minutes. You&apos;ll immediately get access to your Racer Profile, where you can:
             </p>
             <ul style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 24, paddingLeft: 24, lineHeight: 1.8 }}>
               <li>Register and approve your first Mini 4WD car</li>
-              <li>View your loyalty points and ranking</li>
+              <li>View your Loyalty Points and Championship Points</li>
               <li>Browse upcoming races and tournaments</li>
               <li>Buy tickets and manage your garage</li>
             </ul>
           </section>
 
           <section style={{ marginBottom: 60 }}>
-            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>2. Become a Member</h2>
+            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>2. Your Racer Profile is Free</h2>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              You automatically become a member by making your first purchase — whether that's a car kit, parts, tickets, or merchandise. There is no fixed membership fee.
+              Every registered racer gets a free Racer Profile. <strong style={{ color: '#F5F5F5' }}>It does not expire because of inactivity</strong> — there&apos;s no membership clock to keep running.
             </p>
-            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              <strong style={{ color: '#F5F5F5' }}>Your membership length is tied directly to how much you spend:</strong> every 20 DKK you spend adds 1 day of membership. The more active you are, the longer your membership stays active.
-            </p>
-
             <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
-              <div style={{ ...F, fontSize: 14, fontWeight: 700, color: '#DC2626', marginBottom: 12 }}>💡 EXAMPLE</div>
+              <div style={{ ...F, fontSize: 14, fontWeight: 700, color: '#DC2626', marginBottom: 12 }}>🏁 WHAT&apos;S IN YOUR RACER PROFILE</div>
               <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.8 }}>
-                You spend 200 DKK on a chassis kit → +10 days of membership. Later that season you spend 1,000 DKK on tickets and parts → +50 more days. Keep racing and shopping, and your membership stays active continuously.
+                Your registered cars, Loyalty Points balance, Shop Credit balance, Box Stock and B-MAX Championship Points, current leaderboard rank, race history, and awards — each shown separately, never combined into one number.
               </div>
             </div>
+            {FEATURE_FLAGS.legacyMembershipUiEnabled && (
+              <div style={{ background: 'rgba(107,114,128,0.08)', border: '1px dashed rgba(107,114,128,0.3)', borderRadius: 12, padding: 20, ...FB, fontSize: 13, color: '#6B7280', lineHeight: 1.8 }}>
+                <strong style={{ color: '#9CA3AF' }}>Legacy copy (comparison only):</strong> the old system tied membership length to spending — every 20 DKK added 1 day, and membership could expire. This has been discontinued in favor of the free, non-expiring Racer Profile above. Historical membership records are preserved but no longer active.
+              </div>
+            )}
           </section>
 
           <section style={{ marginBottom: 60 }}>
             <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>3. Earn Loyalty Points</h2>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              Every DKK you spend earns you loyalty points. Your earn rate depends on your membership tier:
+              Every 100 DKK you pay earns 1.00 Loyalty Point — the same rate for every racer. Partial spending earns partial points, and points are always shown to two decimal places.
             </p>
-            <div style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
               {[
-                { tier: 'Non-Member', rate: '0%', example: 'Spend 500 kr → 0 points' },
-                { tier: 'Member', rate: '2%', example: 'Spend 500 kr → 10 points' },
-                { tier: 'Pro Racer', rate: '3%', example: 'Spend 500 kr → 15 points' },
-                { tier: 'Elite Racer', rate: '4%', example: 'Spend 500 kr → 20 points' },
-                { tier: 'Arctic Champion', rate: '5%', example: 'Spend 500 kr → 25 points' },
-                { tier: 'Hall of Fame', rate: '8%', example: 'Spend 500 kr → 40 points' },
-              ].map((t, i) => (
-                <div key={i} style={{ background: '#0D1B2A', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ ...F, fontSize: 14, fontWeight: 700, color: '#F5F5F5' }}>{t.tier}</div>
-                    <div style={{ ...F, fontSize: 16, fontWeight: 900, color: '#FACC15' }}>{t.rate}</div>
-                  </div>
-                  <div style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>{t.example}</div>
+                { spend: '25 DKK', points: '0.25 points' },
+                { spend: '50 DKK', points: '0.50 points' },
+                { spend: '150 DKK', points: '1.50 points' },
+                { spend: '299 DKK', points: '2.99 points' },
+              ].map((row, i) => (
+                <div key={i} style={{ background: '#0D1B2A', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 16, textAlign: 'center' }}>
+                  <div style={{ ...F, fontSize: 15, fontWeight: 900, color: '#F5F5F5' }}>{row.spend}</div>
+                  <div style={{ ...FB, fontSize: 13, color: '#FACC15' }}>{row.points}</div>
                 </div>
               ))}
             </div>
             <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', fontStyle: 'italic' }}>
-              💰 Bonus: Every 10 paid race tickets you buy gives you 1 FREE bonus ticket, courtesy of the club!
+              Your Loyalty Points currently have no expiration date. Redeem them for reward milestones any time from your Racer Profile.
             </p>
+            {FEATURE_FLAGS.legacyMembershipUiEnabled && (
+              <div style={{ background: 'rgba(107,114,128,0.08)', border: '1px dashed rgba(107,114,128,0.3)', borderRadius: 12, padding: 20, marginTop: 20, ...FB, fontSize: 13, color: '#6B7280', lineHeight: 1.8 }}>
+                <strong style={{ color: '#9CA3AF' }}>Legacy copy (comparison only):</strong> the old system paid a variable percentage by membership tier (Non-Member 0%, Member 2%, up to Hall of Fame 8%). This has been replaced by the flat rate above so every racer earns the same way.
+              </div>
+            )}
           </section>
 
           <section style={{ marginBottom: 60 }}>
-            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>4. Climb the Rankings</h2>
+            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>4. Compete on the Leaderboard</h2>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              Your rank is based on your season placement. There are six tiers:
+              <strong style={{ color: '#F5F5F5' }}>Leaderboard rank is earned through racing, never through spending.</strong> Loyalty Points and Shop Credit have no effect on your rank. Box Stock and B-MAX each have their own separate Championship standings.
             </p>
-            <div style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
-              {[
-                { title: 'Rookie Racer', color: '#6B7280', desc: "Hasn't placed in a season yet." },
-                { title: 'Club Racer', color: '#3B82F6', desc: 'Active member, no season finish yet.' },
-                { title: 'Pro Racer', color: '#8B5CF6', desc: 'Finished 3rd overall in a season.' },
-                { title: 'Elite Racer', color: '#EC4899', desc: 'Finished 2nd overall in a season.' },
-                { title: 'Arctic Champion', color: '#DC2626', desc: '1st place season champion.' },
-                { title: 'Hall of Fame', color: '#FACC15', desc: 'Legendary status — never resets.' },
-              ].map((tier, i) => (
-                <div key={i} style={{ background: `${tier.color}15`, border: `1px solid ${tier.color}40`, borderRadius: 8, padding: 16 }}>
-                  <div style={{ ...F, fontSize: 14, fontWeight: 700, color: tier.color, marginBottom: 4 }}>{tier.title}</div>
-                  <div style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>{tier.desc}</div>
-                </div>
-              ))}
-            </div>
-            <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', marginTop: 20 }}>
-              🎯 <strong>Seasonal Tiers reset every year</strong> on our club anniversary. Your lifetime spending and Hall of Fame status never reset.
-            </p>
-          </section>
-
-          <section style={{ marginBottom: 60 }}>
-            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>5. Buy Race Tickets</h2>
-            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              Tickets are your passport to racing. We offer two types:
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-              <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 12, padding: 20 }}>
-                <div style={{ ...F, fontSize: 16, fontWeight: 900, color: '#DC2626', marginBottom: 12 }}>WEEKLY TICKET</div>
-                <div style={{ ...F, fontSize: 20, fontWeight: 900, color: '#FACC15', marginBottom: 12 }}>150 DKK</div>
-                <ul style={{ ...FB, fontSize: 13, color: '#B8C1CC', paddingLeft: 16, lineHeight: 1.8 }}>
-                  <li>Enter that week's race only</li>
-                  <li>One entry per car</li>
-                  <li>Counts toward punch card</li>
-                </ul>
-              </div>
-              <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 12, padding: 20 }}>
-                <div style={{ ...F, fontSize: 16, fontWeight: 900, color: '#DC2626', marginBottom: 12 }}>SEASON TICKET</div>
-                <div style={{ ...F, fontSize: 20, fontWeight: 900, color: '#FACC15', marginBottom: 12 }}>500 DKK</div>
-                <ul style={{ ...FB, fontSize: 13, color: '#B8C1CC', paddingLeft: 16, lineHeight: 1.8 }}>
-                  <li>Enter ALL races that season</li>
-                  <li>Unlimited entries</li>
-                  <li>Best value for racers</li>
-                </ul>
-              </div>
-            </div>
-            <div style={{ background: '#071426', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 12, padding: 20 }}>
-              <div style={{ ...F, fontSize: 14, fontWeight: 700, color: '#22C55E', marginBottom: 12 }}>⏰ MEMBERSHIP REQUIREMENT</div>
+            <div style={{ background: '#071426', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 12, padding: 20 }}>
+              <div style={{ ...F, fontSize: 14, fontWeight: 700, color: '#3B82F6', marginBottom: 12 }}>🏆 HOW POINTS ARE EARNED</div>
               <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.8 }}>
-                <strong style={{ color: '#F5F5F5' }}>Active members can use any ticket type.</strong> If your membership runs out, you can still race with a paid ticket (weekly or season), but free bonus tickets become unavailable until you spend again and renew.
+                1st place: 10 pts · 2nd: 7 pts · 3rd: 5 pts · 4th: 3 pts · qualified participation: 1 pt · fastest official clean run: +1 bonus. An eight-event season counts your best six results.
               </div>
             </div>
+          </section>
+
+          <section style={{ marginBottom: 60 }}>
+            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>5. Racing at Events</h2>
+            <div style={{ background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, ...FB, fontSize: 13, color: '#FACC15' }}>
+              🔧 Preview: this section describes where race-day pricing is heading. Current ticket types and prices on the Tickets page are unchanged until the new system ships.
+            </div>
+            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
+              Race Entry will include one registered car, one category, one event, one first life, and race-day warm-up. An optional Second Life can be added for the same car, category and event only — it can&apos;t be transferred, refunded after check-in, or carried to another weekend. See the full <a href="/loyalty" style={{ color: '#FACC15' }}>Racer Profile &amp; Rewards preview</a> for details.
+            </p>
+            {FEATURE_FLAGS.legacyDigitalTicketUiEnabled && (
+              <div style={{ background: 'rgba(107,114,128,0.08)', border: '1px dashed rgba(107,114,128,0.3)', borderRadius: 12, padding: 20, ...FB, fontSize: 13, color: '#6B7280', lineHeight: 1.8 }}>
+                <strong style={{ color: '#9CA3AF' }}>Legacy copy (comparison only):</strong> the old system sold Weekly/Season digital tickets with stored &quot;lives&quot; and a 10-ticket punch card toward a free bonus ticket. This is being replaced by pay-at-the-venue Race Entry/Second Life pricing with no stored digital inventory.
+              </div>
+            )}
           </section>
 
           <section style={{ marginBottom: 60 }}>
@@ -158,15 +130,15 @@ export default function HowToJoin() {
             <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 12, padding: 20 }}>
               <div style={{ ...F, fontSize: 14, fontWeight: 700, color: '#DC2626', marginBottom: 12 }}>📋 EXAMPLE</div>
               <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.8 }}>
-                You build a basic AR kit from the shop with no modifications. Since it meets the strictest requirements, it's eligible for any category — Box Stock, Open Box Stock, B-Max, or Open Class.
+                You build a basic AR kit from the shop with no modifications. Since it meets the strictest requirements, it&apos;s eligible for any category — Box Stock, Open Box Stock, B-Max, or Open Class.
               </div>
             </div>
           </section>
 
           <section style={{ marginBottom: 60 }}>
-            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>7. Unlock Discounts</h2>
+            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>7. Unlock Rewards</h2>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 24, lineHeight: 1.8 }}>
-              The club occasionally drops exclusive promo codes for higher-ranked members. Keep an eye on our social pages — codes are announced there when available.
+              Reach a Loyalty Points milestone and choose whether to redeem it — rewards are personal, non-transferable, and confirmed through your Racer Profile. See the <a href="/loyalty" style={{ color: '#FACC15' }}>full rewards roadmap</a>.
             </p>
           </section>
 
@@ -175,20 +147,20 @@ export default function HowToJoin() {
             <div style={{ display: 'grid', gap: 12 }}>
               {[
                 {
-                  q: 'Do I have to be a member to race?',
-                  a: 'No. You can race without membership if you buy a paid ticket (weekly or season). However, you cannot use free bonus tickets unless your membership is active.',
+                  q: 'Do I need to pay anything to get a Racer Profile?',
+                  a: 'No. Registration and your Racer Profile are completely free and never expire from inactivity.',
                 },
                 {
-                  q: 'What if my membership runs out?',
-                  a: 'You can still buy and race with tickets. To reactivate membership benefits, make any purchase — every 20 DKK you spend adds 1 day back.',
+                  q: 'Do Loyalty Points expire?',
+                  a: 'No. Your Loyalty Points currently have no expiration date.',
                 },
                 {
-                  q: 'How do I move up in rank?',
-                  a: "Rank is based on season placement. Finish 3rd, 2nd, or 1st in a season and you'll move up to Pro Racer, Elite Racer, or Arctic Champion. Hall of Fame is earned through legendary achievements.",
+                  q: 'Does spending more money improve my leaderboard rank?',
+                  a: 'No. Rank is earned only through racing results — Loyalty Points and Shop Credit never affect it.',
                 },
                 {
-                  q: 'Can I use my punch card (free ticket) after membership expires?',
-                  a: 'No. Free bonus tickets are only valid for active members. Paid tickets (weekly / season) work anytime.',
+                  q: 'What is Shop Credit and how is it different from Loyalty Points?',
+                  a: 'Shop Credit is awarded mainly through race prizes and is separate from Loyalty Points — it can be spent on eligible shop products but not on race entry, second lives, or cash withdrawal.',
                 },
                 {
                   q: 'How much do cars cost?',
