@@ -11,9 +11,9 @@ const TIERS: { key: CatalogTier; label: string }[] = [
   { key: 'special_order', label: 'Special Order / Collector' },
 ];
 
-type DryRunStatus = 'new' | 'unchanged' | 'conflicted';
+export type DryRunStatus = 'new' | 'unchanged' | 'conflicted';
 
-interface DryRunRow {
+export interface DryRunRow {
   item: BmaxCatalogProduct;
   status: DryRunStatus;
   conflictReason?: string;
@@ -27,15 +27,15 @@ export interface ExistingProductRef {
   category?: string | null;
 }
 
-function normalizeItemNo(v: string | null | undefined): string {
+export function normalizeItemNo(v: string | null | undefined): string {
   return (v || '').trim().toLowerCase();
 }
 
 // Pure diff — reads the existing product list, never writes anything. Matches the
 // brief's "dry-run mode" + "merge by normalized item_no, never duplicate" requirements
 // without actually executing an import (import execution is intentionally disabled
-// below pending production schema confirmation).
-function computeDryRun(existingProducts: ExistingProductRef[], selectedTiers: Set<CatalogTier>): DryRunRow[] {
+// below pending production schema confirmation). Exported for unit testing.
+export function computeDryRun(existingProducts: ExistingProductRef[], selectedTiers: Set<CatalogTier>): DryRunRow[] {
   const existingByItemNo = new Map<string, ExistingProductRef>();
   for (const p of existingProducts) {
     const key = normalizeItemNo(p.item_no);

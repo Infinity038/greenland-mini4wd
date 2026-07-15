@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { readCachedProducts, writeCachedProducts } from '@/lib/productCache';
+import { readCachedProducts } from '@/lib/productCache';
+import { resilientCatalogFetch } from '@/lib/resilientCatalogFetch';
 import { parseImages } from '@/lib/images';
 
 const CATALOG_CACHE_KEY = 'home_shop_preview';
@@ -50,20 +50,12 @@ export default function ShopPreview() {
 
   useEffect(() => {
     // Pull real, sellable products (cars, parts, merch) — prioritizes whatever's most
-    // recently added, which right now means your Collector's Vault cars.
-    supabase.from('products').select('*').in('status', ['in stock', 'limited', 'preorder only']).order('created_at', { ascending: false }).limit(4)
-      .then(({ data, error }: { data: PreviewItem[] | null; error: PostgrestError | null }) => {
-        if (error) {
-          // Keep whatever's already shown (cached or previous state) rather than
-          // masking a real fetch failure as if it were live data.
-          console.error('[home] shop preview refresh failed:', error.message);
-          return;
-        }
-        if (data && data.length > 0) {
-          setItems(data);
-          writeCachedProducts(CATALOG_CACHE_KEY, data);
-        }
-      });
+    // recently added, which right now means your Collector's Vault cars. On a fetch
+    // error this resolves to the cached catalog (or [], which falls back to FALLBACK
+    // below) instead of masking the failure as if it were live data.
+    resilientCatalogFetch<PreviewItem>(CATALOG_CACHE_KEY, () =>
+      supabase.from('products').select('*').in('status', ['in stock', 'limited', 'preorder only']).order('created_at', { ascending: false }).limit(4)
+    ).then(({ data }) => setItems(data));
   }, []);
 
   const display = items.length > 0 ? items : FALLBACK;

@@ -4,7 +4,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { getMemberData, isRegistered, generatePaymentRef } from '@/lib/member';
 import { supabase } from '@/lib/supabase';
-import { readCachedProducts, writeCachedProducts } from '@/lib/productCache';
+import { readCachedProducts } from '@/lib/productCache';
+import { resilientCatalogFetch } from '@/lib/resilientCatalogFetch';
 import { parseImages } from '@/lib/images';
 import { ProductImage as SharedProductImage } from '@/components/ProductImage';
 import Navbar from '@/components/layout/Navbar';
@@ -332,18 +333,12 @@ export default function ShopPage() {
   };
 
   async function fetchProducts() {
-    const cached = readCachedProducts<Product>(CATALOG_CACHE_KEY);
-    if (!cached) setLoading(true);
-    const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: true });
-    if (error) {
-      console.error('[shop] catalog refresh failed:', error.message);
-      setCatalogError('The catalog could not refresh. Showing the latest saved version.');
-      if (cached) setProducts(cached.data);
-    } else {
-      setProducts(data || []);
-      writeCachedProducts(CATALOG_CACHE_KEY, data || []);
-      setCatalogError(null);
-    }
+    if (!readCachedProducts<Product>(CATALOG_CACHE_KEY)) setLoading(true);
+    const { data, error } = await resilientCatalogFetch<Product>(CATALOG_CACHE_KEY, () =>
+      supabase.from('products').select('*').order('created_at', { ascending: true })
+    );
+    setProducts(data);
+    setCatalogError(error);
     setCatalogLoadedOnce(true);
     setLoading(false);
   }
@@ -352,6 +347,11 @@ export default function ShopPage() {
     const { data } = await supabase.from('shop_inventory').select('*').eq('id', 1).single();
     if (data) setGlobalCaseStock(data.case_stock ?? 0);
   }
+
+  // Only a successful query that genuinely returned zero published products counts as
+  // a real empty catalog — while loading, or after a failed refresh, we keep showing
+  // cached/current products instead (see fetchProducts above).
+  const catalogIsGenuinelyEmpty = catalogLoadedOnce && !catalogError && products.length === 0;
 
   const isCarProduct = (p: Product) => !p.category || p.category === 'cars';
 
@@ -620,7 +620,7 @@ export default function ShopPage() {
             ) : carsFiltered.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280' }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🏎️</div>
-                <div style={{ ...FB, fontSize: 14 }}>No cars match your search/filters.</div>
+                <div style={{ ...FB, fontSize: 14 }}>{catalogIsGenuinelyEmpty ? 'No cars are published yet — check back soon.' : 'No cars match your search/filters.'}</div>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
@@ -710,7 +710,7 @@ export default function ShopPage() {
             ) : partsFiltered.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280' }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🔧</div>
-                <div style={{ ...FB, fontSize: 14 }}>No parts match your search/filters yet.</div>
+                <div style={{ ...FB, fontSize: 14 }}>{catalogIsGenuinelyEmpty ? 'No parts are published yet — check back soon.' : 'No parts match your search/filters yet.'}</div>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20 }}>
