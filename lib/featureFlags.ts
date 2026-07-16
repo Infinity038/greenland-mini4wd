@@ -11,4 +11,12 @@ export const FEATURE_FLAGS = {
   // does not re-enable any removed backend behavior.
   legacyMembershipUiEnabled: process.env.NEXT_PUBLIC_LEGACY_MEMBERSHIP_UI_ENABLED === 'true',
   legacyDigitalTicketUiEnabled: process.env.NEXT_PUBLIC_LEGACY_DIGITAL_TICKET_UI_ENABLED === 'true',
+
+  // BUSINESS DECISION: race entry is in-person only. Online race-ticket
+  // purchasing (the Buy Ticket flow, ticket wallet, digital first/second lives,
+  // ticket inventory) is discontinued — race entry and Second Life payments now
+  // happen only at the venue during check-in. Defaults to false/off. Flipping to
+  // 'true' is an emergency rollback that restores the OLD online purchase flow
+  // exactly as it was — it does not create any new functionality.
+  onlineRaceTicketsEnabled: process.env.NEXT_PUBLIC_ONLINE_RACE_TICKETS_ENABLED === 'true',
 } as const;

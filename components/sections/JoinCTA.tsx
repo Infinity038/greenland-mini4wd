@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { isRegistered } from "@/lib/member";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -18,7 +19,7 @@ export default function JoinCTA() {
         </h2>
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
           <a href="/shop" style={{ background: "#DC2626", color: "#fff", padding: "13px 26px", borderRadius: 8, ...F, fontWeight: 700, fontSize: 15, letterSpacing: 2, textDecoration: "none" }}>SHOP NOW</a>
-          <a href="/tickets" style={{ background: "#FACC15", color: "#050505", padding: "13px 26px", borderRadius: 8, ...F, fontWeight: 900, fontSize: 15, letterSpacing: 2, textDecoration: "none" }}>🎟️ BUY TICKETS</a>
+          <a href="/tickets" style={{ background: "#FACC15", color: "#050505", padding: "13px 26px", borderRadius: 8, ...F, fontWeight: 900, fontSize: 15, letterSpacing: 2, textDecoration: "none" }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? "🎟️ BUY TICKETS" : "🏁 RACE DAY"}</a>
           <a href="/tournament" style={{ background: "transparent", color: "#F5F5F5", padding: "13px 26px", borderRadius: 8, ...F, fontWeight: 700, fontSize: 15, letterSpacing: 2, textDecoration: "none", border: "1px solid rgba(255,255,255,0.15)" }}>TOURNAMENTS</a>
           <a href="/profile" style={{ background: "transparent", color: "#FACC15", padding: "13px 26px", borderRadius: 8, ...F, fontWeight: 700, fontSize: 15, letterSpacing: 2, textDecoration: "none", border: "1px solid rgba(250,204,21,0.3)" }}>MY PROFILE</a>
         </div>

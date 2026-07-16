@@ -23,8 +23,8 @@ const EXAMPLE_ACTIVITY: PointsActivityEntry[] = [
 ];
 
 const HOW_IT_WORKS: { title: string; body: string }[] = [
-  { title: 'How Race Entry works', body: 'Race Entry costs 150 DKK and includes one registered car, one event and one life. Your car is checked and recorded at the venue before racing.' },
-  { title: 'How Second Life works', body: 'A Second Life costs 50 DKK. It must be purchased before check-in closes and applies only to the same registered car and the same event. It cannot be transferred or carried to another weekend.' },
+  { title: 'How Race Entry works', body: 'Race Entry is paid in person at check-in — 150 DKK for a weekly race, 500 DKK for a big event — and includes one registered car, one category, one event and one first life. You may RSVP online first, but payment happens at the venue.' },
+  { title: 'How Second Life works', body: 'An optional Second Life costs 50 DKK (weekly) or 100 DKK (big event), paid in person before check-in closes. It applies only to the same registered car and the same event. It cannot be transferred, refunded after check-in, or carried to another weekend.' },
   { title: 'How the Racer Card works', body: 'Your free Racer Card identifies your Racer Profile. Staff scans the QR code for purchases and loyalty activity. Race lives are controlled using dated physical stamps and a registered car sticker.' },
   { title: 'How Loyalty Points work', body: 'Every 100 DKK you pay earns 1.00 point. Partial spending earns partial points, so a 150 DKK race entry earns 1.50 points. Your points do not expire.' },
   { title: 'How rewards work', body: 'When you reach a reward milestone, you choose whether to redeem it. Rewards are personal and must be confirmed through your Racer Profile.' },
@@ -38,7 +38,7 @@ const HOW_IT_WORKS: { title: string; body: string }[] = [
 function PreviewBanner() {
   return (
     <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 10, padding: '14px 18px', marginBottom: 32, ...FB, fontSize: 13, color: '#FCA5A5', lineHeight: 1.7, textAlign: 'center' }}>
-      🔧 <strong style={{ color: '#fff' }}>Preview page.</strong> Everything below uses example data to show what your Racer Profile will look like. Nothing here is connected to your real account yet, and current pricing/purchase flows on the Tickets and Tournament pages are unchanged until this system ships.
+      🔧 <strong style={{ color: '#fff' }}>Preview page.</strong> Everything below uses example data to show what your Racer Profile will look like. Nothing here is connected to your real account yet. Race entry pricing (150/500 DKK) and the in-person-only payment model shown here are already live on the Tickets and Tournament pages — the Loyalty Points/Shop Credit/Racer Card backend shown below is still example data.
     </div>
   );
 }

@@ -65,7 +65,7 @@ const CLASSES = [
 
 const GENERAL_RULES = [
   { icon: '🔋', title: 'Motors & Batteries', desc: 'Only approved unmodified Tamiya motors. Only alkaline or NiMH batteries. Lithium batteries are prohibited in all classes.' },
-  { icon: '🎟️', title: '1 Ticket = 1 Entry', desc: 'Each ticket lets you enter 1 car into 1 race category. Buy more tickets to enter more cars or more categories.' },
+  { icon: '🏁', title: 'Pay In Person', desc: 'Race entry is paid in person at check-in and covers 1 car in 1 race category. Enter more cars or categories with additional in-person entries.' },
   { icon: '🔄', title: 'Multi-Category Entry', desc: 'The same car can enter multiple different categories on the same race day. However, the same car CANNOT enter the same category twice.' },
   { icon: '📐', title: 'Car Dimensions', desc: 'Max width 105mm · Max height 70mm · Max length 165mm · Min ground clearance 1mm · Min weight 90g · Tires 22–26mm diameter.' },
   { icon: '🏁', title: 'Qualification Format', desc: '2 timed runs per entry. Best run counts. Top qualifiers advance to single-elimination finals.' },

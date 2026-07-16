@@ -7,6 +7,7 @@ import Footer from '@/components/layout/Footer';
 import { isRegistered, getMemberData } from '@/lib/member';
 import { isMemberActive } from '@/lib/loyalty';
 import { supabase } from '@/lib/supabase';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
 const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -202,11 +203,11 @@ export default function TournamentPage() {
             <p style={{ ...FB, fontSize:16, color:'#B8C1CC', maxWidth:560, margin:'0 auto 32px', lineHeight:1.7 }}>Pure stock. Pure skill. Every racer on the same level — the only advantage is your driving.</p>
             <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
               {loggedIn ? (
-                <><a href="/tickets" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>🎟️ BUY TICKETS →</a>
+                <><a href="/tickets" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? '🎟️ BUY TICKETS →' : '🏁 RSVP FOR RACE DAY →'}</a>
                 <a href="/shop" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>GET YOUR CAR</a></>
               ) : (
                 <><a href="/register" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>REGISTER FREE FIRST →</a>
-                <a href="/tickets" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>VIEW TICKETS</a></>
+                <a href="/tickets" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? 'VIEW TICKETS' : 'VIEW RACE DAY INFO'}</a></>
               )}
             </div>
           </div>
@@ -298,8 +299,22 @@ export default function TournamentPage() {
                                 style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:8, padding:'8px 16px', ...F, fontWeight:700, fontSize:12, letterSpacing:1, color:'#B8C1CC', cursor:'pointer' }}>
                                 👥 {total} ENTRANT{total !== 1 ? 'S' : ''} →
                               </button>
-                              {loggedIn ? (
+                              {!FEATURE_FLAGS.onlineRaceTicketsEnabled ? (
+                                // Race entry is in-person only — no online ticket gating.
+                                // The public site only offers a free attendance RSVP here.
+                                loggedIn ? (
+                                  <a href="/tickets" style={{ display:'inline-block', background:'#DC2626', color:'#fff', borderRadius:8, padding:'10px 20px', ...F, fontWeight:900, fontSize:13, letterSpacing:1, textDecoration:'none' }}>
+                                    RSVP →
+                                  </a>
+                                ) : (
+                                  <a href="/register" style={{ display:'inline-block', background:'#DC2626', color:'#fff', borderRadius:8, padding:'10px 20px', ...F, fontWeight:900, fontSize:13, letterSpacing:1, textDecoration:'none' }}>
+                                    REGISTER →
+                                  </a>
+                                )
+                              ) : loggedIn ? (
                                 (() => {
+                                  // Legacy ticket-gated entry — discontinued, preserved only
+                                  // as an emergency rollback behind onlineRaceTicketsEnabled.
                                   // Match tickets to tournament type
                                   const tType = t.ticket_type || 'weekly';
                                   const matchingTickets = myTickets.filter(tk =>
@@ -365,12 +380,12 @@ export default function TournamentPage() {
             <h2 style={{ ...F, fontWeight:900, fontSize:'clamp(32px,6vw,52px)', margin:'0 0 32px' }}>HOW RACING WORKS</h2>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:16 }}>
               {[
-                { icon:'🎟️', title:'1 Ticket = 1 Entry', desc:'Each ticket lets you enter 1 car into 1 race category. Buy more tickets to enter more cars or categories.' },
+                { icon:'🏁', title:'Pay In Person', desc:'Race entry is paid in person at check-in — 150 DKK weekly / 500 DKK big event. Each entry covers 1 car in 1 race category.' },
                 { icon:'🏁', title:'Qualification Format', desc:'2 timed runs per entry. Best run counts. Top qualifiers advance to single-elimination finals.' },
                 { icon:'⚡', title:'Single Elimination Finals', desc:'Head-to-head racing. Win or go home. No second chances.' },
                 { icon:'🔄', title:'Multi-Category Entry', desc:"Same car can enter multiple categories in one race day, but not the same category twice. One racer can enter multiple cars into the same category." },
                 { icon:'🔋', title:'Alkaline AA Only', desc:'Standard Alkaline AA batteries only. No NiMH, lithium, or rechargeable batteries.' },
-                { icon:'👤', title:'Official Members Only', desc:'Tournament entry requires Official Member status. Complete a qualifying purchase to unlock.' },
+                { icon:'👤', title:'Racer Profile Required', desc:'Tournament entry requires a registered Racer Profile and an approved car with a Club Car ID.' },
               ].map(r => (
                 <div key={r.title} style={{ background:'#071426', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:'24px 20px' }}>
                   <div style={{ fontSize:28, marginBottom:12 }}>{r.icon}</div>
@@ -385,7 +400,7 @@ export default function TournamentPage() {
           <section style={{ marginBottom:64 }}>
             <div style={{ ...F, fontSize:11, letterSpacing:5, color:'#DC2626', marginBottom:8 }}>70/30 SPLIT</div>
             <h2 style={{ ...F, fontWeight:900, fontSize:'clamp(32px,6vw,52px)', margin:'0 0 8px' }}>PRIZE POOL</h2>
-            <p style={{ ...FB, fontSize:15, color:'#B8C1CC', margin:'0 0 32px' }}>70% of paid ticket sales goes to the prize pool. Bonus tickets don't contribute.</p>
+            <p style={{ ...FB, fontSize:15, color:'#B8C1CC', margin:'0 0 32px' }}>70% of confirmed in-person race-entry fees goes to the prize pool. Second Life payments don't contribute.</p>
             <PrizeCalculator />
           </section>
 
@@ -413,14 +428,14 @@ export default function TournamentPage() {
           <section style={{ background:'#071426', border:'1px solid rgba(220,38,38,0.2)', borderRadius:16, padding:'40px 32px', textAlign:'center' }}>
             <div style={{ ...F, fontSize:11, letterSpacing:5, color:'#DC2626', marginBottom:12 }}>READY TO RACE?</div>
             <h2 style={{ ...F, fontWeight:900, fontSize:'clamp(32px,7vw,56px)', margin:'0 0 16px' }}>JOIN THE CLUB</h2>
-            <p style={{ ...FB, fontSize:15, color:'#B8C1CC', maxWidth:480, margin:'0 auto 28px', lineHeight:1.7 }}>Register free, get your car approved, buy a ticket, and race in Nuuk.</p>
+            <p style={{ ...FB, fontSize:15, color:'#B8C1CC', maxWidth:480, margin:'0 auto 28px', lineHeight:1.7 }}>Register free, get your car approved, RSVP, and pay in person to race in Nuuk.</p>
             <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
               {loggedIn ? (
-                <><a href="/tickets" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>🎟️ BUY TICKETS →</a>
+                <><a href="/tickets" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? '🎟️ BUY TICKETS →' : '🏁 RSVP FOR RACE DAY →'}</a>
                 <a href="/profile?tab=garage" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>MY GARAGE</a></>
               ) : (
                 <><a href="/register" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>REGISTER FREE →</a>
-                <a href="/tickets" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>VIEW TICKETS</a></>
+                <a href="/tickets" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? 'VIEW TICKETS' : 'VIEW RACE DAY INFO'}</a></>
               )}
             </div>
           </section>

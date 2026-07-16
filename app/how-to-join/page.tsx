@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
+import { IN_PERSON_ONLY_NOTICE } from '@/lib/raceEntryPricing';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -106,11 +107,23 @@ export default function HowToJoin() {
 
           <section style={{ marginBottom: 60 }}>
             <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>5. Racing at Events</h2>
-            <div style={{ background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, ...FB, fontSize: 13, color: '#FACC15' }}>
-              🔧 Preview: this section describes where race-day pricing is heading. Current ticket types and prices on the Tickets page are unchanged until the new system ships.
+            <div style={{ background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, ...FB, fontSize: 14, color: '#F5F5F5', lineHeight: 1.7 }}>
+              {IN_PERSON_ONLY_NOTICE}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+              <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 12, padding: 20 }}>
+                <div style={{ ...F, fontSize: 16, fontWeight: 900, color: '#DC2626', marginBottom: 12 }}>WEEKLY RACE</div>
+                <div style={{ ...F, fontSize: 20, fontWeight: 900, color: '#FACC15', marginBottom: 4 }}>150 DKK <span style={{ fontSize: 13, color: '#B8C1CC', fontWeight: 400 }}>first entry</span></div>
+                <div style={{ ...F, fontSize: 16, fontWeight: 700, color: '#22C55E' }}>50 DKK <span style={{ fontSize: 13, color: '#B8C1CC', fontWeight: 400 }}>optional second life</span></div>
+              </div>
+              <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 12, padding: 20 }}>
+                <div style={{ ...F, fontSize: 16, fontWeight: 900, color: '#DC2626', marginBottom: 12 }}>BIG EVENT</div>
+                <div style={{ ...F, fontSize: 20, fontWeight: 900, color: '#FACC15', marginBottom: 4 }}>500 DKK <span style={{ fontSize: 13, color: '#B8C1CC', fontWeight: 400 }}>first entry</span></div>
+                <div style={{ ...F, fontSize: 16, fontWeight: 700, color: '#22C55E' }}>100 DKK <span style={{ fontSize: 13, color: '#B8C1CC', fontWeight: 400 }}>optional second life</span></div>
+              </div>
             </div>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              Race Entry will include one registered car, one category, one event, one first life, and race-day warm-up. An optional Second Life can be added for the same car, category and event only — it can&apos;t be transferred, refunded after check-in, or carried to another weekend. See the full <a href="/loyalty" style={{ color: '#FACC15' }}>Racer Profile &amp; Rewards preview</a> for details.
+              Race entry includes one registered car, one category, one event, one first life, and race-day warm-up. An optional Second Life must be paid before check-in closes and applies only to the same registered car, category and event — it can&apos;t be transferred, refunded after check-in, or carried to another weekend. You may RSVP on the <a href="/tickets" style={{ color: '#FACC15' }}>Race Day page</a> to help the club estimate attendance. See the full <a href="/loyalty" style={{ color: '#FACC15' }}>Racer Profile &amp; Rewards preview</a> for details.
             </p>
             {FEATURE_FLAGS.legacyDigitalTicketUiEnabled && (
               <div style={{ background: 'rgba(107,114,128,0.08)', border: '1px dashed rgba(107,114,128,0.3)', borderRadius: 12, padding: 20, ...FB, fontSize: 13, color: '#6B7280', lineHeight: 1.8 }}>
@@ -122,7 +135,7 @@ export default function HowToJoin() {
           <section style={{ marginBottom: 60 }}>
             <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>6. Register Your Cars</h2>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              Build or buy a Mini 4WD and add it to your garage. Your car must be approved by an admin before you can race it.
+              Build or buy a Mini 4WD and add it to your garage. Your car must be approved by an admin before you can race it. Once approved, it receives a <strong style={{ color: '#F5F5F5' }}>Club Car ID</strong> (e.g. <code style={{ color: '#FACC15' }}>G4W-BS-0047</code>) identifying the registered chassis — replacing the chassis means registering a new car and receiving a new Club Car ID, though normal legal parts and body changes stay allowed under the category rules.
             </p>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
               <strong style={{ color: '#F5F5F5' }}>Race categories</strong> are: Box Stock, Open Box Stock, B-Max, and Open Class.

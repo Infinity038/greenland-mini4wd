@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { getMemberData, isRegistered, generatePaymentRef } from '@/lib/member';
 import { supabase } from '@/lib/supabase';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
+import EventRsvpPanel from '@/components/racer/EventRsvpPanel';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 
@@ -140,10 +142,10 @@ export default function TicketsPage() {
         <section style={{ background: '#071426', borderBottom: '1px solid rgba(220,38,38,0.2)', padding: '40px 24px 0' }}>
           <div style={{ maxWidth: 900, margin: '0 auto' }}>
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 6 }}>THE ARCTIC HUSTLE</div>
-            <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px,8vw,64px)', margin: '0 0 8px', lineHeight: 0.95 }}>RACE TICKETS</h1>
-            <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', margin: '0 0 24px' }}>Buy your entry, register your car, race for glory.</p>
+            <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px,8vw,64px)', margin: '0 0 8px', lineHeight: 0.95 }}>RACE DAY</h1>
+            <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', margin: '0 0 24px' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? 'Buy your entry, register your car, race for glory.' : 'RSVP, register your car, and pay in person at check-in.'}</p>
             <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
-              {[{id:'buy',label:'🎟️ BUY TICKETS'},{id:'entrants',label:'🏎️ ENTRANTS'},{id:'pass',label:'🏆 RACE PASS'},{id:'rules',label:'📋 RULES'}].map(t => (
+              {[{id:'buy',label: FEATURE_FLAGS.onlineRaceTicketsEnabled ? '🎟️ BUY TICKETS' : '🏁 RSVP'},{id:'entrants',label:'🏎️ ENTRANTS'},{id:'pass',label:'🏆 RACE PASS'},{id:'rules',label:'📋 RULES'}].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
                   style={{ ...F, fontWeight:700, fontSize:12, letterSpacing:2, padding:'12px 16px', border:'none', cursor:'pointer', whiteSpace:'nowrap', borderRadius:'8px 8px 0 0', background: activeTab===t.id ? '#050505' : 'transparent', color: activeTab===t.id ? '#DC2626' : '#B8C1CC', borderTop: activeTab===t.id ? '2px solid #DC2626' : '2px solid transparent' }}>
                   {t.label}
@@ -156,7 +158,13 @@ export default function TicketsPage() {
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 24px' }}>
 
           {/* ── BUY TAB ── */}
-          {activeTab === 'buy' && (
+          {activeTab === 'buy' && !FEATURE_FLAGS.onlineRaceTicketsEnabled && (
+            <EventRsvpPanel member={member} eventId="weekly-race-day" />
+          )}
+
+          {/* Legacy online ticket-purchase flow — discontinued (race entry is in-person
+              only). Preserved behind the flag as an emergency rollback path only. */}
+          {activeTab === 'buy' && FEATURE_FLAGS.onlineRaceTicketsEnabled && (
             <div>
               {step === 'select' && (
                 <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
@@ -341,7 +349,17 @@ export default function TicketsPage() {
           )}
 
           {/* ── RACE PASS TAB ── */}
-          {activeTab === 'pass' && (
+          {activeTab === 'pass' && !FEATURE_FLAGS.onlineRaceTicketsEnabled && (
+            <div style={{ background:'#071426', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:40, textAlign:'center' }}>
+              <div style={{ fontSize:40, marginBottom:12 }}>🔧</div>
+              <div style={{ ...F, fontWeight:900, fontSize:20, color:'#F5F5F5', marginBottom:8 }}>RACE PASS IS BEING REDESIGNED</div>
+              <div style={{ ...FB, fontSize:14, color:'#B8C1CC', maxWidth:420, margin:'0 auto' }}>The old punch-card tracked paid ticket purchases. Since race entry now happens in person, this is being rebuilt around confirmed in-person payments. Check your Racer Profile for Loyalty Points in the meantime.</div>
+            </div>
+          )}
+
+          {/* Legacy weekly/season ticket punch-card — discontinued alongside online
+              ticket purchasing. Preserved behind the flag as an emergency rollback path. */}
+          {activeTab === 'pass' && FEATURE_FLAGS.onlineRaceTicketsEnabled && (
             <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
               {!member ? (
                 <div style={{ background:'#071426', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:40, textAlign:'center' }}>
@@ -401,10 +419,10 @@ export default function TicketsPage() {
                 <div style={{ ...F, fontWeight:900, fontSize:20, color:'#DC2626', marginBottom:16, letterSpacing:1 }}>🏁 RACE RULES</div>
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                   {[
-                    ['🎟️','Ticket System','1 ticket = 1 car entry · 2 qualification lives per ticket · If eliminated, ticket is consumed.'],
+                    ['🏁','Race Entry','Paid in person at check-in — 150 DKK weekly / 500 DKK big event. Includes one car, one category, one first life.'],
+                    ['🔁','Second Life','Optional 50 DKK weekly / 100 DKK big event, paid before check-in closes. Valid only for the same registered car and event — no transfers, refunds after check-in, or carrying to another event.'],
                     ['🚗','Car Entry','Same car cannot enter the same category twice. 1 car CAN enter multiple different categories.'],
-                    ['🎁','Loyalty Rewards','Every 10 paid tickets = 1 FREE ticket. Weekly and Season passes are tracked separately. Free tickets do NOT count toward the 10.'],
-                    ['🔧','Car Registration','Cars must be registered in your Garage and admin-approved before race entry.'],
+                    ['🔧','Car Registration','Cars must be registered in your Garage and admin-approved before race entry, and carry a Club Car ID identifying the registered chassis.'],
                     ['⚡','Modifications','Cars must comply with their entered class. Stock cars can enter B-Max but modified cars cannot enter Box Stock.'],
                     ['📏','Measurements','Max width 105mm · Max height 70mm · Max length 165mm · Min ground clearance 1mm · Min weight 90g'],
                     ['⛽','Motors & Batteries','Only approved unmodified Tamiya motors. Only alkaline or NiMH batteries. Lithium prohibited.'],

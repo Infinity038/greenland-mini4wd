@@ -198,6 +198,10 @@ export default function AdminTicketsPage() {
       </div>
 
       <div style={s.body}>
+        <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 16, background: 'rgba(107,114,128,0.08)', border: '1px solid rgba(107,114,128,0.25)', borderRadius: 8, padding: '10px 14px' }}>
+          🔧 Online race-ticket purchasing has been discontinued — race entry is now paid in person only. This screen manages any remaining legacy/historical ticket records; no new tickets are created from the public site.
+        </div>
+
         {msg && <div style={{ ...FB, fontSize: 13, color: msg.startsWith('❌') ? '#FCA5A5' : '#22C55E', marginBottom: 16, background: msg.startsWith('❌') ? 'rgba(220,38,38,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${msg.startsWith('❌') ? 'rgba(220,38,38,0.2)' : 'rgba(34,197,94,0.2)'}`, borderRadius: 8, padding: '10px 14px' }}>{msg}</div>}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: 24 }}>

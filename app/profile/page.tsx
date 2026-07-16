@@ -6,6 +6,8 @@ import { getMemberData, getMemberDataFromSupabase, getTicketWallet, getReferralS
 import { isMemberActive, daysRemaining } from '@/lib/loyalty';
 import type { Member, TicketWallet, ReferralStats } from '@/lib/member';
 import { supabase } from '@/lib/supabase';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
+import { IN_PERSON_ONLY_NOTICE } from '@/lib/raceEntryPricing';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 
@@ -448,7 +450,43 @@ export default function ProfilePage() {
           )}
 
           {/* TICKETS */}
-          {tab === 'tickets' && (
+          {tab === 'tickets' && !FEATURE_FLAGS.onlineRaceTicketsEnabled && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 12, padding: 16, ...FB, fontSize: 13, color: '#F5F5F5', lineHeight: 1.7 }}>
+                {IN_PERSON_ONLY_NOTICE} Any purchase history below is historical.
+              </div>
+
+              {raceEntries.length > 0 && (
+                <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
+                  <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 16 }}>MY RACE ENTRIES</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {raceEntries.map(e => (
+                      <div key={e.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ ...F, fontWeight: 700, fontSize: 15, color: '#F5F5F5', marginBottom: 2 }}>🏎️ {e.car_name || '—'} <span style={{ color: '#B8C1CC', fontWeight: 400, fontSize: 13 }}>→ {(e.race_category || '').replace(/_/g, ' ').toUpperCase()}</span></div>
+                          <div style={{ ...FB, fontSize: 12, color: '#6B7280' }}>{new Date(e.created_at).toLocaleDateString('en-GB')}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24 }}>
+                <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 16 }}>LEGACY TICKET HISTORY</div>
+                {ticketHistory.length === 0 ? (
+                  <div style={{ ...FB, fontSize: 14, color: '#6B7280', textAlign: 'center', padding: '20px 0' }}>No legacy ticket records.</div>
+                ) : (
+                  <div style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>{ticketHistory.length} historical ticket record{ticketHistory.length !== 1 ? 's' : ''} from before in-person race entry — preserved for reference only.</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Legacy ticket wallet (Paid/Bonus Available, Race Pass punch cards) —
+              discontinued alongside online ticket purchasing. Preserved behind the
+              flag as an emergency rollback path only. */}
+          {tab === 'tickets' && FEATURE_FLAGS.onlineRaceTicketsEnabled && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                 {[
