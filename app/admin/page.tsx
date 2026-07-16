@@ -24,6 +24,7 @@ function saveAuth() {
 }
 
 const NAV = [
+  { href: '/admin/pos',          icon: '🧾', label: 'Point of Sale', desc: 'In-person checkout' },
   { href: '/admin/orders',       icon: '📦', label: 'Orders',        desc: 'Payments & proofs', alertKey: 'pendingProofs' },
   { href: '/admin/products',     icon: '🛒', label: 'Products',      desc: 'Shop catalog' },
   { href: '/admin/members',      icon: '👥', label: 'Members',       desc: 'Accounts & status' },

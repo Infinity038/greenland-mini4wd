@@ -9,6 +9,7 @@ const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
 const NAV = [
   { href: '/admin',               icon: '⬡', label: 'Dashboard' },
+  { href: '/admin/pos',           icon: '🧾', label: 'Point of Sale' },
   { href: '/admin/orders',        icon: '📦', label: 'Orders' },
   { href: '/admin/products',      icon: '🛒', label: 'Products' },
   { href: '/admin/members',       icon: '👥', label: 'Members' },
