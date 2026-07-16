@@ -10,7 +10,9 @@ import BalanceCards from '@/components/racer/BalanceCards';
 import LoyaltyRoadmap from '@/components/racer/LoyaltyRoadmap';
 import PointsActivityList, { type PointsActivityEntry } from '@/components/racer/PointsActivityList';
 import { RacerCardFront, RacerCardBack } from '@/components/racer/RacerCardPreview';
+import RacerIdentityPanel from '@/components/racer/RacerIdentityPanel';
 import { calculatePrizePool, splitPlacementPrize } from '@/lib/prizePool';
+import { formatRacerId } from '@/lib/racerId';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -55,6 +57,11 @@ export default function LoyaltyPreviewPage() {
           <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8, textAlign: 'center' }}>ARCTIC MINI4WD</div>
           <h1 style={{ ...F, fontSize: 40, fontWeight: 900, marginBottom: 20, textAlign: 'center', color: '#F5F5F5' }}>RACER PROFILE &amp; REWARDS</h1>
           <PreviewBanner />
+
+          <section style={{ marginBottom: 48 }}>
+            <h2 style={{ ...F, fontSize: 22, fontWeight: 900, marginBottom: 16, color: '#FACC15' }}>Racer Identity (example)</h2>
+            <RacerIdentityPanel racer={{ displayName: 'J. Racer', racerId: formatRacerId(47), accountStatus: 'Active', photoUrl: null }} />
+          </section>
 
           <section style={{ marginBottom: 48 }}>
             <h2 style={{ ...F, fontSize: 22, fontWeight: 900, marginBottom: 16, color: '#FACC15' }}>Your Balances (example)</h2>

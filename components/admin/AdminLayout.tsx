@@ -13,7 +13,7 @@ const NAV = [
   { href: '/admin/products',      icon: '🛒', label: 'Products' },
   { href: '/admin/members',       icon: '👥', label: 'Members' },
   { href: '/admin/tournaments',   icon: '🏁', label: 'Tournaments' },
-  { href: '/admin/tickets',       icon: '🎟️', label: 'Tickets' },
+  { href: '/admin/tickets',       icon: '🎟️', label: 'Tickets (Legacy)' },
   { href: '/admin/news',          icon: '📰', label: 'News' },
   { href: '/admin/gallery',       icon: '🖼️', label: 'Gallery' },
   { href: '/admin/leaderboard',   icon: '🏆', label: 'Leaderboard' },

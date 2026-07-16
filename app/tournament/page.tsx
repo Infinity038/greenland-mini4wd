@@ -203,11 +203,11 @@ export default function TournamentPage() {
             <p style={{ ...FB, fontSize:16, color:'#B8C1CC', maxWidth:560, margin:'0 auto 32px', lineHeight:1.7 }}>Pure stock. Pure skill. Every racer on the same level — the only advantage is your driving.</p>
             <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
               {loggedIn ? (
-                <><a href="/tickets" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? '🎟️ BUY TICKETS →' : '🏁 RSVP FOR RACE DAY →'}</a>
+                <><a href="/race-check-in" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? '🎟️ BUY TICKETS →' : '🏁 RSVP FOR RACE DAY →'}</a>
                 <a href="/shop" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>GET YOUR CAR</a></>
               ) : (
                 <><a href="/register" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>REGISTER FREE FIRST →</a>
-                <a href="/tickets" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? 'VIEW TICKETS' : 'VIEW RACE DAY INFO'}</a></>
+                <a href="/race-check-in" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? 'VIEW TICKETS' : 'VIEW RACE DAY INFO'}</a></>
               )}
             </div>
           </div>
@@ -303,7 +303,7 @@ export default function TournamentPage() {
                                 // Race entry is in-person only — no online ticket gating.
                                 // The public site only offers a free attendance RSVP here.
                                 loggedIn ? (
-                                  <a href="/tickets" style={{ display:'inline-block', background:'#DC2626', color:'#fff', borderRadius:8, padding:'10px 20px', ...F, fontWeight:900, fontSize:13, letterSpacing:1, textDecoration:'none' }}>
+                                  <a href="/race-check-in" style={{ display:'inline-block', background:'#DC2626', color:'#fff', borderRadius:8, padding:'10px 20px', ...F, fontWeight:900, fontSize:13, letterSpacing:1, textDecoration:'none' }}>
                                     RSVP →
                                   </a>
                                 ) : (
@@ -330,13 +330,13 @@ export default function TournamentPage() {
                                   );
                                   if (myTotalTickets > 0 && matchingAvail <= 0) return (
                                     <div style={{ textAlign:'right' }}>
-                                      <a href="/tickets" style={{ display:'inline-block', background:'rgba(220,38,38,0.15)', color:'#DC2626', border:'1px solid rgba(220,38,38,0.3)', borderRadius:8, padding:'8px 14px', ...F, fontWeight:700, fontSize:11, letterSpacing:1, textDecoration:'none' }}>
+                                      <a href="/race-check-in" style={{ display:'inline-block', background:'rgba(220,38,38,0.15)', color:'#DC2626', border:'1px solid rgba(220,38,38,0.3)', borderRadius:8, padding:'8px 14px', ...F, fontWeight:700, fontSize:11, letterSpacing:1, textDecoration:'none' }}>
                                         {tType === 'season' ? 'NEED SEASON TICKET' : 'NEED WEEKLY TICKET'}
                                       </a>
                                     </div>
                                   );
                                   return (
-                                    <a href="/tickets" style={{ display:'inline-block', background:'rgba(220,38,38,0.15)', color:'#DC2626', border:'1px solid rgba(220,38,38,0.3)', borderRadius:8, padding:'10px 20px', ...F, fontWeight:700, fontSize:12, letterSpacing:1, textDecoration:'none' }}>
+                                    <a href="/race-check-in" style={{ display:'inline-block', background:'rgba(220,38,38,0.15)', color:'#DC2626', border:'1px solid rgba(220,38,38,0.3)', borderRadius:8, padding:'10px 20px', ...F, fontWeight:700, fontSize:12, letterSpacing:1, textDecoration:'none' }}>
                                       BUY TICKET FIRST
                                     </a>
                                   );
@@ -431,11 +431,11 @@ export default function TournamentPage() {
             <p style={{ ...FB, fontSize:15, color:'#B8C1CC', maxWidth:480, margin:'0 auto 28px', lineHeight:1.7 }}>Register free, get your car approved, RSVP, and pay in person to race in Nuuk.</p>
             <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
               {loggedIn ? (
-                <><a href="/tickets" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? '🎟️ BUY TICKETS →' : '🏁 RSVP FOR RACE DAY →'}</a>
+                <><a href="/race-check-in" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? '🎟️ BUY TICKETS →' : '🏁 RSVP FOR RACE DAY →'}</a>
                 <a href="/profile?tab=garage" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>MY GARAGE</a></>
               ) : (
                 <><a href="/register" style={{ background:'#DC2626', color:'#fff', padding:'14px 32px', borderRadius:10, ...F, fontWeight:900, fontSize:17, letterSpacing:2, textDecoration:'none' }}>REGISTER FREE →</a>
-                <a href="/tickets" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? 'VIEW TICKETS' : 'VIEW RACE DAY INFO'}</a></>
+                <a href="/race-check-in" style={{ background:'transparent', color:'#F5F5F5', padding:'14px 32px', borderRadius:10, ...F, fontWeight:700, fontSize:17, letterSpacing:2, textDecoration:'none', border:'1px solid rgba(255,255,255,0.15)' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? 'VIEW TICKETS' : 'VIEW RACE DAY INFO'}</a></>
               )}
             </div>
           </section>

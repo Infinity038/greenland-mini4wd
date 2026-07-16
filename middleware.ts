@@ -1,14 +1,17 @@
 ﻿import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { getLegacyTicketRedirectPath } from "@/lib/legacyTicketRedirect";
 
 // Pages that require membership
-const MEMBER_ONLY = ["/profile", "/tickets/checkout"];
+const MEMBER_ONLY = ["/profile", "/race-check-in/checkout"];
 
 // Pages behind the Open Tournament feature flag — while disabled, direct visits
 // redirect to the beginner-first learning page with a postponed notice instead
-// of exposing the tournament/ticket flows.
-const TOURNAMENT_ONLY = ["/tournament", "/tickets"];
+// of exposing the tournament flow. Race Check-In is NOT gated here — regular
+// weekly Box Stock racing (RSVP + in-person payment) is a standing feature
+// independent of the separately-disabled Open Tournament/Open Class format.
+const TOURNAMENT_ONLY = ["/tournament"];
 
 // Pages that are always public
 // Everything else is public by default
@@ -24,6 +27,14 @@ export function middleware(request: NextRequest) {
     pathname.includes("favicon")
   ) {
     return NextResponse.next();
+  }
+
+  // Legacy route rename: /tickets -> /race-check-in (preserve query string).
+  const legacyRedirect = getLegacyTicketRedirectPath(pathname);
+  if (legacyRedirect) {
+    const url = new URL(legacyRedirect, request.url);
+    url.search = request.nextUrl.search;
+    return NextResponse.redirect(url);
   }
 
   if (!FEATURE_FLAGS.openTournamentEnabled && TOURNAMENT_ONLY.some(p => pathname.startsWith(p))) {

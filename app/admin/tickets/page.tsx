@@ -194,7 +194,7 @@ export default function AdminTicketsPage() {
           <a href="/admin" style={{ ...FB, fontSize: 12, color: '#6B7280', textDecoration: 'none' }}>← Dashboard</a>
           <div style={{ ...F, fontWeight: 900, fontSize: 18, letterSpacing: 2 }}>RACE TICKETS</div>
         </div>
-        <a href="/tickets" target="_blank" style={{ ...FB, fontSize: 12, color: '#B8C1CC', textDecoration: 'none' }}>View Public Page ↗</a>
+        <a href="/race-check-in" target="_blank" style={{ ...FB, fontSize: 12, color: '#B8C1CC', textDecoration: 'none' }}>View Public Page ↗</a>
       </div>
 
       <div style={s.body}>

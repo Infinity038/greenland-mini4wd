@@ -2,6 +2,7 @@
 'use client';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
 const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -71,7 +72,7 @@ const GENERAL_RULES = [
   { icon: '🏁', title: 'Qualification Format', desc: '2 timed runs per entry. Best run counts. Top qualifiers advance to single-elimination finals.' },
   { icon: '⚡', title: 'Finals Format', desc: 'Single elimination head-to-head racing. Win or go home. No second chances in the finals.' },
   { icon: '🚫', title: 'Disqualification', desc: 'Oil/grease leaks, illegal parts, false starts (2nd offense), non-approved motors or batteries result in race or event disqualification.' },
-  { icon: '👤', title: 'Official Members Only', desc: 'Tournament entry requires Official Member status. Complete a qualifying purchase to unlock race entry.' },
+  { icon: '👤', title: 'Racer Profile Required', desc: 'Tournament entry requires a registered Racer Profile and an approved car with a Club Car ID.' },
 ];
 
 const SINGLE_FORMAT_STEPS = [
@@ -292,7 +293,7 @@ export default function RulesPage() {
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 10 }}>READY?</div>
             <h3 style={{ ...F, fontWeight: 900, fontSize: 'clamp(28px, 6vw, 46px)', margin: '0 0 20px' }}>REGISTER YOUR CAR & RACE</h3>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href="/tickets" style={{ background: '#DC2626', color: '#fff', padding: '13px 28px', borderRadius: 8, ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, textDecoration: 'none' }}>🎟️ BUY TICKETS →</a>
+              <a href="/race-check-in" style={{ background: '#DC2626', color: '#fff', padding: '13px 28px', borderRadius: 8, ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, textDecoration: 'none' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? '🎟️ BUY TICKETS →' : '🏁 RACE CHECK-IN →'}</a>
               <a href="/tournament" style={{ background: 'transparent', color: '#F5F5F5', padding: '13px 28px', borderRadius: 8, ...F, fontWeight: 700, fontSize: 16, letterSpacing: 2, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.15)' }}>VIEW TOURNAMENT</a>
             </div>
           </section>

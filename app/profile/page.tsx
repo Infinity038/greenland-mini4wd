@@ -177,6 +177,10 @@ export default function ProfilePage() {
   );
 
   const TABS: Tab[] = ['overview', 'orders', 'tickets', 'garage', 'wishlist', 'referral'];
+  const TAB_LABELS: Record<Tab, string> = {
+    overview: 'Overview', orders: 'Orders', tickets: 'Race Check-In',
+    garage: 'Garage', wishlist: 'Wishlist', referral: 'Referral',
+  };
 
   return (
     <>
@@ -340,7 +344,7 @@ export default function ProfilePage() {
                   onClick={() => setTab(t)}
                   style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 2, padding: '12px 20px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', borderRadius: '8px 8px 0 0', background: tab === t ? '#050505' : 'transparent', color: tab === t ? '#DC2626' : '#B8C1CC', borderTop: tab === t ? '2px solid #DC2626' : '2px solid transparent' }}
                 >
-                  {t.toUpperCase()}
+                  {TAB_LABELS[t].toUpperCase()}
                 </button>
               ))}
             </div>
@@ -357,7 +361,9 @@ export default function ProfilePage() {
                 {[
                   { label: 'Total Coins', value: points, color: '#FACC15' },
                   { label: 'Lifetime Spend', value: `${(member as any)?.lifetime_spending || 0} kr`, color: '#A855F7' },
-                  { label: 'Tickets Available', value: wallet.paid_available + wallet.bonus_available, color: '#22C55E' },
+                  FEATURE_FLAGS.onlineRaceTicketsEnabled
+                    ? { label: 'Tickets Available', value: wallet.paid_available + wallet.bonus_available, color: '#22C55E' }
+                    : { label: 'Race Entries', value: raceEntries.length, color: '#22C55E' },
                   { label: 'Orders', value: orders.length, color: '#3B82F6' },
                   { label: 'Referrals', value: referral.confirmed_referrals, color: '#DC2626' },
                 ].map(s => (

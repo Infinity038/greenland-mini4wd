@@ -7,6 +7,7 @@ import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import EventRsvpPanel from '@/components/racer/EventRsvpPanel';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import { RACE_CHECK_IN_STEPS, RACE_CHECK_IN_NOTICE } from '@/lib/raceCheckInSteps';
 
 const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -142,7 +143,7 @@ export default function TicketsPage() {
         <section style={{ background: '#071426', borderBottom: '1px solid rgba(220,38,38,0.2)', padding: '40px 24px 0' }}>
           <div style={{ maxWidth: 900, margin: '0 auto' }}>
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 6 }}>THE ARCTIC HUSTLE</div>
-            <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px,8vw,64px)', margin: '0 0 8px', lineHeight: 0.95 }}>RACE DAY</h1>
+            <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px,8vw,64px)', margin: '0 0 8px', lineHeight: 0.95 }}>RACE CHECK-IN</h1>
             <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', margin: '0 0 24px' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? 'Buy your entry, register your car, race for glory.' : 'RSVP, register your car, and pay in person at check-in.'}</p>
             <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
               {[{id:'buy',label: FEATURE_FLAGS.onlineRaceTicketsEnabled ? '🎟️ BUY TICKETS' : '🏁 RSVP'},{id:'entrants',label:'🏎️ ENTRANTS'},{id:'pass',label:'🏆 RACE PASS'},{id:'rules',label:'📋 RULES'}].map(t => (
@@ -159,7 +160,28 @@ export default function TicketsPage() {
 
           {/* ── BUY TAB ── */}
           {activeTab === 'buy' && !FEATURE_FLAGS.onlineRaceTicketsEnabled && (
-            <EventRsvpPanel member={member} eventId="weekly-race-day" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 12, padding: 16, ...FB, fontSize: 14, color: '#F5F5F5', lineHeight: 1.7 }}>
+                {RACE_CHECK_IN_NOTICE}
+              </div>
+
+              <div>
+                <div style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 3, color: '#B8C1CC', marginBottom: 14 }}>HOW RACE CHECK-IN WORKS</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {RACE_CHECK_IN_STEPS.map(s => (
+                    <div key={s.step} style={{ display: 'flex', gap: 14, background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '12px 16px' }}>
+                      <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#DC2626', minWidth: 28 }}>{s.step}</div>
+                      <div>
+                        <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', marginBottom: 2 }}>{s.title}</div>
+                        <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.5 }}>{s.desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <EventRsvpPanel member={member} eventId="weekly-race-day" />
+            </div>
           )}
 
           {/* Legacy online ticket-purchase flow — discontinued (race entry is in-person

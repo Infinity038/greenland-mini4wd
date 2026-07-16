@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { isRegistered } from '@/lib/member';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -73,7 +74,7 @@ export default function EventsPage() {
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               {live > 0 && <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 8, padding: '8px 16px', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 2, color: '#22C55E' }}>🔴 {live} LIVE NOW</div>}
               {upcoming > 0 && <div style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '8px 16px', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 2, color: '#3B82F6' }}>🗓️ {upcoming} UPCOMING</div>}
-              <a href="/tickets" style={{ background: '#DC2626', color: '#fff', borderRadius: 8, padding: '8px 20px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 2, textDecoration: 'none' }}>🎟️ BUY TICKETS →</a>
+              <a href="/race-check-in" style={{ background: '#DC2626', color: '#fff', borderRadius: 8, padding: '8px 20px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 2, textDecoration: 'none' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? '🎟️ BUY TICKETS →' : '🏁 RACE CHECK-IN →'}</a>
             </div>
           </div>
         </section>
@@ -131,7 +132,7 @@ export default function EventsPage() {
                       {!isPast && (
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
                           {registered ? (
-                            <a href="/tickets" style={{ background: '#DC2626', color: '#fff', borderRadius: 8, padding: '10px 20px', ...F, fontWeight: 900, fontSize: 14, letterSpacing: 2, textDecoration: 'none' }}>🎟️ BUY TICKET →</a>
+                            <a href="/race-check-in" style={{ background: '#DC2626', color: '#fff', borderRadius: 8, padding: '10px 20px', ...F, fontWeight: 900, fontSize: 14, letterSpacing: 2, textDecoration: 'none' }}>{FEATURE_FLAGS.onlineRaceTicketsEnabled ? '🎟️ BUY TICKET →' : '🏁 RACE CHECK-IN →'}</a>
                           ) : (
                             <a href="/register" style={{ background: '#DC2626', color: '#fff', borderRadius: 8, padding: '10px 20px', ...F, fontWeight: 900, fontSize: 14, letterSpacing: 2, textDecoration: 'none' }}>REGISTER TO ENTER →</a>
                           )}

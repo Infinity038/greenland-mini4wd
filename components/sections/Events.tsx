@@ -71,7 +71,7 @@ export default function Events() {
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     {ev.ticket_price_dkk && <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#FACC15', marginBottom: 6 }}>{ev.ticket_price_dkk} DKK{!FEATURE_FLAGS.onlineRaceTicketsEnabled && <span style={{ fontSize: 11, color: '#6B7280' }}> · paid in person</span>}</div>}
-                    <a href="/tickets" style={{ display: 'inline-block', background: '#DC2626', color: '#fff', padding: '10px 20px', borderRadius: 6, ...F, fontWeight: 700, fontSize: 13, letterSpacing: '0.2em', textDecoration: 'none' }}>
+                    <a href="/race-check-in" style={{ display: 'inline-block', background: '#DC2626', color: '#fff', padding: '10px 20px', borderRadius: 6, ...F, fontWeight: 700, fontSize: 13, letterSpacing: '0.2em', textDecoration: 'none' }}>
                       {FEATURE_FLAGS.onlineRaceTicketsEnabled ? 'BUY TICKET' : 'RACE DAY INFO'}
                     </a>
                   </div>

@@ -4,33 +4,34 @@ import { isRegistered, getMemberData, logout } from "@/lib/member";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 // Beginner-first order: Start Here -> Cars -> Shop -> Race Rules take priority.
-// Tournament/Tickets only appear while NEXT_PUBLIC_OPEN_TOURNAMENT_ENABLED=true.
+// Race Check-In is a standing feature, always shown regardless of the Open Tournament flag.
+// Tournament only appears while NEXT_PUBLIC_OPEN_TOURNAMENT_ENABLED=true.
 const BASE_NAV_LINKS = [
-  { label: "Start Here",  href: "/how-to-join" },
-  { label: "Cars",        href: "/cars" },
-  { label: "Shop",        href: "/shop" },
-  { label: "Race Rules",  href: "/rules" },
-  { label: "Leaderboard", href: "/leaderboard" },
-  { label: "Events",      href: "/events" },
-  { label: "Gallery",     href: "/gallery" },
-  { label: "Blog",        href: "/blog" },
-  { label: "About",       href: "/about" },
+  { label: "Start Here",     href: "/how-to-join" },
+  { label: "Cars",           href: "/cars" },
+  { label: "Shop",           href: "/shop" },
+  { label: "Race Rules",     href: "/rules" },
+  { label: "Race Check-In",  href: "/race-check-in" },
+  { label: "Leaderboard",    href: "/leaderboard" },
+  { label: "Events",         href: "/events" },
+  { label: "Gallery",        href: "/gallery" },
+  { label: "Blog",           href: "/blog" },
+  { label: "About",          href: "/about" },
 ];
 
 const TOURNAMENT_NAV_LINKS = [
   { label: "Tournament", href: "/tournament" },
-  { label: "Tickets",    href: "/tickets" },
 ];
 
 const NAV_LINKS = FEATURE_FLAGS.openTournamentEnabled
-  ? [...BASE_NAV_LINKS.slice(0, 4), ...TOURNAMENT_NAV_LINKS, ...BASE_NAV_LINKS.slice(4)]
+  ? [...BASE_NAV_LINKS.slice(0, 5), ...TOURNAMENT_NAV_LINKS, ...BASE_NAV_LINKS.slice(5)]
   : BASE_NAV_LINKS;
 
 const MEMBER_LINKS = [
-  { label: "👤 Profile",      href: "/profile" },
-  { label: "📦 My Orders",    href: "/profile?tab=orders" },
-  { label: "🎟️ Race Tickets", href: "/profile?tab=tickets" },
-  { label: "🏎️ My Garage",   href: "/profile?tab=garage" },
+  { label: "👤 Profile",         href: "/profile" },
+  { label: "📦 My Orders",       href: "/profile?tab=orders" },
+  { label: "🏁 Race Check-In",   href: "/race-check-in" },
+  { label: "🏎️ My Garage",      href: "/profile?tab=garage" },
 ];
 
 export default function Navbar() {
@@ -72,15 +73,15 @@ export default function Navbar() {
             <a key={link.label} href={link.href}
               style={{
                 fontFamily: "'Barlow Condensed', sans-serif",
-                fontWeight: link.label === 'Tickets' ? 900 : 600,
+                fontWeight: link.label === 'Race Check-In' ? 900 : 600,
                 fontSize: 13,
-                color: link.label === 'Tickets' ? '#FACC15' : link.label === 'Race Rules' ? '#22C55E' : '#B8C1CC',
+                color: link.label === 'Race Check-In' ? '#FACC15' : link.label === 'Race Rules' ? '#22C55E' : '#B8C1CC',
                 letterSpacing: 3,
                 textDecoration: 'none',
-                ...(link.label === 'Tickets' ? { border: '1px solid rgba(250,204,21,0.3)', padding: '4px 10px', borderRadius: 6 } : {}),
+                ...(link.label === 'Race Check-In' ? { border: '1px solid rgba(250,204,21,0.3)', padding: '4px 10px', borderRadius: 6 } : {}),
                 ...(link.label === 'Race Rules' ? { border: '1px solid rgba(34,197,94,0.3)', padding: '4px 10px', borderRadius: 6 } : {}),
               }}>
-              {link.label === 'Tickets' ? '🎟️ ' + link.label : link.label === 'Race Rules' ? '📋 ' + link.label : link.label}
+              {link.label === 'Race Check-In' ? '🏁 ' + link.label : link.label === 'Race Rules' ? '📋 ' + link.label : link.label}
             </a>
           ))}
 

@@ -123,7 +123,7 @@ export default function HowToJoin() {
               </div>
             </div>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              Race entry includes one registered car, one category, one event, one first life, and race-day warm-up. An optional Second Life must be paid before check-in closes and applies only to the same registered car, category and event — it can&apos;t be transferred, refunded after check-in, or carried to another weekend. You may RSVP on the <a href="/tickets" style={{ color: '#FACC15' }}>Race Day page</a> to help the club estimate attendance. See the full <a href="/loyalty" style={{ color: '#FACC15' }}>Racer Profile &amp; Rewards preview</a> for details.
+              Race entry includes one registered car, one category, one event, one first life, and race-day warm-up. An optional Second Life must be paid before check-in closes and applies only to the same registered car, category and event — it can&apos;t be transferred, refunded after check-in, or carried to another weekend. You may RSVP on the <a href="/race-check-in" style={{ color: '#FACC15' }}>Race Check-In page</a> to help the club estimate attendance. See the full <a href="/loyalty" style={{ color: '#FACC15' }}>Racer Profile &amp; Rewards preview</a> for details.
             </p>
             {FEATURE_FLAGS.legacyDigitalTicketUiEnabled && (
               <div style={{ background: 'rgba(107,114,128,0.08)', border: '1px dashed rgba(107,114,128,0.3)', borderRadius: 12, padding: 20, ...FB, fontSize: 13, color: '#6B7280', lineHeight: 1.8 }}>
