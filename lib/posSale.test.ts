@@ -5,6 +5,7 @@ import {
   scanPresetItem,
   attachRacer,
   removeRacer,
+  attachEvent,
   applyLoyaltyReward,
   applyShopCredit,
   calculateSaleTotals,
@@ -12,6 +13,7 @@ import {
   cancelSale,
   refundSale,
   type RacerSnapshot,
+  type EventSnapshot,
 } from './posSale';
 import { MOCK_PRODUCT_CATALOG, PRESET_POS_ITEMS } from './posCatalog';
 
@@ -26,6 +28,14 @@ const RACER: RacerSnapshot = {
   accountStatus: 'Active',
   loyaltyPoints: 42,
   shopCreditDkk: 100,
+};
+
+const EVENT: EventSnapshot = {
+  eventId: 'EVT-2026-07-18',
+  name: 'Weekly Race Night',
+  date: '2026-07-18',
+  type: 'weekly',
+  pricingModel: 'weekly',
 };
 
 describe('posSale — scanning', () => {
@@ -130,6 +140,21 @@ describe('posSale — rewards and Shop Credit', () => {
     expect(totals.cashDueDkk).toBe(100);
   });
 
+  it('applies a specific reward tier when provided (Redemption QR flow), not just the highest available', () => {
+    let sale = createNewSale();
+    sale = attachRacer(sale, { ...RACER, loyaltyPoints: 42 }); // eligible for up to the 25-point/50 DKK tier
+    sale = scanPresetItem(sale, WEEKLY_ENTRY);
+    sale = applyLoyaltyReward(sale, { points: 25, discountDkk: 50 });
+    expect(sale.appliedReward).toEqual({ points: 25, discountDkk: 50 });
+  });
+
+  it('rejects a specific reward the racer no longer has enough points for', () => {
+    let sale = createNewSale();
+    sale = attachRacer(sale, { ...RACER, loyaltyPoints: 10 });
+    sale = scanPresetItem(sale, WEEKLY_ENTRY);
+    expect(() => applyLoyaltyReward(sale, { points: 25, discountDkk: 50 })).toThrow(/no longer has enough points/i);
+  });
+
   it('blocks reward redemption for a non-Active account', () => {
     let sale = createNewSale();
     sale = attachRacer(sale, { ...RACER, accountStatus: 'Suspended', loyaltyPoints: 42 });
@@ -166,6 +191,7 @@ describe('posSale — confirmation, stock, and audit trail', () => {
     let sale = createNewSale();
     sale = scanPresetItem(sale, WEEKLY_ENTRY);
     sale = attachRacer(sale, RACER);
+    sale = attachEvent(sale, EVENT);
     const result = confirmSale(sale, 'key-2', new Set());
     expect(result.receiptReference).toMatch(/^RCPT-/);
     expect(result.auditLogEntry.action).toBe('sale_confirmed');
@@ -176,10 +202,33 @@ describe('posSale — confirmation, stock, and audit trail', () => {
     let sale = createNewSale();
     sale = scanPresetItem(sale, WEEKLY_ENTRY);
     sale = attachRacer(sale, RACER);
+    sale = attachEvent(sale, EVENT);
     const result = confirmSale(sale, 'key-3', new Set());
     expect(result.pointsAwarded).toBe(1.5);
     expect(result.pointsActivityEntry).not.toBeNull();
     expect(result.pointsActivityEntry?.pointsDelta).toBe(1.5);
+  });
+
+  it('race-related services require an attached Active Racer Profile and a selected event before confirmation', () => {
+    let sale = createNewSale();
+    sale = scanPresetItem(sale, WEEKLY_ENTRY);
+    sale = attachRacer(sale, RACER); // event still missing
+    expect(() => confirmSale(sale, 'key-race-1', new Set())).toThrow(/attached Active Racer Profile and a selected event/i);
+  });
+
+  it('race-related services are blocked even with an event selected if the racer is not Active', () => {
+    let sale = createNewSale();
+    sale = scanPresetItem(sale, WEEKLY_ENTRY);
+    sale = attachRacer(sale, { ...RACER, accountStatus: 'Suspended' });
+    sale = attachEvent(sale, EVENT);
+    expect(() => confirmSale(sale, 'key-race-2', new Set())).toThrow(/attached Active Racer Profile and a selected event/i);
+  });
+
+  it('a non-race sale (e.g. a plain product) does not require an event', () => {
+    let sale = createNewSale();
+    sale = scanProduct(sale, MOTOR, 1);
+    sale = attachRacer(sale, RACER);
+    expect(() => confirmSale(sale, 'key-race-3', new Set())).not.toThrow();
   });
 
   it('a cancelled sale cannot be confirmed and awards no points', () => {
@@ -198,6 +247,7 @@ describe('posSale — confirmation, stock, and audit trail', () => {
     let sale = createNewSale();
     sale = scanPresetItem(sale, WEEKLY_ENTRY);
     sale = attachRacer(sale, RACER);
+    sale = attachEvent(sale, EVENT);
     const processedKeys = new Set<string>();
     confirmSale(sale, 'shared-key', processedKeys);
     expect(() => confirmSale(sale, 'shared-key', processedKeys)).toThrow(/already been confirmed/i);

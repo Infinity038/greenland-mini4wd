@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { lookupRacerByScan, searchRacers, MOCK_RACER_DIRECTORY, REVOKED_CARD_SCAN_CODE } from './posRacerDirectory';
+import { lookupRacerByScan, lookupRacerByQrToken, searchRacers, MOCK_RACER_DIRECTORY, REVOKED_CARD_SCAN_CODE } from './posRacerDirectory';
+
+describe('lookupRacerByQrToken', () => {
+  it('attaches the profile for a valid Racer QR token', () => {
+    const outcome = lookupRacerByQrToken('tok_racer_0047');
+    expect(outcome).toEqual({ kind: 'found', racer: MOCK_RACER_DIRECTORY[0] });
+  });
+
+  it('does not match on the Racer ID itself — only the opaque token', () => {
+    expect(lookupRacerByQrToken('G4W-R-0047')).toEqual({ kind: 'invalid_qr' });
+  });
+
+  it('returns invalid_qr for an unknown token', () => {
+    expect(lookupRacerByQrToken('tok_unknown')).toEqual({ kind: 'invalid_qr' });
+  });
+});
 
 describe('lookupRacerByScan', () => {
   it('resolves an Active racer to a found outcome', () => {

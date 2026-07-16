@@ -1,13 +1,13 @@
 'use client';
-// Reusable real browser-camera scanner: getUserMedia (rear camera preferred)
-// + the native BarcodeDetector Shape Detection API, feature-detected at
-// runtime. Used for both product barcodes and racer QR codes — callers pass
-// the format list and label. No third-party decoding library is bundled: as
-// of now BarcodeDetector covers Chrome/Edge desktop, Android Chrome, and
-// Safari 17+ (iOS/macOS); unsupported browsers (e.g. Firefox) get a clear
-// fallback message instead of a silently broken camera button.
+// Shared QR scanner used for every club-controlled record type (Racer,
+// Product, Service, Car, Event, Redemption) — see lib/scanner/qrPayload.ts.
+// Prefers the native BarcodeDetector Shape Detection API when QR support is
+// genuinely available; otherwise lazy-loads a pure-JS fallback decoder
+// (jsQR) so scanning still works on browsers without native support —
+// notably iPhone Safari/WebKit versions that predate Safari 17.
 import { useEffect, useRef, useState } from 'react';
-import { getBarcodeDetectorCapability, getCameraCapability, createBarcodeDetector } from '@/lib/scanner/scannerSupport';
+import { getCameraCapability } from '@/lib/scanner/scannerSupport';
+import { selectQrDecoderEngine, type QrDecoderEngine } from '@/lib/scanner/qrDecoderEngine';
 import { createDuplicateScanGuard } from '@/lib/scanner/duplicateScanGuard';
 
 const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
@@ -17,21 +17,19 @@ type ScanState = 'requesting_permission' | 'scanning' | 'permission_denied' | 'u
 
 export interface CameraScannerModalProps {
   title: string;
-  formats: readonly string[];
   onDetected: (code: string) => void;
   onCancel: () => void;
 }
 
 // Capability is decided once, synchronously, before the component ever
 // renders — so the effect that follows only ever performs genuinely async
-// work (getUserMedia) and calls setState inside its .then()/.catch(), never
-// synchronously in the effect body itself.
+// work (getUserMedia, and lazy-loading the fallback decoder) and calls
+// setState inside .then()/.catch(), never synchronously in the effect body.
 function computeInitialState(): ScanState {
-  if (getCameraCapability() === 'unsupported' || getBarcodeDetectorCapability() === 'unsupported') return 'unsupported';
-  return 'requesting_permission';
+  return getCameraCapability() === 'unsupported' ? 'unsupported' : 'requesting_permission';
 }
 
-export default function CameraScannerModal({ title, formats, onDetected, onCancel }: CameraScannerModalProps) {
+export default function CameraScannerModal({ title, onDetected, onCancel }: CameraScannerModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -46,9 +44,9 @@ export default function CameraScannerModal({ title, formats, onDetected, onCance
     streamRef.current = null;
   };
 
-  const tick = (detector: { detect(source: unknown): Promise<{ rawValue: string }[]> }) => {
+  const tick = (engine: QrDecoderEngine) => {
     if (!videoRef.current || streamRef.current == null) return;
-    detector.detect(videoRef.current)
+    engine.detect(videoRef.current)
       .then(results => {
         const first = results[0];
         if (first?.rawValue && guardRef.current.shouldAccept(first.rawValue)) {
@@ -57,11 +55,11 @@ export default function CameraScannerModal({ title, formats, onDetected, onCance
           onDetected(first.rawValue);
           return;
         }
-        rafRef.current = requestAnimationFrame(() => tick(detector));
+        rafRef.current = requestAnimationFrame(() => tick(engine));
       })
       .catch(() => {
         // Transient per-frame decode errors are expected — keep scanning.
-        rafRef.current = requestAnimationFrame(() => tick(detector));
+        rafRef.current = requestAnimationFrame(() => tick(engine));
       });
   };
 
@@ -74,11 +72,11 @@ export default function CameraScannerModal({ title, formats, onDetected, onCance
         video.srcObject = stream;
         return video.play();
       })
-      .then(() => {
+      .then(() => selectQrDecoderEngine())
+      .then(engine => {
+        if (!engine) { setState('unsupported'); return; }
         setState('scanning');
-        const detector = createBarcodeDetector(formats);
-        if (!detector) { setState('unsupported'); return; }
-        rafRef.current = requestAnimationFrame(() => tick(detector));
+        rafRef.current = requestAnimationFrame(() => tick(engine));
       })
       .catch((e: unknown) => {
         const name = (e as { name?: string })?.name;

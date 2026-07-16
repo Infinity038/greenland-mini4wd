@@ -6,8 +6,9 @@
 // This is a future database-dependent phase pending schema/RLS review.
 import { calculateLoyaltyPoints } from './loyaltyPoints';
 import { getAvailableReward, type RewardTier } from './loyaltyRoadmap';
-import type { PosProduct, PosPresetItem } from './posCatalog';
+import { isRaceServiceBarcode, type PosProduct, type PosPresetItem } from './posCatalog';
 import { canRedeemRewards, type RacerAccountStatus } from './racerAccountStatus';
+import type { PosEventRecord } from './posEventDirectory';
 
 export type SaleStatus = 'open' | 'confirmed' | 'cancelled' | 'refunded';
 
@@ -31,11 +32,20 @@ export interface RacerSnapshot {
   shopCreditDkk: number;
 }
 
+export interface EventSnapshot {
+  eventId: string;
+  name: string;
+  date: string;
+  type: PosEventRecord['type'];
+  pricingModel: PosEventRecord['pricingModel'];
+}
+
 export interface Sale {
   id: string;
   status: SaleStatus;
   lineItems: SaleLineItem[];
   racer: RacerSnapshot | null;
+  event: EventSnapshot | null;
   appliedReward: RewardTier | null;
   shopCreditAppliedDkk: number;
   createdAt: string;
@@ -103,6 +113,7 @@ export function createNewSale(): Sale {
     status: 'open',
     lineItems: [],
     racer: null,
+    event: null,
     appliedReward: null,
     shopCreditAppliedDkk: 0,
     createdAt: new Date().toISOString(),
@@ -177,15 +188,44 @@ export function removeRacer(sale: Sale): Sale {
   return { ...sale, racer: null, appliedReward: null, shopCreditAppliedDkk: 0 };
 }
 
+// Scanning an Event QR selects the current event context so a payment can
+// never be recorded against the wrong event. May be attached before or after
+// scanning products/services or a racer.
+export function attachEvent(sale: Sale, event: EventSnapshot): Sale {
+  assertOpen(sale);
+  return { ...sale, event };
+}
+
+export function removeEvent(sale: Sale): Sale {
+  assertOpen(sale);
+  return { ...sale, event: null };
+}
+
+// A sale containing a race-related service (entry/second life) requires an
+// attached Active Racer Profile and a selected event before it can be
+// confirmed — enforced in confirmSale(), not just as a soft warning.
+export function hasUnmetRaceServiceRequirements(sale: Sale): boolean {
+  const hasRaceService = sale.lineItems.some(li => isRaceServiceBarcode(li.barcode));
+  if (!hasRaceService) return false;
+  return !sale.racer || sale.racer.accountStatus !== 'Active' || !sale.event;
+}
+
 function calculateSubtotal(sale: Sale): number {
   return round2(sale.lineItems.reduce((sum, li) => sum + li.unitPriceDkk * li.quantity, 0));
 }
 
-export function applyLoyaltyReward(sale: Sale): Sale {
+// `specificReward` is used by the Redemption QR flow, which redeems the one
+// reward tied to that token rather than "whatever is highest available" —
+// the permanent Racer QR never drives this path (see lib/posRedemption.ts).
+export function applyLoyaltyReward(sale: Sale, specificReward?: RewardTier): Sale {
   assertOpen(sale);
   if (!sale.racer) throw new Error('Scan a Racer Profile before applying a loyalty reward.');
   if (!canRedeemRewards(sale.racer.accountStatus)) throw new Error(`A ${sale.racer.accountStatus} account cannot redeem rewards.`);
   if (sale.appliedReward) throw new Error('A loyalty reward has already been applied to this sale.');
+  if (specificReward) {
+    if (sale.racer.loyaltyPoints < specificReward.points) throw new Error('This racer no longer has enough points for this reward.');
+    return { ...sale, appliedReward: specificReward };
+  }
   const reward = getAvailableReward(sale.racer.loyaltyPoints);
   if (!reward) throw new Error('This racer has no eligible loyalty reward.');
   return { ...sale, appliedReward: reward };
@@ -222,6 +262,9 @@ export function confirmSale(
 ): ConfirmedSaleResult {
   if (sale.status !== 'open') throw new Error('Only an open sale can be confirmed.');
   if (sale.lineItems.length === 0) throw new Error('Cannot confirm an empty sale.');
+  if (hasUnmetRaceServiceRequirements(sale)) {
+    throw new Error('Race-related services require an attached Active Racer Profile and a selected event before payment can be confirmed.');
+  }
   if (processedKeys.has(idempotencyKey)) {
     throw new Error('This payment has already been confirmed — points cannot be awarded twice.');
   }

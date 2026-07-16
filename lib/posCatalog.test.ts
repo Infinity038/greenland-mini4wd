@@ -1,5 +1,33 @@
 import { describe, it, expect } from 'vitest';
-import { scanBarcode, searchProducts, isRaceServiceBarcode, PRESET_POS_ITEMS, MOCK_PRODUCT_CATALOG } from './posCatalog';
+import { scanBarcode, searchProducts, isRaceServiceBarcode, lookupProductByQrToken, lookupServiceByCode, PRESET_POS_ITEMS, MOCK_PRODUCT_CATALOG } from './posCatalog';
+
+describe('posCatalog — QR lookups', () => {
+  it('resolves a Product QR token to the correct product', () => {
+    const product = lookupProductByQrToken('tok_prod_15373');
+    expect(product?.name).toBe('Hyper-Dash 3 Motor');
+  });
+
+  it('returns null for an unknown Product QR token', () => {
+    expect(lookupProductByQrToken('tok_unknown')).toBeNull();
+  });
+
+  it('resolves a Service QR code to the correct preset with its configured amount', () => {
+    const service = lookupServiceByCode('weekly-entry');
+    expect(service?.name).toBe('Weekly Entry');
+    expect(service?.unitPriceDkk).toBe(150);
+  });
+
+  it('returns null for an unknown Service QR code', () => {
+    expect(lookupServiceByCode('unknown-service')).toBeNull();
+  });
+
+  it('marks only collector/limited-edition/expensive products as eligible for unit-level QR', () => {
+    const collector = MOCK_PRODUCT_CATALOG.find(p => p.name.includes('Limited Edition'))!;
+    const ordinary = MOCK_PRODUCT_CATALOG.find(p => p.name === 'Hyper-Dash 3 Motor')!;
+    expect(collector.unitLevelQrEligible).toBe(true);
+    expect(ordinary.unitLevelQrEligible).toBe(false);
+  });
+});
 
 describe('posCatalog — scanning', () => {
   it('scans a stock-tracked product by barcode', () => {
@@ -60,6 +88,11 @@ describe('posCatalog — search', () => {
   it('finds products by category', () => {
     const results = searchProducts('Rollers');
     expect(results.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('finds a product by Club Product ID', () => {
+    const results = searchProducts('G4W-P-0002');
+    expect(results.map(p => p.name)).toContain('Hyper-Dash 3 Motor');
   });
 
   it('finds products by chassis', () => {

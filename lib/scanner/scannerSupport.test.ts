@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { getBarcodeDetectorCapability, getCameraCapability, createBarcodeDetector, PRODUCT_BARCODE_FORMATS } from './scannerSupport';
+import { getBarcodeDetectorCapability, getCameraCapability, createBarcodeDetector, QR_FORMATS } from './scannerSupport';
 
 describe('scannerSupport', () => {
   afterEach(() => {
@@ -25,7 +25,7 @@ describe('scannerSupport', () => {
   });
 
   it('createBarcodeDetector returns null when unsupported', () => {
-    expect(createBarcodeDetector(PRODUCT_BARCODE_FORMATS)).toBeNull();
+    expect(createBarcodeDetector(QR_FORMATS)).toBeNull();
   });
 
   it('createBarcodeDetector constructs a detector with the given formats when supported', () => {
@@ -35,8 +35,8 @@ describe('scannerSupport', () => {
       constructor(opts: { formats: string[] }) { capturedFormats = opts.formats; }
       detect() { return Promise.resolve([]); }
     };
-    const detector = createBarcodeDetector(PRODUCT_BARCODE_FORMATS);
+    const detector = createBarcodeDetector(QR_FORMATS);
     expect(detector).not.toBeNull();
-    expect(capturedFormats).toEqual([...PRODUCT_BARCODE_FORMATS]);
+    expect(capturedFormats).toEqual([...QR_FORMATS]);
   });
 });

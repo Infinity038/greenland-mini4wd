@@ -1,38 +1,56 @@
 'use client';
-// Staff-only grocery-style POS terminal — mock screen only. Wired to the pure
-// lib/posSale.ts + lib/posCatalog.ts + lib/posRacerDirectory.ts reference
-// modules. Nothing here writes to a live table: stock, points, receipts,
-// the audit log, and any barcode-link proposal shown after "Confirm Payment"
+// Staff-only grocery-style POS terminal — mock screen only. QR is the
+// primary scan format for every club-controlled record (Racer, Product,
+// Service, Car, Event, Redemption) — see lib/scanner/qrPayload.ts. One
+// shared camera scanner routes any scanned/typed g4w:<type>:<token> payload
+// to the correct lookup. Manual search and typed-code fallback are kept for
+// every record type. Nothing here writes to a live table: stock, points,
+// receipts, the audit log, redemption state and any barcode-link proposal
 // are all in-memory simulation pending schema/auth/RLS review.
 import { useRef, useState } from 'react';
 import {
   scanBarcode,
   isRaceServiceBarcode,
+  lookupProductByQrToken,
+  lookupServiceByCode,
   PRESET_POS_ITEMS,
   type PosProduct,
   type PosPresetItem,
 } from '@/lib/posCatalog';
-import { lookupRacerByScan, type PosRacerRecord } from '@/lib/posRacerDirectory';
-import { PRODUCT_BARCODE_FORMATS, RACER_QR_FORMATS } from '@/lib/scanner/scannerSupport';
+import { lookupRacerByScan, lookupRacerByQrToken, type PosRacerRecord, type RacerScanOutcome } from '@/lib/posRacerDirectory';
+import { lookupCarByQrToken, carsForRacer, type PosCarRecord } from '@/lib/posCarDirectory';
+import { lookupEventByQrToken, searchEvents, type PosEventRecord } from '@/lib/posEventDirectory';
+import { parseQrPayload, formatQrPayload } from '@/lib/scanner/qrPayload';
 import { createDuplicateScanGuard } from '@/lib/scanner/duplicateScanGuard';
 import { proposeBarcodeMapping } from '@/lib/posBarcodeMapping';
+import {
+  issueRedemptionToken,
+  resolveRedemptionScan,
+  markRedemptionTokenUsed,
+  type RedemptionToken,
+} from '@/lib/posRedemption';
 import CameraScannerModal from './CameraScannerModal';
 import ProductSearchCombobox from './ProductSearchCombobox';
 import RacerSearchCombobox from './RacerSearchCombobox';
+import CarSearchCombobox from './CarSearchCombobox';
 import {
   createNewSale,
   scanProduct,
   scanPresetItem,
   attachRacer,
   removeRacer,
+  attachEvent,
+  removeEvent,
   applyLoyaltyReward,
   applyShopCredit,
   calculateSaleTotals,
   confirmSale,
   cancelSale,
+  hasUnmetRaceServiceRequirements,
   type Sale,
   type SaleLineItem,
   type RacerSnapshot,
+  type EventSnapshot,
   type ConfirmedSaleResult,
 } from '@/lib/posSale';
 import { getAvailableReward } from '@/lib/loyaltyRoadmap';
@@ -44,7 +62,6 @@ const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const PRODUCT_EMPTY_MESSAGE = 'Enter a barcode or use the camera scanner.';
 const RACER_EMPTY_MESSAGE = 'Enter a Racer ID, scan a QR code, or search by name.';
 const REVOKED_CARD_MESSAGE = 'This physical card is no longer active. Use the racer’s digital QR code or replacement card.';
-const RACE_SERVICE_WARNING = 'Attach a Racer Profile before confirming a race-related payment.';
 
 function initials(name: string): string {
   return name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('') || '?';
@@ -54,25 +71,56 @@ function toRacerSnapshot(r: PosRacerRecord): RacerSnapshot {
   return { racerId: r.racerId, displayName: r.displayName, photoUrl: r.photoUrl, accountStatus: r.accountStatus, loyaltyPoints: r.loyaltyPoints, shopCreditDkk: r.shopCreditDkk };
 }
 
+function toEventSnapshot(e: PosEventRecord): EventSnapshot {
+  return { eventId: e.eventId, name: e.name, date: e.date, type: e.type, pricingModel: e.pricingModel };
+}
+
+function racerOutcomeMessage(outcome: RacerScanOutcome, code: string): string {
+  switch (outcome.kind) {
+    case 'invalid_qr': return `No Racer Profile found for "${code}".`;
+    case 'revoked_card': return REVOKED_CARD_MESSAGE;
+    case 'pending_account': return `${outcome.racer.displayName}'s Racer Profile is Pending Review — rewards cannot be redeemed until it is approved.`;
+    case 'suspended_account': return `${outcome.racer.displayName}'s Racer Profile is Suspended — rewards cannot be redeemed.`;
+    case 'archived_account': return `${outcome.racer.displayName}'s Racer Profile is Archived — rewards cannot be redeemed.`;
+    case 'found': return '';
+  }
+}
+
 export default function POSTerminal() {
   const [sale, setSale] = useState<Sale>(() => createNewSale());
-  const [barcodeInput, setBarcodeInput] = useState('');
-  const [racerInput, setRacerInput] = useState('');
-  const [productMessage, setProductMessage] = useState('');
-  const [racerMessage, setRacerMessage] = useState('');
-  const [creditInput, setCreditInput] = useState('');
   const [confirmed, setConfirmed] = useState<ConfirmedSaleResult | null>(null);
-  const [cameraTarget, setCameraTarget] = useState<'product' | 'racer' | null>(null);
+
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [qrInput, setQrInput] = useState('');
+  const [qrMessage, setQrMessage] = useState('');
+
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [productMessage, setProductMessage] = useState('');
   const [showProductSearch, setShowProductSearch] = useState(false);
-  const [showRacerSearch, setShowRacerSearch] = useState(false);
   const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
   const [linkProposal, setLinkProposal] = useState<{ barcode: string; product: PosProduct } | null>(null);
   const [linkedNotice, setLinkedNotice] = useState('');
-  const [raceServiceWarning, setRaceServiceWarning] = useState('');
+
+  const [racerInput, setRacerInput] = useState('');
+  const [racerMessage, setRacerMessage] = useState('');
+  const [showRacerSearch, setShowRacerSearch] = useState(false);
+  const [creditInput, setCreditInput] = useState('');
+
+  const [attachedCar, setAttachedCar] = useState<PosCarRecord | null>(null);
+  const [carMessage, setCarMessage] = useState('');
+  const [showCarSearch, setShowCarSearch] = useState(false);
+
+  const [eventMessage, setEventMessage] = useState('');
+  const [showEventPicker, setShowEventPicker] = useState(false);
+
+  const [redemptionTokens, setRedemptionTokens] = useState<RedemptionToken[]>([]);
+  const [generatedRedemption, setGeneratedRedemption] = useState<string>('');
+
   const [itemsExpanded, setItemsExpanded] = useState(true);
 
   const barcodeInputRef = useRef<HTMLInputElement | null>(null);
   const racerInputRef = useRef<HTMLInputElement | null>(null);
+  const qrInputRef = useRef<HTMLInputElement | null>(null);
   // Simulates a payment-idempotency store (a unique DB constraint in the real system).
   const processedKeysRef = useRef<Set<string>>(new Set());
   const productScanGuardRef = useRef(createDuplicateScanGuard(1500));
@@ -82,6 +130,7 @@ export default function POSTerminal() {
   const availableReward = sale.racer ? getAvailableReward(sale.racer.loyaltyPoints) : null;
   const rewardEligible = !!sale.racer && canRedeemRewards(sale.racer.accountStatus);
   const saleOpen = sale.status === 'open';
+  const raceServiceBlocked = hasUnmetRaceServiceRequirements(sale);
 
   const addProductToSale = (product: PosProduct) => {
     if (product.availability === 'out_of_stock') {
@@ -94,9 +143,105 @@ export default function POSTerminal() {
 
   const addPresetToSale = (preset: PosPresetItem, staffEnteredPriceDkk?: number) => {
     setSale(s => scanPresetItem(s, preset, { staffEnteredPriceDkk }));
-    if (isRaceServiceBarcode(preset.barcode) && !sale.racer) {
-      setRaceServiceWarning(RACE_SERVICE_WARNING);
+  };
+
+  const handlePresetClick = (preset: PosPresetItem) => {
+    if (preset.unitPriceDkk == null) {
+      const entered = window.prompt(`Enter amount for ${preset.name} (DKK):`);
+      const amount = Number(entered);
+      if (!entered || !Number.isFinite(amount) || amount <= 0) return;
+      addPresetToSale(preset, amount);
+      return;
     }
+    addPresetToSale(preset);
+  };
+
+  const applyRacerOutcome = (outcome: RacerScanOutcome, code: string) => {
+    if (outcome.kind === 'invalid_qr' || outcome.kind === 'revoked_card') {
+      setRacerMessage(racerOutcomeMessage(outcome, code));
+      return;
+    }
+    setSale(s => attachRacer(s, toRacerSnapshot(outcome.racer)));
+    setRacerMessage(racerOutcomeMessage(outcome, code));
+  };
+
+  // Routes any scanned/typed g4w:<type>:<token> payload to the correct
+  // lookup. Shared by the camera scanner and the generic manual QR field.
+  const routeQrPayload = (raw: string) => {
+    const result = parseQrPayload(raw);
+    if (!result.ok) {
+      setQrMessage('This QR code is not a recognized Arctic Mini4WD code.');
+      return;
+    }
+    const { type, token } = result.payload;
+    setQrMessage('');
+    switch (type) {
+      case 'product': {
+        if (!productScanGuardRef.current.shouldAccept(token)) return;
+        const product = lookupProductByQrToken(token);
+        if (!product) { setUnknownBarcode(token); return; }
+        addProductToSale(product);
+        return;
+      }
+      case 'service': {
+        const preset = lookupServiceByCode(token);
+        if (!preset) { setQrMessage('Unknown service QR code.'); return; }
+        handlePresetClick(preset);
+        return;
+      }
+      case 'racer': {
+        applyRacerOutcome(lookupRacerByQrToken(token), token);
+        return;
+      }
+      case 'car': {
+        const car = lookupCarByQrToken(token);
+        if (!car) { setCarMessage('No registered car found for this QR code.'); return; }
+        setAttachedCar(car);
+        setCarMessage('');
+        return;
+      }
+      case 'event': {
+        const event = lookupEventByQrToken(token);
+        if (!event) { setEventMessage('No event found for this QR code.'); return; }
+        setSale(s => attachEvent(s, toEventSnapshot(event)));
+        setEventMessage('');
+        return;
+      }
+      case 'redemption': {
+        const outcome = resolveRedemptionScan(token, redemptionTokens);
+        if (outcome.kind === 'not_found') { setQrMessage('Redemption code not recognized.'); return; }
+        if (outcome.kind === 'expired') { setQrMessage('This redemption code has expired.'); return; }
+        if (outcome.kind === 'already_redeemed') { setQrMessage('This redemption code has already been used.'); return; }
+        if (!sale.racer) { setQrMessage('Scan the Racer QR before redeeming.'); return; }
+        if (outcome.token.racerId !== sale.racer.racerId) { setQrMessage('This redemption code belongs to a different racer.'); return; }
+        try {
+          setSale(s => applyLoyaltyReward(s, outcome.token.reward));
+          setRedemptionTokens(tokens => tokens.map(t => t.token === outcome.token.token ? markRedemptionTokenUsed(t) : t));
+          setQrMessage(`Redeemed: -${outcome.token.reward.discountDkk} DKK`);
+        } catch (e) { setQrMessage((e as Error).message); }
+        return;
+      }
+    }
+  };
+
+  const handleCameraDetected = (raw: string) => {
+    setCameraOpen(false);
+    routeQrPayload(raw);
+  };
+
+  const handleQrFieldSubmit = () => {
+    const code = qrInput.trim();
+    if (!code) { setQrMessage('Enter or paste a QR payload.'); return; }
+    routeQrPayload(code);
+    setQrInput('');
+    qrInputRef.current?.focus();
+  };
+
+  const handleGenerateRedemption = () => {
+    if (!sale.racer || !availableReward) return;
+    const token = issueRedemptionToken(sale.racer.racerId, availableReward);
+    setRedemptionTokens(tokens => [...tokens, token]);
+    setGeneratedRedemption(formatQrPayload('redemption', token.token));
   };
 
   const handleProductLookup = (rawCode?: string) => {
@@ -126,32 +271,7 @@ export default function POSTerminal() {
     const code = (rawCode ?? racerInput).trim();
     if (!code) { setRacerMessage(RACER_EMPTY_MESSAGE); return; }
     if (!racerScanGuardRef.current.shouldAccept(code)) { setRacerInput(''); racerInputRef.current?.focus(); return; }
-
-    const outcome = lookupRacerByScan(code);
-    switch (outcome.kind) {
-      case 'found':
-        setSale(s => attachRacer(s, toRacerSnapshot(outcome.racer)));
-        setRacerMessage('');
-        break;
-      case 'invalid_qr':
-        setRacerMessage(`No Racer Profile found for "${code}".`);
-        break;
-      case 'revoked_card':
-        setRacerMessage(REVOKED_CARD_MESSAGE);
-        break;
-      case 'pending_account':
-        setSale(s => attachRacer(s, toRacerSnapshot(outcome.racer)));
-        setRacerMessage(`${outcome.racer.displayName}'s Racer Profile is Pending Review — rewards cannot be redeemed until it is approved.`);
-        break;
-      case 'suspended_account':
-        setSale(s => attachRacer(s, toRacerSnapshot(outcome.racer)));
-        setRacerMessage(`${outcome.racer.displayName}'s Racer Profile is Suspended — rewards cannot be redeemed.`);
-        break;
-      case 'archived_account':
-        setSale(s => attachRacer(s, toRacerSnapshot(outcome.racer)));
-        setRacerMessage(`${outcome.racer.displayName}'s Racer Profile is Archived — rewards cannot be redeemed.`);
-        break;
-    }
+    applyRacerOutcome(lookupRacerByScan(code), code);
     setRacerInput('');
     racerInputRef.current?.focus();
   };
@@ -173,7 +293,7 @@ export default function POSTerminal() {
   const handleConfirmLinkProposal = () => {
     if (!linkProposal) return;
     proposeBarcodeMapping({
-      productId: linkProposal.product.barcode,
+      productId: linkProposal.product.clubProductId,
       barcode: linkProposal.barcode,
       barcodeType: 'manual',
       assignedBy: 'staff',
@@ -184,16 +304,22 @@ export default function POSTerminal() {
 
   const handleRacerSearchSelect = (racer: PosRacerRecord) => {
     setShowRacerSearch(false);
-    setSale(s => attachRacer(s, toRacerSnapshot(racer)));
-    setRacerMessage('');
+    applyRacerOutcome(lookupRacerByQrToken(racer.qrToken), racer.racerId);
   };
 
-  const handleCameraDetected = (code: string) => {
-    const target = cameraTarget;
-    setCameraTarget(null);
-    if (target === 'product') handleProductLookup(code);
-    else if (target === 'racer') handleRacerLookup(code);
+  const handleCarSearchSelect = (car: PosCarRecord) => {
+    setShowCarSearch(false);
+    setAttachedCar(car);
+    setCarMessage('');
   };
+
+  const handleSelectEvent = (event: PosEventRecord) => {
+    setShowEventPicker(false);
+    setSale(s => attachEvent(s, toEventSnapshot(event)));
+    setEventMessage('');
+  };
+
+  const handleRemoveEvent = () => setSale(s => removeEvent(s));
 
   const changeQuantity = (li: SaleLineItem, delta: number) => {
     setSale(s => {
@@ -231,10 +357,13 @@ export default function POSTerminal() {
   const handleNewSale = () => {
     setSale(createNewSale());
     setConfirmed(null);
-    setBarcodeInput(''); setRacerInput(''); setCreditInput('');
-    setProductMessage(''); setRacerMessage(''); setUnknownBarcode(null);
-    setLinkProposal(null); setLinkedNotice(''); setRaceServiceWarning('');
+    setBarcodeInput(''); setRacerInput(''); setCreditInput(''); setQrInput('');
+    setProductMessage(''); setRacerMessage(''); setUnknownBarcode(null); setQrMessage('');
+    setLinkProposal(null); setLinkedNotice(''); setAttachedCar(null); setCarMessage('');
+    setEventMessage(''); setGeneratedRedemption('');
   };
+
+  const registeredCars = sale.racer ? carsForRacer(sale.racer.racerId) : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: sale.lineItems.length > 0 ? 64 : 0 }}>
@@ -251,18 +380,33 @@ export default function POSTerminal() {
         </div>
       </div>
 
-      {/* Product scan/search panel — the primary first panel */}
-      <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 14 }}>
-        <div style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#B8C1CC', marginBottom: 10 }}>PRODUCT / SERVICE</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-          <button onClick={() => setCameraTarget('product')} disabled={!saleOpen} style={{ background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', ...F, fontWeight: 900, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5 }}>
-            📷 OPEN CAMERA
+      {/* Shared QR scanner — routes any club-controlled QR type automatically */}
+      <div style={{ background: '#071426', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 12, padding: 14 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={() => setCameraOpen(true)} disabled={!saleOpen} style={{ background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 20px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5 }}>
+            📷 SCAN QR
           </button>
-          <button onClick={() => setShowProductSearch(v => !v)} disabled={!saleOpen} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#F5F5F5', borderRadius: 8, padding: '10px 16px', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5 }}>
-            SEARCH PRODUCTS
-          </button>
+          <span style={{ ...FB, fontSize: 12, color: '#6B7280' }}>Racer, Product, Service, Car, Event, or Redemption</span>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+          <input
+            ref={qrInputRef}
+            value={qrInput}
+            onChange={e => setQrInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleQrFieldSubmit(); }}
+            disabled={!saleOpen}
+            placeholder="Or type/paste a QR payload (g4w:...)"
+            style={{ flex: '1 1 200px', minWidth: 0, background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#F5F5F5', ...FB, fontSize: 13 }}
+          />
+          <button onClick={handleQrFieldSubmit} disabled={!saleOpen} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#F5F5F5', borderRadius: 8, padding: '8px 16px', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed' }}>ROUTE</button>
+        </div>
+        {qrMessage && <div style={{ marginTop: 10, ...FB, fontSize: 13, color: '#FACC15' }}>{qrMessage}</div>}
+      </div>
+
+      {/* Product panel */}
+      <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 14 }}>
+        <div style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#B8C1CC', marginBottom: 10 }}>PRODUCT / SERVICE (MANUAL FALLBACK)</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
           <input
             ref={barcodeInputRef}
             value={barcodeInput}
@@ -274,6 +418,9 @@ export default function POSTerminal() {
           />
           <button onClick={() => handleProductLookup()} disabled={!saleOpen} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', ...F, fontWeight: 900, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5, whiteSpace: 'nowrap' }}>
             ADD / LOOK UP
+          </button>
+          <button onClick={() => setShowProductSearch(v => !v)} disabled={!saleOpen} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#F5F5F5', borderRadius: 8, padding: '10px 16px', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5 }}>
+            SEARCH PRODUCTS
           </button>
         </div>
 
@@ -310,22 +457,9 @@ export default function POSTerminal() {
           </div>
         )}
 
-        {raceServiceWarning && (
-          <div style={{ marginTop: 10, background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 8, padding: 10, ...FB, fontSize: 13, color: '#FACC15' }}>{raceServiceWarning}</div>
-        )}
-
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
           {PRESET_POS_ITEMS.map(p => (
-            <button key={p.barcode} onClick={() => {
-              if (p.unitPriceDkk == null) {
-                const entered = window.prompt(`Enter amount for ${p.name} (DKK):`);
-                const amount = Number(entered);
-                if (!entered || !Number.isFinite(amount) || amount <= 0) return;
-                addPresetToSale(p, amount);
-                return;
-              }
-              addPresetToSale(p);
-            }} disabled={!saleOpen}
+            <button key={p.barcode} onClick={() => handlePresetClick(p)} disabled={!saleOpen}
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#F5F5F5', borderRadius: 6, padding: '6px 10px', ...FB, fontSize: 11, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5 }}>
               {p.name}{p.unitPriceDkk != null ? ` — ${p.unitPriceDkk} DKK` : ''}
             </button>
@@ -357,7 +491,7 @@ export default function POSTerminal() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <button onClick={() => changeQuantity(li, -1)} aria-label={`Decrease quantity for ${li.name}`} style={{ width: 26, height: 26, borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: 'none', color: '#F5F5F5', cursor: 'pointer' }}>−</button>
                       <span style={{ ...F, fontWeight: 700, fontSize: 13, color: '#F5F5F5', minWidth: 18, textAlign: 'center' }}>{li.quantity}</span>
-                      <button onClick={() => changeQuantity(li, 1)} disabled={isRaceService} title={isRaceService ? 'Race entries and Second Lives cannot be quantity-stacked — scan the preset again for a separate entry.' : undefined}
+                      <button onClick={() => changeQuantity(li, 1)} disabled={isRaceService} title={isRaceService ? 'Race entries and Second Lives cannot be quantity-stacked — scan the service again for a separate entry.' : undefined}
                         aria-label={`Increase quantity for ${li.name}`} style={{ width: 26, height: 26, borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: 'none', color: isRaceService ? '#4B5563' : '#F5F5F5', cursor: isRaceService ? 'not-allowed' : 'pointer' }}>+</button>
                     </div>
                     <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#FACC15', minWidth: 70, textAlign: 'right' }}>{li.unitPriceDkk * li.quantity} DKK</div>
@@ -370,19 +504,11 @@ export default function POSTerminal() {
         )}
       </div>
 
-      {/* Racer scan/search + profile autofill */}
+      {/* Racer panel */}
       <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 14 }}>
         <div style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#B8C1CC', marginBottom: 10 }}>RACER (OPTIONAL)</div>
         {!sale.racer ? (
           <>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-              <button onClick={() => setCameraTarget('racer')} disabled={!saleOpen} style={{ background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', ...F, fontWeight: 900, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5 }}>
-                📷 OPEN QR CAMERA
-              </button>
-              <button onClick={() => setShowRacerSearch(v => !v)} disabled={!saleOpen} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#F5F5F5', borderRadius: 8, padding: '10px 16px', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5 }}>
-                SEARCH RACERS
-              </button>
-            </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input
                 ref={racerInputRef}
@@ -390,11 +516,14 @@ export default function POSTerminal() {
                 onChange={e => setRacerInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleRacerLookup(); }}
                 disabled={!saleOpen}
-                placeholder="Racer ID or QR token"
+                placeholder="Racer ID"
                 style={{ flex: '1 1 160px', minWidth: 0, background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 14px', color: '#F5F5F5', ...FB, fontSize: 14 }}
               />
               <button onClick={() => handleRacerLookup()} disabled={!saleOpen} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', ...F, fontWeight: 900, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5, whiteSpace: 'nowrap' }}>
                 LOOK UP
+              </button>
+              <button onClick={() => setShowRacerSearch(v => !v)} disabled={!saleOpen} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#F5F5F5', borderRadius: 8, padding: '10px 16px', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5 }}>
+                SEARCH RACERS
               </button>
             </div>
             {racerMessage && (
@@ -432,20 +561,103 @@ export default function POSTerminal() {
               <button onClick={handleRemoveRacer} style={{ background: 'transparent', border: '1px solid rgba(220,38,38,0.3)', color: '#DC2626', borderRadius: 8, padding: '6px 12px', ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: 'pointer' }}>REMOVE / CHANGE RACER</button>
             </div>
 
+            <div style={{ ...FB, fontSize: 11, color: '#F97316', marginTop: 10 }}>⚠️ Staff: visually verify the profile picture matches the racer.</div>
+
+            {registeredCars.length > 0 && (
+              <div style={{ marginTop: 10, ...FB, fontSize: 12, color: '#B8C1CC' }}>
+                Registered cars: {registeredCars.map(c => `${c.clubCarId} (${c.model})`).join(', ')}
+              </div>
+            )}
+
             {saleOpen && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
                 <button onClick={handleApplyReward} disabled={!rewardEligible || !availableReward || !!sale.appliedReward}
                   style={{ background: 'transparent', border: '1px solid rgba(250,204,21,0.3)', color: '#FACC15', borderRadius: 8, padding: '8px 14px', ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: rewardEligible && availableReward && !sale.appliedReward ? 'pointer' : 'not-allowed', opacity: rewardEligible && availableReward && !sale.appliedReward ? 1 : 0.4 }}>
                   {sale.appliedReward ? `REWARD APPLIED (-${sale.appliedReward.discountDkk} DKK)` : !rewardEligible ? 'REWARDS UNAVAILABLE' : availableReward ? `APPLY REWARD (-${availableReward.discountDkk} DKK)` : 'NO REWARD AVAILABLE'}
                 </button>
+                {rewardEligible && availableReward && !sale.appliedReward && (
+                  <button onClick={handleGenerateRedemption} style={{ background: 'transparent', border: '1px solid rgba(59,130,246,0.3)', color: '#3B82F6', borderRadius: 8, padding: '8px 14px', ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: 'pointer' }}>
+                    GENERATE REDEMPTION QR (DEMO)
+                  </button>
+                )}
                 <input value={creditInput} onChange={e => setCreditInput(e.target.value)} placeholder="Shop Credit DKK"
                   style={{ width: 120, background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: '#F5F5F5', ...FB, fontSize: 13 }} />
                 <button onClick={handleApplyCredit} style={{ background: 'transparent', border: '1px solid rgba(34,197,94,0.3)', color: '#22C55E', borderRadius: 8, padding: '8px 14px', ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: 'pointer' }}>APPLY SHOP CREDIT</button>
               </div>
             )}
+            {generatedRedemption && (
+              <div style={{ marginTop: 10, ...FB, fontSize: 11, color: '#6B7280' }}>
+                Demo redemption code (scan/paste to redeem): <span style={{ fontFamily: 'monospace', color: '#93C5FD' }}>{generatedRedemption}</span>
+              </div>
+            )}
           </>
         )}
       </div>
+
+      {/* Car panel */}
+      <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 14 }}>
+        <div style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#B8C1CC', marginBottom: 10 }}>CLUB CAR (OPTIONAL)</div>
+        {!attachedCar ? (
+          <>
+            <button onClick={() => setShowCarSearch(v => !v)} disabled={!saleOpen} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#F5F5F5', borderRadius: 8, padding: '10px 16px', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5 }}>
+              SEARCH CARS
+            </button>
+            {carMessage && <div style={{ marginTop: 10, ...FB, fontSize: 13, color: '#FCA5A5' }}>{carMessage}</div>}
+            {showCarSearch && <div style={{ marginTop: 10 }}><CarSearchCombobox onSelect={handleCarSearchSelect} onClose={() => setShowCarSearch(false)} /></div>}
+          </>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#F5F5F5' }}>{attachedCar.model}</div>
+                <div style={{ ...FB, fontSize: 11, color: '#FACC15', fontFamily: 'monospace' }}>{attachedCar.clubCarId}</div>
+                <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 4 }}>
+                  Owner: {attachedCar.ownerName} ({attachedCar.racerId}) · Chassis: {attachedCar.chassis} · {attachedCar.category} · {attachedCar.mainColor}
+                </div>
+                <div style={{ ...FB, fontSize: 11, color: '#6B7280', marginTop: 2 }}>Registration: {attachedCar.registrationStatus}</div>
+              </div>
+              <button onClick={() => setAttachedCar(null)} style={{ background: 'transparent', border: '1px solid rgba(220,38,38,0.3)', color: '#DC2626', borderRadius: 8, padding: '6px 12px', ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: 'pointer' }}>REMOVE</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Event panel */}
+      <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 14 }}>
+        <div style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#B8C1CC', marginBottom: 10 }}>EVENT (REQUIRED FOR RACE SERVICES)</div>
+        {!sale.event ? (
+          <>
+            <button onClick={() => setShowEventPicker(v => !v)} disabled={!saleOpen} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#F5F5F5', borderRadius: 8, padding: '10px 16px', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed', opacity: saleOpen ? 1 : 0.5 }}>
+              SELECT EVENT
+            </button>
+            {eventMessage && <div style={{ marginTop: 10, ...FB, fontSize: 13, color: '#FCA5A5' }}>{eventMessage}</div>}
+            {showEventPicker && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {searchEvents('').map(ev => (
+                  <button key={ev.eventId} onClick={() => handleSelectEvent(ev)}
+                    style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 12px', cursor: 'pointer', textAlign: 'left', color: '#F5F5F5', ...FB, fontSize: 13 }}>
+                    <span>{ev.name}</span><span style={{ color: '#6B7280' }}>{ev.date}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#F5F5F5' }}>{sale.event.name}</div>
+              <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>{sale.event.date} · {sale.event.type.replace('_', ' ')} · pricing: {sale.event.pricingModel.replace('_', ' ')}</div>
+            </div>
+            <button onClick={handleRemoveEvent} style={{ background: 'transparent', border: '1px solid rgba(220,38,38,0.3)', color: '#DC2626', borderRadius: 8, padding: '6px 12px', ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: 'pointer' }}>CHANGE EVENT</button>
+          </div>
+        )}
+      </div>
+
+      {raceServiceBlocked && (
+        <div style={{ background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 8, padding: 10, ...FB, fontSize: 13, color: '#FACC15' }}>
+          Attach a Racer Profile before confirming a race-related payment.
+        </div>
+      )}
 
       {/* Totals + confirm */}
       <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 12, padding: 18 }}>
@@ -493,12 +705,11 @@ export default function POSTerminal() {
         </div>
       )}
 
-      {cameraTarget && (
+      {cameraOpen && (
         <CameraScannerModal
-          title={cameraTarget === 'product' ? 'Scan Product Barcode' : 'Scan Racer QR Code'}
-          formats={cameraTarget === 'product' ? PRODUCT_BARCODE_FORMATS : RACER_QR_FORMATS}
+          title="Scan QR Code"
           onDetected={handleCameraDetected}
-          onCancel={() => setCameraTarget(null)}
+          onCancel={() => setCameraOpen(false)}
         />
       )}
     </div>
