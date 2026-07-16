@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { issueRedemptionToken, resolveRedemptionScan, markRedemptionTokenUsed } from './posRedemption';
+import { issueRedemptionToken, resolveRedemptionScan, markRedemptionTokenUsed, DEMO_VALID_REDEMPTION_TOKEN, DEMO_EXPIRED_REDEMPTION_TOKEN } from './posRedemption';
 
 const REWARD = { points: 25, discountDkk: 50 };
 
@@ -46,5 +46,15 @@ describe('posRedemption', () => {
     const used = markRedemptionTokenUsed(token);
     expect(token.redeemedAt).toBeNull();
     expect(used.redeemedAt).not.toBeNull();
+  });
+
+  it('the demo valid redemption token resolves as valid today', () => {
+    const outcome = resolveRedemptionScan(DEMO_VALID_REDEMPTION_TOKEN.token, [DEMO_VALID_REDEMPTION_TOKEN]);
+    expect(outcome).toEqual({ kind: 'valid', token: DEMO_VALID_REDEMPTION_TOKEN });
+  });
+
+  it('the demo expired redemption token resolves as expired today', () => {
+    const outcome = resolveRedemptionScan(DEMO_EXPIRED_REDEMPTION_TOKEN.token, [DEMO_EXPIRED_REDEMPTION_TOKEN]);
+    expect(outcome).toEqual({ kind: 'expired' });
   });
 });

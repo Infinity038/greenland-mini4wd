@@ -53,3 +53,27 @@ export function resolveRedemptionScan(
 export function markRedemptionTokenUsed(token: RedemptionToken, now: Date = new Date()): RedemptionToken {
   return { ...token, redeemedAt: now.toISOString() };
 }
+
+// Fixed demo tokens for the Preview-only QR test sheet (app/admin/qr-test-sheet).
+// Real tokens are always randomly generated per-racer at redemption time —
+// these two are the only exception, kept deterministic purely so the test
+// sheet can print a stable, reproducible QR code. Both are seeded into
+// POSTerminal's initial redemption-token list. Racer: G4W-R-0047 (J. Racer),
+// reward: the 25-point / 50 DKK tier.
+export const DEMO_VALID_REDEMPTION_TOKEN: RedemptionToken = {
+  token: 'redeem_demo_valid_0001',
+  racerId: 'G4W-R-0047',
+  reward: { points: 25, discountDkk: 50 },
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: '2099-01-01T00:00:00.000Z',
+  redeemedAt: null,
+};
+
+export const DEMO_EXPIRED_REDEMPTION_TOKEN: RedemptionToken = {
+  token: 'redeem_demo_expired_0001',
+  racerId: 'G4W-R-0047',
+  reward: { points: 25, discountDkk: 50 },
+  issuedAt: '2020-01-01T00:00:00.000Z',
+  expiresAt: '2020-01-01T00:05:00.000Z',
+  redeemedAt: null,
+};

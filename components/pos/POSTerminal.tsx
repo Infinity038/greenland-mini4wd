@@ -27,6 +27,8 @@ import {
   issueRedemptionToken,
   resolveRedemptionScan,
   markRedemptionTokenUsed,
+  DEMO_VALID_REDEMPTION_TOKEN,
+  DEMO_EXPIRED_REDEMPTION_TOKEN,
   type RedemptionToken,
 } from '@/lib/posRedemption';
 import CameraScannerModal from './CameraScannerModal';
@@ -113,8 +115,12 @@ export default function POSTerminal() {
   const [eventMessage, setEventMessage] = useState('');
   const [showEventPicker, setShowEventPicker] = useState(false);
 
-  const [redemptionTokens, setRedemptionTokens] = useState<RedemptionToken[]>([]);
+  // Seeded with the two fixed demo tokens (see lib/posRedemption.ts) so the
+  // Preview-only QR test sheet's "valid"/"expired" Redemption codes work
+  // against this live screen. Any newly generated demo tokens are appended.
+  const [redemptionTokens, setRedemptionTokens] = useState<RedemptionToken[]>([DEMO_VALID_REDEMPTION_TOKEN, DEMO_EXPIRED_REDEMPTION_TOKEN]);
   const [generatedRedemption, setGeneratedRedemption] = useState<string>('');
+  const [pendingRedemption, setPendingRedemption] = useState<RedemptionToken | null>(null);
 
   const [itemsExpanded, setItemsExpanded] = useState(true);
 
@@ -214,11 +220,9 @@ export default function POSTerminal() {
         if (outcome.kind === 'already_redeemed') { setQrMessage('This redemption code has already been used.'); return; }
         if (!sale.racer) { setQrMessage('Scan the Racer QR before redeeming.'); return; }
         if (outcome.token.racerId !== sale.racer.racerId) { setQrMessage('This redemption code belongs to a different racer.'); return; }
-        try {
-          setSale(s => applyLoyaltyReward(s, outcome.token.reward));
-          setRedemptionTokens(tokens => tokens.map(t => t.token === outcome.token.token ? markRedemptionTokenUsed(t) : t));
-          setQrMessage(`Redeemed: -${outcome.token.reward.discountDkk} DKK`);
-        } catch (e) { setQrMessage((e as Error).message); }
+        // Identifies the reward but does not apply it yet — staff must confirm.
+        setPendingRedemption(outcome.token);
+        setQrMessage('');
         return;
       }
     }
@@ -242,6 +246,21 @@ export default function POSTerminal() {
     const token = issueRedemptionToken(sale.racer.racerId, availableReward);
     setRedemptionTokens(tokens => [...tokens, token]);
     setGeneratedRedemption(formatQrPayload('redemption', token.token));
+  };
+
+  const handleConfirmRedemption = () => {
+    if (!pendingRedemption) return;
+    try {
+      setSale(s => applyLoyaltyReward(s, pendingRedemption.reward));
+      setRedemptionTokens(tokens => tokens.map(t => t.token === pendingRedemption.token ? markRedemptionTokenUsed(t) : t));
+      setQrMessage(`Redeemed: -${pendingRedemption.reward.discountDkk} DKK`);
+    } catch (e) { setQrMessage((e as Error).message); }
+    setPendingRedemption(null);
+  };
+
+  const handleCancelRedemption = () => {
+    setPendingRedemption(null);
+    setQrMessage('Redemption cancelled — not applied.');
   };
 
   const handleProductLookup = (rawCode?: string) => {
@@ -360,7 +379,7 @@ export default function POSTerminal() {
     setBarcodeInput(''); setRacerInput(''); setCreditInput(''); setQrInput('');
     setProductMessage(''); setRacerMessage(''); setUnknownBarcode(null); setQrMessage('');
     setLinkProposal(null); setLinkedNotice(''); setAttachedCar(null); setCarMessage('');
-    setEventMessage(''); setGeneratedRedemption('');
+    setEventMessage(''); setGeneratedRedemption(''); setPendingRedemption(null);
   };
 
   const registeredCars = sale.racer ? carsForRacer(sale.racer.racerId) : [];
@@ -401,6 +420,18 @@ export default function POSTerminal() {
           <button onClick={handleQrFieldSubmit} disabled={!saleOpen} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#F5F5F5', borderRadius: 8, padding: '8px 16px', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: saleOpen ? 'pointer' : 'not-allowed' }}>ROUTE</button>
         </div>
         {qrMessage && <div style={{ marginTop: 10, ...FB, fontSize: 13, color: '#FACC15' }}>{qrMessage}</div>}
+
+        {pendingRedemption && (
+          <div style={{ marginTop: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: 12 }}>
+            <div style={{ ...FB, fontSize: 13, color: '#93C5FD', marginBottom: 10 }}>
+              Redemption identified: -{pendingRedemption.reward.discountDkk} DKK reward. This has not been applied yet.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={handleConfirmRedemption} style={{ background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: 'pointer' }}>CONFIRM REDEMPTION</button>
+              <button onClick={handleCancelRedemption} style={{ background: 'transparent', border: 'none', color: '#6B7280', ...FB, fontSize: 11, cursor: 'pointer' }}>CANCEL</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Product panel */}

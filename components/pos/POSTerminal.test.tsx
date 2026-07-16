@@ -136,6 +136,45 @@ describe('POSTerminal — typed QR payload routing', () => {
 });
 
 describe('POSTerminal — Redemption QR', () => {
+  it('a valid Redemption QR identifies the reward but requires confirmation before it is applied', () => {
+    render(<POSTerminal />);
+    routeQr(SERVICE_QR); // Weekly Entry, so there is a total to discount
+    routeQr(RACER_QR);
+    fireEvent.click(screen.getByText('GENERATE REDEMPTION QR (DEMO)'));
+    const code = screen.getByText(/g4w:redemption:/).textContent!.replace('Demo redemption code (scan/paste to redeem): ', '');
+    routeQr(code);
+    expect(screen.getByText(/Redemption identified/)).toBeInTheDocument();
+    expect(screen.queryByText(/REWARD APPLIED/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('CONFIRM REDEMPTION'));
+    expect(screen.getByText(/REWARD APPLIED/)).toBeInTheDocument();
+  });
+
+  it('cancelling a pending redemption does not apply it and leaves the code reusable', () => {
+    render(<POSTerminal />);
+    routeQr(RACER_QR);
+    fireEvent.click(screen.getByText('GENERATE REDEMPTION QR (DEMO)'));
+    const code = screen.getByText(/g4w:redemption:/).textContent!.replace('Demo redemption code (scan/paste to redeem): ', '');
+    routeQr(code);
+    fireEvent.click(screen.getByText('CANCEL'));
+    expect(screen.queryByText(/REWARD APPLIED/)).not.toBeInTheDocument();
+    routeQr(code);
+    expect(screen.getByText(/Redemption identified/)).toBeInTheDocument();
+  });
+
+  it('the seeded demo valid Redemption QR (as printed on the test sheet) identifies the reward', () => {
+    render(<POSTerminal />);
+    routeQr(RACER_QR);
+    routeQr('g4w:redemption:redeem_demo_valid_0001');
+    expect(screen.getByText(/Redemption identified/)).toBeInTheDocument();
+  });
+
+  it('the seeded demo expired Redemption QR (as printed on the test sheet) is rejected as expired', () => {
+    render(<POSTerminal />);
+    routeQr(RACER_QR);
+    routeQr('g4w:redemption:redeem_demo_expired_0001');
+    expect(screen.getByText(/has expired/)).toBeInTheDocument();
+  });
+
   it('an expired Redemption QR is rejected', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-16T12:00:00Z'));
@@ -154,19 +193,10 @@ describe('POSTerminal — Redemption QR', () => {
     fireEvent.click(screen.getByText('GENERATE REDEMPTION QR (DEMO)'));
     const code = screen.getByText(/g4w:redemption:/).textContent!.replace('Demo redemption code (scan/paste to redeem): ', '');
     routeQr(code);
+    fireEvent.click(screen.getByText('CONFIRM REDEMPTION'));
     expect(screen.getByText(/Redeemed:/)).toBeInTheDocument();
     routeQr(code);
     expect(screen.getByText(/already been used/)).toBeInTheDocument();
-  });
-
-  it('a valid Redemption QR applies the linked reward', () => {
-    render(<POSTerminal />);
-    routeQr(SERVICE_QR); // Weekly Entry, so there is a total to discount
-    routeQr(RACER_QR);
-    fireEvent.click(screen.getByText('GENERATE REDEMPTION QR (DEMO)'));
-    const code = screen.getByText(/g4w:redemption:/).textContent!.replace('Demo redemption code (scan/paste to redeem): ', '');
-    routeQr(code);
-    expect(screen.getByText(/REWARD APPLIED/)).toBeInTheDocument();
   });
 });
 
