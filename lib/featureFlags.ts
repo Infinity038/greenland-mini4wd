@@ -19,4 +19,20 @@ export const FEATURE_FLAGS = {
   // 'true' is an emergency rollback that restores the OLD online purchase flow
   // exactly as it was — it does not create any new functionality.
   onlineRaceTicketsEnabled: process.env.NEXT_PUBLIC_ONLINE_RACE_TICKETS_ENABLED === 'true',
+
+  // Pricing/campaign engine (docs/PRODUCT-PRICING-POLICY.md,
+  // docs/SALE-CAMPAIGN-RULES.md). All four flags default to false/off in
+  // every environment. Because Supabase Auth/staff roles/RLS are not yet
+  // live (see docs/PHASED-SUPABASE-MIGRATION-PLAN.md), the admin pricing and
+  // campaign UI is ALSO hard-gated to Preview only via
+  // `process.env.VERCEL_ENV === 'preview'` (the same pattern as
+  // app/admin/pos-camera-test) regardless of these flags — flipping a flag
+  // to 'true' in Production does not expose the admin UI, it only controls
+  // whether the flag-gated pieces render in Preview. See
+  // docs/PRICING-ADMIN-PERMISSIONS.md §"Feature flags" for the full gating
+  // model.
+  pricingEngineEnabled: process.env.NEXT_PUBLIC_PRICING_ENGINE_ENABLED === 'true',
+  saleCampaignsEnabled: process.env.NEXT_PUBLIC_SALE_CAMPAIGNS_ENABLED === 'true',
+  assemblyServicesEnabled: process.env.NEXT_PUBLIC_ASSEMBLY_SERVICES_ENABLED === 'true',
+  inventoryAgingEnabled: process.env.NEXT_PUBLIC_INVENTORY_AGING_ENABLED === 'true',
 } as const;

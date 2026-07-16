@@ -35,10 +35,29 @@ ship to production regardless.
   tests) once physical-device verification is complete and no longer
   needed.
 
+## 3. `/admin/pricing`
+
+- **Files**: `app/admin/pricing/page.tsx`, `app/admin/pricing/PricingAdminClient.tsx`
+- **Purpose**: Preview-only pricing/campaign engine admin UI (campaign
+  creation, activation, and the required pre-activation preview) — see
+  `docs/PRICING-ADMIN-PERMISSIONS.md`.
+- **Existing safeguard**: same Server Component `VERCEL_ENV === "preview"` +
+  `notFound()` pattern as `/admin/pos-camera-test`. Operates entirely on the
+  in-memory demo catalog (`lib/pricing/previewDemoCatalog.ts`) and an
+  in-memory audit log — zero Supabase reads/writes.
+- **Removal**: do NOT delete this route once Supabase Auth/staff
+  roles/RLS (`docs/PHASED-SUPABASE-MIGRATION-PLAN.md`) are live — instead
+  replace the mock role selector with a real session check and the
+  in-memory campaign/audit stores with real Supabase-backed reads/writes
+  behind the `SALE_CAMPAIGNS_ENABLED` flag. Only delete outright if the
+  pricing/campaign feature itself is abandoned.
+
 ## Verification before merge
 
 - [ ] `app/admin/qr-test-sheet/` removed or gated to Preview only
 - [ ] `app/admin/pos-camera-test/` removed
+- [ ] `app/admin/pricing/` removed, or migrated to real Auth/RLS-backed data
+      (see item 3 above — this one is not necessarily a deletion)
 - [ ] `grep -r "qr-test-sheet\|pos-camera-test"` across `app/`, `components/`
       returns no remaining references
 - [ ] Full test suite still passes after removal

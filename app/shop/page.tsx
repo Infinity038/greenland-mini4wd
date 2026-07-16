@@ -10,6 +10,9 @@ import { parseImages } from '@/lib/images';
 import { ProductImage as SharedProductImage } from '@/components/ProductImage';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
+import { DEFAULT_SERVICE_ADDONS, BUILD_TO_ORDER_MESSAGE, type ServiceAddOnId } from '@/lib/pricing/serviceAddOns';
+import { calculateBoxedKitOrderTotal } from '@/lib/pricing/boxedKit';
 
 const CATALOG_CACHE_KEY = 'shop_products';
 
@@ -37,37 +40,25 @@ interface Product {
   image_url: string;
 }
 
-const VARIANTS = [
-  { key: 'unbuilt',      label: 'Unbuilt',        shortLabel: '🔧 Unbuilt / Boxed Kit',           icon: '🔧', isBuilt: false, needsCase: false },
-  { key: 'unbuilt_case', label: 'Unbuilt + Case', shortLabel: '🔧 Unbuilt / Boxed Kit + Case',     icon: '📦', isBuilt: false, needsCase: true  },
-  { key: 'built',        label: 'Built',          shortLabel: '⚡ Built / Ready-to-Race',          icon: '⚡', isBuilt: true,  needsCase: false },
-  { key: 'built_case',   label: 'Built + Case',   shortLabel: '⚡ Built / Ready-to-Race + Case',   icon: '⚡', isBuilt: true,  needsCase: true  },
-];
-
-function isVariantAvailable(p: Product, key: string, caseStock: number): boolean {
+// Boxed-kit-only sale structure (docs/ASSEMBLY-SERVICE-WORKFLOW.md): every
+// car is a single saleable SKU, the Boxed Kit. Display Case, Standard
+// Assembly and Ready-to-Race Assembly are add-on services selected in the
+// order modal (see AddOnPicker below) — they are never separate stock
+// variants and never create a second "built" SKU. `unbuilt_stock` remains
+// the live schema's stock column for the boxed kit; `built_stock` is no
+// longer read or written by this page.
+function boxedKitAvailable(p: Product): boolean {
   if (p.status === 'sold out' || p.status === 'coming soon') return false;
-  const v = VARIANTS.find(x => x.key === key);
-  if (!v) return false;
-  const base = v.isBuilt ? (p.built_stock ?? 1) : (p.unbuilt_stock ?? 1);
-  if (base <= 0) return false;
-  if (v.needsCase && caseStock <= 0) return false;
-  return true;
+  return (p.unbuilt_stock ?? 1) > 0;
 }
 
-const VARIANT_PRICE_FIELDS: Record<string, { price: string; original: string }> = {
-  unbuilt:      { price: 'unbuilt_price_dkk',      original: 'unbuilt_original_price_dkk' },
-  unbuilt_case: { price: 'unbuilt_case_price_dkk', original: 'unbuilt_case_original_price_dkk' },
-  built:        { price: 'built_price_dkk',        original: 'built_original_price_dkk' },
-  built_case:   { price: 'built_case_price_dkk',   original: 'built_case_original_price_dkk' },
-};
-
-function variantPricing(p: any, key: string): { price: number; original: number | null } {
-  const f = VARIANT_PRICE_FIELDS[key];
-  if (!f) return { price: p.price_dkk || 0, original: null };
-  const price = p[f.price] ?? p.price_dkk ?? 0;
-  const original = p[f.original];
-  return { price, original: original && original > price ? original : null };
+function boxedKitPricing(p: Product): { price: number; original: number | null } {
+  const price = p.price_dkk || 0;
+  const original = p.original_price_dkk && p.original_price_dkk > price ? p.original_price_dkk : null;
+  return { price, original };
 }
+
+const ADD_ON_ORDER: ServiceAddOnId[] = ['display_case', 'standard_assembly', 'ready_to_race_assembly'];
 
 // Simple (non-car) availability + pricing — parts & merchandise use a flat price_dkk
 // and a single stock_qty pool instead of the 4-variant unbuilt/built system.
@@ -182,11 +173,11 @@ function SimpleProductCard({ p, wishlistIds, toggleWishlist, shareProduct, copie
           <div style={{ ...F, fontWeight: 900, fontSize: 20, color: original ? '#22C55E' : '#FACC15' }}>{price.toLocaleString()} kr</div>
         </div>
         {available ? (
-          <button onClick={() => openModal(p, 'standard')} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 0', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+          <button onClick={() => openModal(p)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 0', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
         ) : (
           <>
             <div style={{ ...F, fontSize: 11, letterSpacing: 1, color: '#DC2626', fontWeight: 700, marginBottom: 6 }}>SOLD OUT</div>
-            <button onClick={() => openPreorder(p, 'standard')} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '10px 0', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+            <button onClick={() => openPreorder(p)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '10px 0', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
           </>
         )}
       </div>
@@ -213,7 +204,7 @@ export default function ShopPage() {
   const didInitFromUrl = useRef(false);
 
   const [selected, setSelected] = useState<Product | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<string>('unbuilt');
+  const [selectedAddOns, setSelectedAddOns] = useState<ServiceAddOnId[]>([]);
   const [step, setStep] = useState<ModalStep>('confirm');
   const [orderId, setOrderId] = useState('');
   const [payRef, setPayRef] = useState('');
@@ -225,7 +216,7 @@ export default function ShopPage() {
   const [lightbox, setLightbox] = useState<Product | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [preorderTarget, setPreorderTarget] = useState<{ product: Product; variantKey: string } | null>(null);
+  const [preorderTarget, setPreorderTarget] = useState<{ product: Product } | null>(null);
   const [preorderSending, setPreorderSending] = useState(false);
   const [preorderDone, setPreorderDone] = useState(false);
 
@@ -382,22 +373,22 @@ export default function ShopPage() {
     return matchesSub && matchesSearch;
   });
 
-  const openModal = (p: Product, variantKey: string) => {
+  const openModal = (p: Product) => {
     if (!isRegistered()) { window.location.href = '/register'; return; }
     if (isCarProduct(p)) {
-      if (!isVariantAvailable(p, variantKey, globalCaseStock)) return;
+      if (!boxedKitAvailable(p)) return;
     } else {
       if (!isSimpleAvailable(p)) return;
     }
-    setSelected(p); setSelectedVariant(variantKey); setStep('confirm');
+    setSelected(p); setSelectedAddOns([]); setStep('confirm');
     setOrderId(''); setPayRef(''); setProofFile(null); setProofPreview(null); setError('');
     setPaymentOption('deposit');
     setDiscountInput(''); setDiscountApplied(null); setDiscountError('');
   };
 
-  const openPreorder = (p: Product, variantKey: string) => {
+  const openPreorder = (p: Product) => {
     if (!isRegistered()) { window.location.href = '/register'; return; }
-    setPreorderTarget({ product: p, variantKey });
+    setPreorderTarget({ product: p });
     setPreorderDone(false);
   };
 
@@ -408,7 +399,7 @@ export default function ShopPage() {
       await supabase.from('preorders').insert({
         product_id: preorderTarget.product.id,
         product_name: preorderTarget.product.name,
-        variant: preorderTarget.variantKey,
+        variant: 'boxed_kit',
         member_email: member.email,
         member_name: member.name || member.email,
         status: 'pending',
@@ -418,31 +409,51 @@ export default function ShopPage() {
     setPreorderSending(false);
   };
 
+  // Display Case is independent; Standard Assembly and Ready-to-Race
+  // Assembly are mutually exclusive (one build service per order, not both).
+  const toggleAddOn = (addOn: ServiceAddOnId) => {
+    setSelectedAddOns(prev => {
+      if (prev.includes(addOn)) return prev.filter(a => a !== addOn);
+      if (addOn === 'standard_assembly' || addOn === 'ready_to_race_assembly') {
+        return [...prev.filter(a => a !== 'standard_assembly' && a !== 'ready_to_race_assembly'), addOn];
+      }
+      return [...prev, addOn];
+    });
+  };
+
   const placeOrder = async () => {
     if (!selected || !member) return;
     setUploading(true); setError('');
     const isCar = isCarProduct(selected);
-    const v = isCar ? VARIANTS.find(x => x.key === selectedVariant)! : null;
-    const rawPrice = isCar ? variantPricing(selected, selectedVariant).price : simplePricing(selected).price;
+    const addOnsForOrder = isCar && FEATURE_FLAGS.assemblyServicesEnabled ? selectedAddOns : [];
+    const boxedKitTotal = isCar
+      ? calculateBoxedKitOrderTotal(Math.round(boxedKitPricing(selected).price * 100), { productId: selected.id, addOns: addOnsForOrder })
+      : null;
+    const rawPrice = isCar ? (boxedKitTotal!.totalOre / 100) : simplePricing(selected).price;
     const price = discountApplied ? Math.round(rawPrice * (1 - discountApplied.percent / 100)) : rawPrice;
     try {
       const depositAmount = Math.ceil(price / 2);
       const memberName = member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
-      const productLabel = isCar ? `${selected.name} (${v!.label})` : selected.name;
+      const addOnLabels = boxedKitTotal?.addOnLines.map(l => l.label) ?? [];
+      const productLabel = isCar
+        ? `${selected.name} (Boxed Kit${addOnLabels.length ? ` + ${addOnLabels.join(' + ')}` : ''})`
+        : selected.name;
       const { data, error: err } = await supabase.from('orders').insert({
         member_email: member.email,
         member_name: memberName,
         product_name: productLabel,
         chassis: selected.chassis || null,
-        type: isCar ? (v!.isBuilt ? 'built' : 'boxed') : selected.category,
-        variant: isCar ? selectedVariant : 'standard',
+        type: isCar ? 'boxed' : selected.category,
+        variant: isCar ? (addOnsForOrder.join(',') || 'none') : 'standard',
         quantity: 1,
         status: 'pending',
         payment_status: 'awaiting_payment',
         spend_amount_dkk: price,
-        notes: (discountApplied ? `Code ${discountApplied.code} applied (-${discountApplied.percent}%). ` : '') + (paymentOption === 'deposit'
-          ? `50% Deposit: ${depositAmount} DKK (Remaining: ${price - depositAmount} DKK on pickup)`
-          : `Full Payment: ${price} DKK`),
+        notes: (discountApplied ? `Code ${discountApplied.code} applied (-${discountApplied.percent}%). ` : '')
+          + (boxedKitTotal?.requiresAssembly ? `${BUILD_TO_ORDER_MESSAGE} ` : '')
+          + (paymentOption === 'deposit'
+            ? `50% Deposit: ${depositAmount} DKK (Remaining: ${price - depositAmount} DKK on pickup)`
+            : `Full Payment: ${price} DKK`),
       }).select().single();
       if (err || !data) throw new Error('failed');
 
@@ -453,13 +464,14 @@ export default function ShopPage() {
       }
 
       if (isCar) {
-        const stockUpdate: any = v!.isBuilt
-          ? { built_stock: Math.max(0, (selected.built_stock ?? 1) - 1) }
-          : { unbuilt_stock: Math.max(0, (selected.unbuilt_stock ?? 1) - 1) };
-        await supabase.from('products').update(stockUpdate).eq('id', selected.id);
-        setProducts(prev => prev.map(p => p.id === selected.id ? { ...p, ...stockUpdate } : p));
+        // Only the Boxed Kit stock count is ever reduced — assembly is a
+        // service, never a second "built" SKU (docs/ASSEMBLY-SERVICE-WORKFLOW.md).
+        const newKitStock = Math.max(0, (selected.unbuilt_stock ?? 1) - 1);
+        await supabase.from('products').update({ unbuilt_stock: newKitStock }).eq('id', selected.id);
+        setProducts(prev => prev.map(p => p.id === selected.id ? { ...p, unbuilt_stock: newKitStock } : p));
 
-        if (v!.needsCase) {
+        // Display Case stock is tracked separately from kit stock.
+        if (addOnsForOrder.includes('display_case')) {
           const newCaseStock = Math.max(0, (globalCaseStock ?? 0) - 1);
           await supabase.from('shop_inventory').update({ case_stock: newCaseStock }).eq('id', 1);
           setGlobalCaseStock(newCaseStock);
@@ -500,7 +512,13 @@ export default function ShopPage() {
 
   const closeModal = () => setSelected(null);
   const isSelectedCar = selected ? isCarProduct(selected) : true;
-  const modalPricing = selected ? (isSelectedCar ? variantPricing(selected, selectedVariant) : simplePricing(selected)) : { price: 0, original: null };
+  const activeAddOns = isSelectedCar && FEATURE_FLAGS.assemblyServicesEnabled ? selectedAddOns : [];
+  const modalBoxedKitTotal = selected && isSelectedCar
+    ? calculateBoxedKitOrderTotal(Math.round(boxedKitPricing(selected).price * 100), { productId: selected.id, addOns: activeAddOns })
+    : null;
+  const modalPricing = selected
+    ? (isSelectedCar ? { price: (modalBoxedKitTotal!.totalOre / 100), original: boxedKitPricing(selected).original } : simplePricing(selected))
+    : { price: 0, original: null };
   const rawModalPrice = modalPricing.price;
   const modalPrice = discountApplied ? Math.round(rawModalPrice * (1 - discountApplied.percent / 100)) : rawModalPrice;
 
@@ -555,11 +573,8 @@ export default function ShopPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
                 {collectors.map(p => {
-                  // Vault spotlight always quotes the UNBUILT price/availability — keeps it
-                  // consistent with the UNBUILT row in the full variant grid further down,
-                  // instead of jumping to whichever variant happens to be cheapest/in stock.
-                  const unbuiltAvailable = isVariantAvailable(p, 'unbuilt', globalCaseStock);
-                  const { price: unbuiltPrice, original: unbuiltOriginal } = variantPricing(p, 'unbuilt');
+                  const boxedKitIsAvailable = boxedKitAvailable(p);
+                  const { price: unbuiltPrice, original: unbuiltOriginal } = boxedKitPricing(p);
                   return (
                     <div key={p.id} id={`product-${p.id}`} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
@@ -581,10 +596,10 @@ export default function ShopPage() {
                             <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{unbuiltPrice.toLocaleString()} kr</div>
                           </div>
                         </div>
-                        {unbuiltAvailable ? (
-                          <button onClick={() => openModal(p, 'unbuilt')} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                        {boxedKitIsAvailable ? (
+                          <button onClick={() => openModal(p)} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
                         ) : (
-                          <button onClick={() => openPreorder(p, 'unbuilt')} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                          <button onClick={() => openPreorder(p)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
                         )}
                       </div>
                     </div>
@@ -653,29 +668,32 @@ export default function ShopPage() {
                         <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
                         <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, margin: '0 0 14px' }}>{p.description}</p>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          {VARIANTS.map(v => {
-                            const available = isVariantAvailable(p, v.key, globalCaseStock);
-                            const { price, original } = variantPricing(p, v.key);
-                            return (
-                              <div key={v.key} style={{ background: '#050505', border: `1px solid ${available ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.25)'}`, borderRadius: 8, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#B8C1CC' }}>{v.icon} {v.label.toUpperCase()}</div>
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
-                                  {original && <span style={{ ...FB, fontSize: 11, color: '#6B7280', textDecoration: 'line-through' }}>{original.toLocaleString()}</span>}
-                                  <div style={{ ...F, fontWeight: 900, fontSize: 15, color: available ? (original ? '#22C55E' : (isCollector ? '#FACC15' : '#F5F5F5')) : '#6B7280' }}>{price.toLocaleString()} kr</div>
+                        {(() => {
+                          const available = boxedKitAvailable(p);
+                          const { price, original } = boxedKitPricing(p);
+                          return (
+                            <div style={{ background: '#050505', border: `1px solid ${available ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.25)'}`, borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#B8C1CC' }}>📦 BOXED KIT</div>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                  {original && <span style={{ ...FB, fontSize: 12, color: '#6B7280', textDecoration: 'line-through' }}>{original.toLocaleString()}</span>}
+                                  <div style={{ ...F, fontWeight: 900, fontSize: 20, color: available ? (original ? '#22C55E' : (isCollector ? '#FACC15' : '#F5F5F5')) : '#6B7280' }}>{price.toLocaleString()} kr</div>
                                 </div>
-                                {available ? (
-                                  <button onClick={() => openModal(p, v.key)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
-                                ) : (
-                                  <>
-                                    <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>SOLD OUT</div>
-                                    <button onClick={() => openPreorder(p, v.key)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
-                                  </>
-                                )}
                               </div>
-                            );
-                          })}
-                        </div>
+                              {FEATURE_FLAGS.assemblyServicesEnabled && (
+                                <div style={{ ...FB, fontSize: 10, color: '#6B7280' }}>+ Display Case, Standard or Ready-to-Race Assembly available at checkout</div>
+                              )}
+                              {available ? (
+                                <button onClick={() => openModal(p)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '9px 0', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                              ) : (
+                                <>
+                                  <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>SOLD OUT</div>
+                                  <button onClick={() => openPreorder(p)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '9px 0', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   );
@@ -777,7 +795,7 @@ export default function ShopPage() {
                   <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 18 }}>
                     <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5' }}>{selected.name}</div>
                     <div style={{ ...F, fontSize: 11, letterSpacing: 2, color: '#B8C1CC', margin: '4px 0 12px' }}>
-                      {isSelectedCar ? `${VARIANTS.find(v => v.key === selectedVariant)?.shortLabel} · ${selected.chassis}` : (selected.subcategory || selected.category)}
+                      {isSelectedCar ? `📦 Boxed Kit · ${selected.chassis}` : (selected.subcategory || selected.category)}
                       {selected.item_no ? ` · #${selected.item_no}` : ''}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
@@ -809,9 +827,31 @@ export default function ShopPage() {
                       </div>
                     </div>
                   </div>
-                  {isSelectedCar && VARIANTS.find(v => v.key === selectedVariant)?.isBuilt && (
-                    <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#FCA5A5', lineHeight: 1.6 }}>
-                      ⚡ <strong style={{ color: '#fff' }}>Race-Ready Car:</strong> This is a fully assembled and tuned Mini 4WD — no building required. Open the box and race immediately.
+                  {isSelectedCar && FEATURE_FLAGS.assemblyServicesEnabled && (
+                    <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 16 }}>
+                      <div style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 2, color: '#B8C1CC', marginBottom: 12 }}>OPTIONAL ADD-ONS</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {ADD_ON_ORDER.map(addOnId => {
+                          const def = DEFAULT_SERVICE_ADDONS[addOnId];
+                          const isSelected = selectedAddOns.includes(addOnId);
+                          const disabled = addOnId === 'display_case' && globalCaseStock <= 0;
+                          return (
+                            <div key={addOnId} onClick={() => !disabled && toggleAddOn(addOnId)}
+                              style={{ opacity: disabled ? 0.4 : 1, cursor: disabled ? 'not-allowed' : 'pointer', background: isSelected ? 'rgba(220,38,38,0.08)' : '#071426', border: `1.5px solid ${isSelected ? '#DC2626' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                              <div>
+                                <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5' }}>{isSelected ? '☑' : '☐'} {def.label}{disabled ? ' (out of stock)' : ''}</div>
+                                <div style={{ ...FB, fontSize: 11, color: '#6B7280', marginTop: 2 }}>{def.includes[0]}{def.includes.length > 1 ? ` + ${def.includes.length - 1} more` : ''}</div>
+                              </div>
+                              <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#FACC15', whiteSpace: 'nowrap' }}>+{def.defaultPriceDkk} DKK</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {modalBoxedKitTotal?.requiresAssembly && (
+                    <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#93C5FD', lineHeight: 1.6 }}>
+                      🛠️ <strong style={{ color: '#fff' }}>{BUILD_TO_ORDER_MESSAGE}</strong>
                     </div>
                   )}
 
