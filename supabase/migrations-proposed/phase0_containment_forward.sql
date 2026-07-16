@@ -1,0 +1,38 @@
+-- DO NOT RUN — REVIEWED PROPOSAL ONLY
+--
+-- PHASE 0 — IMMEDIATE CONTAINMENT
+--
+-- Deliberately contains NO schema changes. Blindly enabling RLS on all 29
+-- public tables today — before Phase 1 (auth_user_id), Phase 2 (staff_roles)
+-- and Phase 3 (actual policies) exist — would flip every table from
+-- "unrestricted" straight to "fully denied for anon/authenticated," which
+-- breaks Production instantly for every page that reads members, products,
+-- orders, tournaments, etc. That is exactly the outcome this phase exists to
+-- avoid; see docs/LIVE-SCHEMA-SECURITY-AUDIT.md and the Phase 0 table in
+-- docs/PHASED-SUPABASE-MIGRATION-PLAN.md for the full per-table exposure /
+-- dependency / containment-option / permanent-policy breakdown.
+--
+-- PREREQUISITES: none — this phase is read-only analysis, already completed.
+--
+-- CODE DEPENDENCIES (recommended, not applied in this pass — requires
+-- separate approval before implementation):
+--   - Stop selecting `password_hash` in `lib/member.ts` (`getMemberDataFromSupabase`),
+--     `lib/loyalty.ts` (2 call sites), `app/orders/page.tsx:86`, and
+--     `app/admin/members/page.tsx:86` — replace `.select('*')` with an
+--     explicit column list that excludes `password_hash`. This is a pure
+--     code change, touches no schema/auth/RLS, and immediately shrinks the
+--     live exposure window without waiting for Supabase Auth to be ready.
+--   - `app/orders/page.tsx:86` fetches the ENTIRE `members` table
+--     unfiltered from a nominally single-member "my orders" page — worth a
+--     query-design review independent of the RLS timeline.
+--
+-- DATA BACKFILL: none.
+-- TESTING: none (no schema change to test).
+-- VERIFICATION QUERIES: see docs/LIVE-SCHEMA-SECURITY-AUDIT.md §4 (RLS
+--   disabled on all 29 tables) and §5 (concrete exposure findings) — already run.
+-- RISKS: none introduced by this phase (it does nothing); the risk this
+--   phase documents is the *current, pre-existing* state.
+-- STOP CONDITIONS: n/a.
+-- ROLLBACK TRIGGERS: n/a — see phase0_containment_rollback.sql.
+
+select 1; -- intentional no-op placeholder; no DDL/DML in Phase 0.
