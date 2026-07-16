@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { scanBarcode, PRESET_POS_ITEMS, MOCK_PRODUCT_CATALOG } from './posCatalog';
+import { scanBarcode, searchProducts, isRaceServiceBarcode, PRESET_POS_ITEMS, MOCK_PRODUCT_CATALOG } from './posCatalog';
 
-describe('posCatalog', () => {
+describe('posCatalog — scanning', () => {
   it('scans a stock-tracked product by barcode', () => {
     const result = scanBarcode('4950344958926');
     expect(result).toEqual({ kind: 'product', product: MOCK_PRODUCT_CATALOG[0] });
@@ -38,5 +38,61 @@ describe('posCatalog', () => {
     scanBarcode('4950344958926');
     scanBarcode('4950344993737');
     expect(JSON.stringify(MOCK_PRODUCT_CATALOG)).toBe(before);
+  });
+});
+
+describe('posCatalog — search', () => {
+  it('finds a product by name', () => {
+    const results = searchProducts('Hyper-Dash');
+    expect(results.map(p => p.name)).toContain('Hyper-Dash 3 Motor');
+  });
+
+  it('finds a product by Tamiya item number', () => {
+    const results = searchProducts('95892');
+    expect(results.map(p => p.name)).toContain('Mini 4WD Fully Cowled Chassis Kit');
+  });
+
+  it('finds a product by barcode', () => {
+    const results = searchProducts('4950344180938');
+    expect(results.map(p => p.name)).toContain('Low Friction Plastic Roller 13mm');
+  });
+
+  it('finds products by category', () => {
+    const results = searchProducts('Rollers');
+    expect(results.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('finds products by chassis', () => {
+    const results = searchProducts('Super-X');
+    expect(results.map(p => p.name)).toContain('Super-X Chassis Kit');
+  });
+
+  it('returns the full catalog for an empty query', () => {
+    expect(searchProducts('')).toEqual(MOCK_PRODUCT_CATALOG);
+  });
+
+  it('marks an out-of-stock, non-preorder product as out_of_stock and a preorder-only item as preorder', () => {
+    const roller = MOCK_PRODUCT_CATALOG.find(p => p.name === 'Low Friction Plastic Roller 13mm')!;
+    const preorder = MOCK_PRODUCT_CATALOG.find(p => p.name === 'Aluminum Roller 9-8mm')!;
+    expect(roller.availability).toBe('out_of_stock');
+    expect(preorder.availability).toBe('preorder');
+  });
+});
+
+describe('posCatalog — race service classification', () => {
+  it('classifies race entry and second life presets as race services', () => {
+    expect(isRaceServiceBarcode('POS-WEEKLY-ENTRY')).toBe(true);
+    expect(isRaceServiceBarcode('POS-WEEKLY-2ND')).toBe(true);
+    expect(isRaceServiceBarcode('POS-BIGEVENT-ENTRY')).toBe(true);
+  });
+
+  it('does not classify practice, rental, refreshment or merchandise as race services', () => {
+    expect(isRaceServiceBarcode('POS-PRACTICE')).toBe(false);
+    expect(isRaceServiceBarcode('POS-HOUSECAR-HR')).toBe(false);
+    expect(isRaceServiceBarcode('POS-SNACK')).toBe(false);
+  });
+
+  it('returns false for an unknown barcode', () => {
+    expect(isRaceServiceBarcode('0000000000000')).toBe(false);
   });
 });

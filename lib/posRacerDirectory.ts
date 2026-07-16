@@ -1,16 +1,74 @@
 // Mock racer directory for the POS preview screen only — simulates what a
-// QR/Racer ID scan would resolve to. Not wired to any live members table.
-import type { RacerSnapshot } from './posSale';
+// QR/Racer ID scan or a staff search would resolve to. Not wired to any live
+// members table. Phone numbers exist here for staff search only and must
+// never be rendered on a result card (see components/pos/RacerSearchCombobox.tsx).
+import type { RacerAccountStatus } from './racerAccountStatus';
+import type { PhysicalCardStatus } from './physicalCard';
 
-export const MOCK_RACER_DIRECTORY: RacerSnapshot[] = [
-  { racerId: 'G4W-R-0047', displayName: 'J. Racer', photoUrl: null, loyaltyPoints: 42, shopCreditDkk: 100 },
-  { racerId: 'G4W-R-0012', displayName: 'A. Nielsen', photoUrl: null, loyaltyPoints: 8, shopCreditDkk: 0 },
+export interface PosRacerRecord {
+  racerId: string;
+  displayName: string;
+  photoUrl: string | null;
+  phone: string;
+  clubCarIds: string[];
+  accountStatus: RacerAccountStatus;
+  physicalCardStatus: PhysicalCardStatus | 'None';
+  loyaltyPoints: number;
+  shopCreditDkk: number;
+}
+
+// A QR code carrying this exact sentinel simulates a revoked physical card
+// for the demo screen — a real revoked-card QR would still resolve to a
+// racer record, but be flagged invalid at the card layer, not the racer layer.
+export const REVOKED_CARD_SCAN_CODE = 'REVOKED-CARD-DEMO';
+
+export const MOCK_RACER_DIRECTORY: PosRacerRecord[] = [
+  { racerId: 'G4W-R-0047', displayName: 'J. Racer',    photoUrl: null, phone: '+299 12 34 56', clubCarIds: ['G4W-BS-0047'],           accountStatus: 'Active',         physicalCardStatus: 'Collected',    loyaltyPoints: 42, shopCreditDkk: 100 },
+  { racerId: 'G4W-R-0012', displayName: 'A. Nielsen',  photoUrl: null, phone: '+299 23 45 67', clubCarIds: ['G4W-BM-0012'],           accountStatus: 'Active',         physicalCardStatus: 'None',         loyaltyPoints: 8,  shopCreditDkk: 0 },
+  { racerId: 'G4W-R-0099', displayName: 'K. Petersen', photoUrl: null, phone: '+299 34 56 78', clubCarIds: [],                        accountStatus: 'Pending Review', physicalCardStatus: 'None',         loyaltyPoints: 0,  shopCreditDkk: 0 },
+  { racerId: 'G4W-R-0031', displayName: 'M. Lund',     photoUrl: null, phone: '+299 45 67 89', clubCarIds: ['G4W-OPEN-0031'],         accountStatus: 'Suspended',      physicalCardStatus: 'Deactivated',  loyaltyPoints: 15, shopCreditDkk: 0 },
+  { racerId: 'G4W-R-0004', displayName: 'S. Kristiansen', photoUrl: null, phone: '+299 56 78 90', clubCarIds: ['G4W-OBS-0004'],       accountStatus: 'Archived',       physicalCardStatus: 'Deactivated',  loyaltyPoints: 60, shopCreditDkk: 0 },
 ];
 
-// A real QR token never encodes the Racer ID in plain text (see lib/qrIdentity.ts) —
-// this mock simply accepts either the Racer ID itself or a scanned QR token
-// string ending in it, so the preview screen can be driven by either input.
-export function lookupRacerByScan(code: string): RacerSnapshot | null {
+export type RacerScanOutcome =
+  | { kind: 'found'; racer: PosRacerRecord }
+  | { kind: 'invalid_qr' }
+  | { kind: 'revoked_card' }
+  | { kind: 'pending_account'; racer: PosRacerRecord }
+  | { kind: 'suspended_account'; racer: PosRacerRecord }
+  | { kind: 'archived_account'; racer: PosRacerRecord };
+
+// A real QR token never encodes the Racer ID in plain text (see
+// lib/qrIdentity.ts) — this mock simply accepts either the Racer ID itself
+// or a scanned QR token string ending in it, so the preview screen can be
+// driven by either input.
+export function lookupRacerByScan(
+  code: string,
+  directory: PosRacerRecord[] = MOCK_RACER_DIRECTORY
+): RacerScanOutcome {
   const trimmed = code.trim();
-  return MOCK_RACER_DIRECTORY.find(r => trimmed === r.racerId || trimmed.endsWith(r.racerId)) ?? null;
+  if (!trimmed) return { kind: 'invalid_qr' };
+  if (trimmed.toUpperCase() === REVOKED_CARD_SCAN_CODE) return { kind: 'revoked_card' };
+
+  const racer = directory.find(r => trimmed === r.racerId || trimmed.endsWith(r.racerId));
+  if (!racer) return { kind: 'invalid_qr' };
+
+  if (racer.accountStatus === 'Pending Review') return { kind: 'pending_account', racer };
+  if (racer.accountStatus === 'Suspended') return { kind: 'suspended_account', racer };
+  if (racer.accountStatus === 'Archived') return { kind: 'archived_account', racer };
+  return { kind: 'found', racer };
+}
+
+// Searches Racer ID, display name, phone, and Club Car ID. Phone numbers are
+// searchable but must never be shown on a result card.
+export function searchRacers(query: string, directory: PosRacerRecord[] = MOCK_RACER_DIRECTORY): PosRacerRecord[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const qDigits = q.replace(/\D/g, '');
+  return directory.filter(r =>
+    r.racerId.toLowerCase().includes(q) ||
+    r.displayName.toLowerCase().includes(q) ||
+    r.clubCarIds.some(id => id.toLowerCase().includes(q)) ||
+    (qDigits.length >= 3 && r.phone.replace(/\D/g, '').includes(qDigits))
+  );
 }

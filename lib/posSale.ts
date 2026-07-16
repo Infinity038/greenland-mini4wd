@@ -7,6 +7,7 @@
 import { calculateLoyaltyPoints } from './loyaltyPoints';
 import { getAvailableReward, type RewardTier } from './loyaltyRoadmap';
 import type { PosProduct, PosPresetItem } from './posCatalog';
+import { canRedeemRewards, type RacerAccountStatus } from './racerAccountStatus';
 
 export type SaleStatus = 'open' | 'confirmed' | 'cancelled' | 'refunded';
 
@@ -25,6 +26,7 @@ export interface RacerSnapshot {
   racerId: string;
   displayName: string;
   photoUrl: string | null;
+  accountStatus: RacerAccountStatus;
   loyaltyPoints: number;
   shopCreditDkk: number;
 }
@@ -167,6 +169,14 @@ export function attachRacer(sale: Sale, racer: RacerSnapshot): Sale {
   return { ...sale, racer };
 }
 
+// Clears the attached racer along with any reward/credit that depended on
+// their balance — the totals preview returns to zero points automatically
+// since calculateSaleTotals() only awards points when a racer is attached.
+export function removeRacer(sale: Sale): Sale {
+  assertOpen(sale);
+  return { ...sale, racer: null, appliedReward: null, shopCreditAppliedDkk: 0 };
+}
+
 function calculateSubtotal(sale: Sale): number {
   return round2(sale.lineItems.reduce((sum, li) => sum + li.unitPriceDkk * li.quantity, 0));
 }
@@ -174,6 +184,7 @@ function calculateSubtotal(sale: Sale): number {
 export function applyLoyaltyReward(sale: Sale): Sale {
   assertOpen(sale);
   if (!sale.racer) throw new Error('Scan a Racer Profile before applying a loyalty reward.');
+  if (!canRedeemRewards(sale.racer.accountStatus)) throw new Error(`A ${sale.racer.accountStatus} account cannot redeem rewards.`);
   if (sale.appliedReward) throw new Error('A loyalty reward has already been applied to this sale.');
   const reward = getAvailableReward(sale.racer.loyaltyPoints);
   if (!reward) throw new Error('This racer has no eligible loyalty reward.');

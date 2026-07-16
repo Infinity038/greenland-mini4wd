@@ -4,6 +4,7 @@ import {
   scanProduct,
   scanPresetItem,
   attachRacer,
+  removeRacer,
   applyLoyaltyReward,
   applyShopCredit,
   calculateSaleTotals,
@@ -22,6 +23,7 @@ const RACER: RacerSnapshot = {
   racerId: 'G4W-R-0047',
   displayName: 'J. Racer',
   photoUrl: null,
+  accountStatus: 'Active',
   loyaltyPoints: 42,
   shopCreditDkk: 100,
 };
@@ -81,6 +83,18 @@ describe('posSale — points calculation', () => {
     expect(totals.pointsToEarn).toBe(1.5);
   });
 
+  it('removing a racer returns the points preview to zero and clears reward/credit', () => {
+    let sale = createNewSale();
+    sale = attachRacer(sale, RACER);
+    sale = scanPresetItem(sale, WEEKLY_ENTRY);
+    sale = applyLoyaltyReward(sale);
+    sale = removeRacer(sale);
+    const totals = calculateSaleTotals(sale);
+    expect(totals.pointsToEarn).toBe(0);
+    expect(sale.appliedReward).toBeNull();
+    expect(sale.shopCreditAppliedDkk).toBe(0);
+  });
+
   it('a customer without a Racer Profile earns no Loyalty Points', () => {
     let sale = createNewSale();
     sale = scanPresetItem(sale, WEEKLY_ENTRY);
@@ -114,6 +128,13 @@ describe('posSale — rewards and Shop Credit', () => {
     const totals = calculateSaleTotals(sale);
     expect(totals.rewardDiscountDkk).toBe(50);
     expect(totals.cashDueDkk).toBe(100);
+  });
+
+  it('blocks reward redemption for a non-Active account', () => {
+    let sale = createNewSale();
+    sale = attachRacer(sale, { ...RACER, accountStatus: 'Suspended', loyaltyPoints: 42 });
+    sale = scanPresetItem(sale, WEEKLY_ENTRY);
+    expect(() => applyLoyaltyReward(sale)).toThrow(/Suspended account cannot redeem/i);
   });
 
   it('rejects Shop Credit beyond the racer\'s available balance', () => {
