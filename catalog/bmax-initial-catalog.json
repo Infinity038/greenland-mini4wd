@@ -39,7 +39,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "board_approved_fixed_price",
-    "approved_regular_price_dkk": 319
+    "approved_regular_price_dkk": 319,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "18094",
@@ -81,7 +87,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "18103",
@@ -123,7 +135,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "18714",
@@ -165,7 +183,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "18718",
@@ -207,7 +231,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "19451",
@@ -233,7 +263,7 @@
     "source_url": "https://www.tamiya.com/english/products/19451/index.html",
     "image_url": "",
     "image_status": "needs approved upload",
-    "price_dkk": 299,
+    "price_dkk": 359,
     "original_price_dkk": 0,
     "stock_qty": 0,
     "unbuilt_stock": 0,
@@ -249,7 +279,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "board_approved_fixed_price",
-    "approved_regular_price_dkk": 299
+    "approved_regular_price_dkk": 359,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "18701",
@@ -291,7 +327,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "18705",
@@ -333,7 +375,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "board_approved_fixed_price",
-    "approved_regular_price_dkk": 299
+    "approved_regular_price_dkk": 299,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "18704",
@@ -375,7 +423,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "board_approved_fixed_price",
-    "approved_regular_price_dkk": 299
+    "approved_regular_price_dkk": 299,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "19447",
@@ -401,7 +455,7 @@
     "source_url": "https://www.tamiya.com/english/products/19447/index.html",
     "image_url": "",
     "image_status": "needs approved upload",
-    "price_dkk": 299,
+    "price_dkk": 359,
     "original_price_dkk": 0,
     "stock_qty": 0,
     "unbuilt_stock": 0,
@@ -409,7 +463,7 @@
     "status": "coming soon",
     "published": false,
     "available": false,
-    "is_collectors_vault": false,
+    "is_collectors_vault": true,
     "catalog_order": 10,
     "id": "tamiya-19447-beak-stinger-g",
     "shipping_class": "complete_car_kit",
@@ -417,7 +471,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "board_approved_fixed_price",
-    "approved_regular_price_dkk": 299
+    "approved_regular_price_dkk": 359,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "19443",
@@ -459,7 +519,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "board_approved_fixed_price",
-    "approved_regular_price_dkk": 249
+    "approved_regular_price_dkk": 249,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "18646",
@@ -501,7 +567,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "18657",
@@ -543,7 +615,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "18640",
@@ -585,7 +663,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "18627",
@@ -627,7 +711,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "19438",
@@ -669,7 +759,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "92462",
@@ -695,7 +791,7 @@
     "source_url": "https://www.tamiyausa.com/shop/132-rev/jr-mach-frame-philippine-cup-2/",
     "image_url": "",
     "image_status": "needs approved upload",
-    "price_dkk": 389,
+    "price_dkk": 469,
     "original_price_dkk": 0,
     "stock_qty": 0,
     "unbuilt_stock": 0,
@@ -711,7 +807,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "board_approved_fixed_price",
-    "approved_regular_price_dkk": 389
+    "approved_regular_price_dkk": 469,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "95706",
@@ -737,7 +839,7 @@
     "source_url": "https://www.tamiya.com/english/newstopics/2026/0115messe2026news/index.html",
     "image_url": "",
     "image_status": "needs approved upload",
-    "price_dkk": 359,
+    "price_dkk": 429,
     "original_price_dkk": 0,
     "stock_qty": 0,
     "unbuilt_stock": 0,
@@ -753,7 +855,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "board_approved_fixed_price",
-    "approved_regular_price_dkk": 359
+    "approved_regular_price_dkk": 429,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "95571",
@@ -779,7 +887,7 @@
     "source_url": "https://www.tamiya.com/japan/products/95571/index.html",
     "image_url": "",
     "image_status": "needs approved upload",
-    "price_dkk": 329,
+    "price_dkk": 389,
     "original_price_dkk": 0,
     "stock_qty": 0,
     "unbuilt_stock": 0,
@@ -795,7 +903,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "board_approved_fixed_price",
-    "approved_regular_price_dkk": 329
+    "approved_regular_price_dkk": 389,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "95126",
@@ -821,7 +935,7 @@
     "source_url": "https://www.tamiya.com/japan/products/95126/index.html",
     "image_url": "",
     "image_status": "needs approved upload",
-    "price_dkk": 329,
+    "price_dkk": 389,
     "original_price_dkk": 0,
     "stock_qty": 0,
     "unbuilt_stock": 0,
@@ -837,7 +951,13 @@
     "is_complete_car_kit": true,
     "is_club_asset": false,
     "pricing_source": "board_approved_fixed_price",
-    "approved_regular_price_dkk": 329
+    "approved_regular_price_dkk": 389,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15526",
@@ -879,7 +999,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15514",
@@ -921,7 +1047,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15476",
@@ -963,7 +1095,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15450",
@@ -1005,7 +1143,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15484",
@@ -1052,7 +1196,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15485",
@@ -1099,7 +1249,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15486",
@@ -1146,7 +1302,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15455",
@@ -1193,7 +1355,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15477",
@@ -1240,7 +1408,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15487",
@@ -1283,7 +1457,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15488",
@@ -1326,7 +1506,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15489",
@@ -1369,7 +1555,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15402",
@@ -1412,7 +1604,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15375",
@@ -1455,7 +1653,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15512",
@@ -1502,7 +1706,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15492",
@@ -1549,7 +1759,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15458",
@@ -1594,7 +1810,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15518",
@@ -1641,7 +1863,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15405",
@@ -1688,7 +1916,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15392",
@@ -1735,7 +1969,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15401",
@@ -1782,7 +2022,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15501",
@@ -1829,7 +2075,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15459",
@@ -1873,7 +2125,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15490",
@@ -1916,7 +2174,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15381",
@@ -1963,7 +2227,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15457",
@@ -2010,7 +2280,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15525",
@@ -2057,7 +2333,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15398",
@@ -2104,7 +2386,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15449",
@@ -2151,7 +2439,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15464",
@@ -2198,7 +2492,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15408",
@@ -2245,7 +2545,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15391",
@@ -2292,7 +2598,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15528",
@@ -2339,7 +2651,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15394",
@@ -2386,7 +2704,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15430",
@@ -2433,7 +2757,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15451",
@@ -2476,7 +2806,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15452",
@@ -2519,7 +2855,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15472",
@@ -2566,7 +2908,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15524",
@@ -2612,7 +2960,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15498",
@@ -2659,7 +3013,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15499",
@@ -2706,7 +3066,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15542",
@@ -2753,7 +3119,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15534",
@@ -2800,7 +3172,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15541",
@@ -2847,7 +3225,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15544",
@@ -2894,7 +3278,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15453",
@@ -2941,7 +3331,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15462",
@@ -2989,7 +3385,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15456",
@@ -3030,7 +3432,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15516",
@@ -3071,7 +3479,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15429",
@@ -3114,7 +3528,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15434",
@@ -3161,7 +3581,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15347",
@@ -3204,7 +3630,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15523",
@@ -3251,7 +3683,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15519",
@@ -3298,7 +3736,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15416",
@@ -3343,7 +3787,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15417",
@@ -3386,7 +3836,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15508",
@@ -3433,7 +3889,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15510",
@@ -3480,7 +3942,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15527",
@@ -3527,7 +3995,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15473",
@@ -3574,7 +4048,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15506",
@@ -3621,7 +4101,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15463",
@@ -3662,7 +4148,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15474",
@@ -3703,7 +4195,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15465",
@@ -3744,7 +4242,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15383",
@@ -3785,7 +4289,13 @@
     "is_complete_car_kit": false,
     "is_club_asset": false,
     "pricing_source": "unverified",
-    "approved_regular_price_dkk": null
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
   },
   {
     "item_no": "15505",
@@ -3825,6 +4335,58 @@
     "part_group": "accessories",
     "is_complete_car_kit": false,
     "is_club_asset": false,
+    "pricing_source": "unverified",
+    "approved_regular_price_dkk": null,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false
+  },
+  {
+    "item_no": "19431",
+    "name": "Magnum Saber",
+    "category": "cars",
+    "subcategory": "Mini 4WD Kit",
+    "chassis": "AR",
+    "compatibility": [
+      "AR"
+    ],
+    "motor_type": "Single-shaft",
+    "beginner_level": "Intermediate",
+    "upgrade_stage": "Box Stock",
+    "purpose_tags": [
+      "Collector"
+    ],
+    "bmax_approved": false,
+    "catalog_tier": "expansion",
+    "recommended": false,
+    "description": "Existing club item pending a verified Philippine supplier cost — kept visible as PRICE PENDING rather than hidden.",
+    "source_url": "",
+    "image_url": "",
+    "image_status": "needs approved upload",
+    "price_dkk": 0,
+    "original_price_dkk": 0,
+    "stock_qty": 0,
+    "unbuilt_stock": 0,
+    "built_stock": 0,
+    "status": "coming soon",
+    "published": false,
+    "available": false,
+    "is_collectors_vault": true,
+    "catalog_order": 87,
+    "id": "tamiya-19431-magnum-saber",
+    "shipping_class": "complete_car_kit",
+    "part_group": null,
+    "is_complete_car_kit": true,
+    "is_club_asset": false,
+    "has_unresolved_duplicate": false,
+    "has_uncertain_edition": false,
+    "is_internal_test_record": false,
+    "is_archived_by_admin": false,
+    "is_preorder_enabled": false,
+    "force_coming_soon": false,
     "pricing_source": "unverified",
     "approved_regular_price_dkk": null
   }

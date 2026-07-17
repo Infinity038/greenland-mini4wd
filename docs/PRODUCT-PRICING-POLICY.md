@@ -24,6 +24,33 @@ landed cost = supplier cost (converted to DKK) + fixed allocated shipping
 minimum regular retail = landed cost / (1 - 0.50)   [= landed cost × 2]
 ```
 
+### Collector margin (corrected — supersedes the original 50% rule for Collector items)
+
+Every product **explicitly classified Collector** (`is_collectors_vault: true`
+in the catalog — never inferred from the product name alone) must maintain
+**at least a 60% gross margin** instead of the normal 50% floor:
+
+```
+minimum Collector retail = landed cost / (1 - 0.60)   [= landed cost × 2.5]
+```
+
+The same `roundToEndingNineNotBelowFloor()` rounding rule applies on top —
+round **upward** to the nearest price ending in 9 that does not fall below
+the 60% floor. Worked example (`lib/pricing/regularPrice.test.ts`): 1000 PHP
+supplier cost at an illustrative 0.1 DKK/PHP rate + 80 DKK
+`complete_car_kit` freight = 180 DKK landed cost → minimum Collector retail =
+180 × 2.5 = exactly 450 DKK (already ending in a round number below 9;
+the next valid ending-in-9 price at or above it is applied).
+`calculateRegularPrice(cost, shipping, marginFloor)` takes the margin floor
+as a parameter — `REGULAR_PRICE_MARGIN_FLOOR` (0.5) for normal products,
+`COLLECTOR_MARGIN_FLOOR` (0.6) for Collector products
+(`lib/pricing/regularPrice.ts`).
+
+Collector products remain excluded from ordinary sale campaigns by default
+(`ExclusionRule: { kind: 'collector_products' }`,
+`docs/SALE-CAMPAIGN-RULES.md`) — an administrator may deliberately include a
+specific Collector campaign, but it is never automatic.
+
 ## Final price rounding
 
 All published prices end in 9. Calculate the exact minimum price, then
@@ -79,9 +106,17 @@ A new exchange-rate snapshot applies only to products not yet purchased, or
 through an explicit administrator recalculation action — never retroactively
 to already-calculated landed costs. Official Tamiya pricing and delivered
 eBay pricing may be stored as market references but never replace actual
-landed cost. **Supplier costs are never invented** — a product without a
-verified cost stays an unpublished draft
-(`lib/pricing/catalogPricingStatus.ts`: `checkPublishability`).
+landed cost. **Supplier costs are never invented.**
+
+### Visibility vs. purchase eligibility (Preview review correction — supersedes the original "unverified cost = unpublished" rule)
+
+A product without a verified supplier cost stays **publicly visible** in the
+catalog — it is never hidden for pricing or stock reasons. It displays
+**PRICE PENDING** and is simply not purchasable until a real price is
+approved. See `docs/CATALOG-COSTING-AND-FREIGHT.md` for the full public
+product-state model and the catalog-visibility rules
+(`lib/pricing/catalogPricingStatus.ts`: `checkCatalogVisibility` /
+`isPurchasable`, `lib/pricing/publicProductState.ts`: `derivePublicState`).
 
 ## Approved car prices (locked)
 
@@ -90,18 +125,27 @@ share similar names. See `catalog/catalogPricing.test.ts` for the regression
 test locking these in, and `scripts/applyApprovedPricing.mjs` for the
 idempotent script that applied them to `catalog/bmax-initial-catalog.json`.
 
-| Item # | Name | Approved price |
-|---|---|---|
-| 19443 | Diospada (Premium) | 249 DKK |
-| 18704 | Shadow Shark | 299 DKK |
-| 18705 | Flame Astute | 299 DKK |
-| 19447 | Beak Stinger G | 299 DKK |
-| 19451 | Gun Bluster XTO Premium | 299 DKK |
-| 18099 | Ray Spear | 319 DKK |
-| 95126 | Cyclone Magnum (Memorial 25th Anniversary) | 329 DKK |
-| 95571 | Exflowly Polycarbonate Body Special (Purple) | 329 DKK |
-| 95706 | Geo Glider Asia Challenge (2026 Special) | 359 DKK |
-| 92462 | Mach Frame Philippine Cup Special | 389 DKK |
+| Item # | Name | Approved price | Margin floor |
+|---|---|---|---|
+| 19443 | Diospada (Premium) | 249 DKK | 60% (Collector — pre-existing) |
+| 18704 | Shadow Shark | 299 DKK | 50% |
+| 18705 | Flame Astute | 299 DKK | 50% |
+| 18099 | Ray Spear | 319 DKK | 50% |
+| 19447 | Beak Stinger G | **359 DKK** | 60% (Collector) |
+| 19451 | Gun Bluster XTO Premium | **359 DKK** | 60% (Collector) |
+| 95126 | Cyclone Magnum (Memorial 25th Anniversary) | **389 DKK** | 60% (Collector) |
+| 95571 | Exflowly Polycarbonate Body Special (Purple) | **389 DKK** | 60% (Collector) |
+| 95706 | Geo Glider Asia Challenge (2026 Special) | **429 DKK** | 60% (Collector) |
+| 92462 | Mach Frame Philippine Cup Special | **469 DKK** | 60% (Collector) |
+| 19431 | Magnum Saber | **PRICE PENDING** — no Philippine supplier cost verified yet; do **not** carry the legacy 339 DKK price | n/a until verified |
+
+The six bold-price rows above are the Preview review's Collector-margin
+correction: these items are explicitly classified Collector
+(`is_collectors_vault: true`) and were re-priced at the 60% floor, replacing
+prices an earlier pass had calculated at the (incorrect, for a Collector
+item) 50% floor. Magnum Saber (item 19431) is a real, existing club item
+added to the curated catalog this pass — it stays visible with PRICE PENDING
+rather than disappearing or being assigned a fabricated fallback price.
 
 **Not applied — no unambiguous match, documented rather than guessed:**
 
@@ -109,20 +153,22 @@ idempotent script that applied them to `catalog/bmax-initial-catalog.json`.
   Avante" (item 18701), a different edition/bundle. The approved price is
   **not** applied to 18701.
 - **Aero Thunder Shot Advertising Pack (629 DKK)** — not present in the
-  86-item catalog at all. Also explicitly previously personal stock — must
+  87-item catalog at all. Also explicitly previously personal stock — must
   never be auto-published even if added later.
 
 For every other car kit: use verified Philippine supplier cost + 80 DKK
-fixed freight, calculate the 50% margin floor, round to the nearest valid
-ending-in-9 price, and keep unpublished while supplier cost is unverified
-(which is the current state of every one of the other 10 car kits in the
-86-item catalog — none has a verified cost on file).
+fixed freight, calculate the applicable margin floor (50% normal, 60%
+Collector), round to the nearest valid ending-in-9 price, and stay
+**publicly visible with PRICE PENDING** while supplier cost is unverified —
+this is the current state of every one of the other 11 car kits in the
+87-item catalog (including Magnum Saber), none of which has a verified cost
+on file.
 
 ## Approved motor pricing
 
 **Ultra-Dash Motor**: 350 PHP Philippine supplier baseline, `small_part`
 shipping class (25 DKK), approved regular retail **129 DKK**, margin ≥ 50%.
-No product named "Ultra-Dash Motor" exists in the current 86-item catalog
+No product named "Ultra-Dash Motor" exists in the current 87-item catalog
 (confirmed — the 10 Motors entries are Torque-Tuned 2, Rev-Tuned 2,
 Atomic-Tuned 2, Light-Dash, Hyper-Dash 3, and their PRO variants; no
 "Ultra-Dash"). This is a **pure formula regression test**

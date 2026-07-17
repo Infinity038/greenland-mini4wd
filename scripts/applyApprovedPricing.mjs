@@ -31,21 +31,30 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JSON_PATH = path.join(__dirname, '..', 'catalog', 'bmax-initial-catalog.json');
 const CSV_PATH = path.join(__dirname, '..', 'catalog', 'bmax-initial-catalog.csv');
 
-// Locked, board-approved fixed regular prices (docs/PRODUCT-PRICING-POLICY.md
-// §4), keyed by exact Tamiya item number — never matched by name alone,
-// since several editions share similar names (e.g. "Mach Frame" vs
-// "Mach Frame Philippine Cup Special").
+// Locked, board-approved fixed regular prices for NON-collector items
+// (docs/PRODUCT-PRICING-POLICY.md §4), keyed by exact Tamiya item number —
+// never matched by name alone, since several editions share similar names
+// (e.g. "Mach Frame" vs "Mach Frame Philippine Cup Special").
 const APPROVED_CAR_PRICES_DKK_BY_ITEM_NO = {
   '19443': 249, // Diospada (Premium)
   '18704': 299, // Shadow Shark
   '18705': 299, // Flame Astute
-  '19447': 299, // Beak Stinger G
-  '19451': 299, // Gun Bluster XTO Premium
   '18099': 319, // Ray Spear
-  '95126': 329, // Cyclone Magnum (Memorial 25th Anniversary)
-  '95571': 329, // Exflowly Polycarbonate Body Special (Purple)
-  '95706': 359, // Geo Glider Asia Challenge (2026 Special)
-  '92462': 389, // Mach Frame Philippine Cup Special — NOT the plain "Mach Frame" (18714)
+};
+
+// Collector correction pass (Preview review, docs/PRODUCT-PRICING-POLICY.md
+// §"Collector regular margin"): these items are explicitly classified
+// Collector (is_collectors_vault forced true here, overriding whatever the
+// original curated catalog had) and priced under the 60% Collector margin
+// floor rather than the normal 50% floor. Supersedes any price these item
+// numbers were given in an earlier pass.
+const COLLECTOR_PRICE_CORRECTIONS_DKK_BY_ITEM_NO = {
+  '19447': 359, // Beak Stinger G
+  '19451': 359, // Gun Bluster XTO Premium
+  '95126': 389, // Cyclone Magnum (Memorial 25th Anniversary)
+  '95571': 389, // Exflowly Polycarbonate Body Special (Purple)
+  '95706': 429, // Geo Glider Asia Challenge (2026 Special)
+  '92462': 469, // Mach Frame Philippine (Cup) Special — NOT the plain "Mach Frame" (18714)
 };
 
 // Named in the approved list but with NO matching catalog row today — do
@@ -55,6 +64,45 @@ const UNMATCHED_APPROVED_NAMES = [
   { name: 'Aero Avante Starter Pack', approvedPriceDkk: 469, note: 'Catalog only has plain "Aero Avante" (18701) — a different edition/bundle. Do not apply this price to 18701.' },
   { name: 'Aero Thunder Shot Advertising Pack', approvedPriceDkk: 629, note: 'Not in the 86-item catalog at all. Also explicitly "previously personal stock" — must not be auto-published even if added later.' },
   { name: 'Ultra-Dash Motor', approvedPriceDkk: 129, note: 'Not in the 86-item catalog at all (no motor by this name among the 10 Motors entries). See lib/pricing/regularPrice.test.ts for the formula worked example.' },
+];
+
+// Added to the curated catalog this pass (Preview review correction): an
+// existing club item, real and previously live-only (Supabase item_no
+// 19431, "MAGNUM SABER"), that must stay visible with PRICE PENDING rather
+// than disappear or carry a fabricated fallback price. Chassis and
+// collector classification mirror the pre-existing live record; pricing is
+// deliberately left unverified — no cost is invented.
+const NEW_CATALOG_ITEMS = [
+  {
+    item_no: '19431',
+    name: 'Magnum Saber',
+    category: 'cars',
+    subcategory: 'Mini 4WD Kit',
+    chassis: 'AR',
+    compatibility: ['AR'],
+    motor_type: 'Single-shaft',
+    beginner_level: 'Intermediate',
+    upgrade_stage: 'Box Stock',
+    purpose_tags: ['Collector'],
+    bmax_approved: false,
+    catalog_tier: 'expansion',
+    recommended: false,
+    description: 'Existing club item pending a verified Philippine supplier cost — kept visible as PRICE PENDING rather than hidden.',
+    source_url: '',
+    image_url: '',
+    image_status: 'needs approved upload',
+    price_dkk: 0,
+    original_price_dkk: 0,
+    stock_qty: 0,
+    unbuilt_stock: 0,
+    built_stock: 0,
+    status: 'coming soon',
+    published: false,
+    available: false,
+    is_collectors_vault: true,
+    catalog_order: 87,
+    id: 'tamiya-19431-magnum-saber',
+  },
 ];
 
 function classifyShippingClass(item) {
@@ -82,23 +130,56 @@ function classifyPartGroup(item) {
 }
 
 const raw = readFileSync(JSON_PATH, 'utf-8');
-const items = JSON.parse(raw);
+const existingItems = JSON.parse(raw);
+
+// Append any new catalog items (idempotent: skip if already present from a
+// prior run) before running classification/pricing over the full set.
+const items = [...existingItems];
+for (const newItem of NEW_CATALOG_ITEMS) {
+  if (!items.some(i => i.item_no === newItem.item_no)) {
+    items.push(newItem);
+  }
+}
 
 let appliedCount = 0;
+let collectorCorrectedCount = 0;
 const updated = items.map(item => {
   const shipping_class = classifyShippingClass(item);
   const part_group = classifyPartGroup(item);
   const approvedDkk = APPROVED_CAR_PRICES_DKK_BY_ITEM_NO[item.item_no];
+  const collectorDkk = COLLECTOR_PRICE_CORRECTIONS_DKK_BY_ITEM_NO[item.item_no];
 
   const next = {
     ...item,
     shipping_class,
     part_group,
     is_complete_car_kit: item.category === 'cars',
-    is_club_asset: false, // none of the 86 curated items are club/house/demo assets
+    is_club_asset: false, // none of the curated items are club/house/demo assets
+    // Catalog VISIBILITY fields (docs/PRODUCT-PRICING-POLICY.md §"Catalog
+    // visibility") — none of the curated/added items have an unresolved
+    // identity problem, so every one of these is false; kept as explicit
+    // per-item fields (not inferred) so an admin can flag one later without
+    // a schema change.
+    has_unresolved_duplicate: false,
+    has_uncertain_edition: false,
+    is_internal_test_record: false,
+    is_archived_by_admin: false,
+    // Public-state inputs (lib/pricing/publicProductState.ts) not already
+    // covered by existing fields.
+    is_preorder_enabled: false,
+    force_coming_soon: false,
   };
 
-  if (approvedDkk != null) {
+  if (collectorDkk != null) {
+    // Collector correction always wins and always forces the explicit tag —
+    // never inferred from the name (docs/PRODUCT-PRICING-POLICY.md
+    // §"Collector regular margin").
+    next.is_collectors_vault = true;
+    next.pricing_source = 'board_approved_fixed_price';
+    next.approved_regular_price_dkk = collectorDkk;
+    next.price_dkk = collectorDkk;
+    collectorCorrectedCount += 1;
+  } else if (approvedDkk != null) {
     next.pricing_source = 'board_approved_fixed_price';
     next.approved_regular_price_dkk = approvedDkk;
     // Reflect the approved price in the existing price_dkk field the app
@@ -131,8 +212,10 @@ for (const item of updated) {
 }
 writeFileSync(CSV_PATH, csvLines.join('\n') + '\n');
 
-console.log(`Classified ${updated.length} products (shipping_class + part_group + pricing_source).`);
-console.log(`Applied board-approved fixed prices to ${appliedCount} car kits by item_no.`);
+console.log(`Classified ${updated.length} products (shipping_class + part_group + pricing_source + visibility fields).`);
+console.log(`Applied board-approved fixed (non-collector) prices to ${appliedCount} car kits by item_no.`);
+console.log(`Applied Collector-margin-corrected prices to ${collectorCorrectedCount} car kits by item_no.`);
+console.log(`Added ${NEW_CATALOG_ITEMS.length} new catalog item(s) (e.g. Magnum Saber, kept PRICE PENDING).`);
 console.log('Unmatched approved-name entries (documented, not applied):');
 for (const u of UNMATCHED_APPROVED_NAMES) {
   console.log(`  - ${u.name} (${u.approvedPriceDkk} DKK): ${u.note}`);

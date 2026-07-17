@@ -52,12 +52,33 @@ ship to production regardless.
   behind the `SALE_CAMPAIGNS_ENABLED` flag. Only delete outright if the
   pricing/campaign feature itself is abandoned.
 
+## 4. `/admin/catalog-status`
+
+- **Files**: `app/admin/catalog-status/page.tsx`,
+  `app/admin/catalog-status/CatalogStatusClient.tsx`
+- **Purpose**: Preview-only admin catalog-status / restock view (product,
+  SKU, category, chassis, tier, public state, stock, pricing status,
+  restock-interest count, suggested reorder qty, missing-data reason) — see
+  `docs/CATALOG-COSTING-AND-FREIGHT.md` §"Admin catalog-status view".
+- **Existing safeguard**: same Server Component `VERCEL_ENV === "preview"` +
+  `notFound()` pattern as `/admin/pos-camera-test` and `/admin/pricing`. It
+  reads the real curated catalog (static/bundled, no Supabase dependency)
+  plus the in-memory `restockInterestStore` — zero Supabase reads/writes,
+  and it never places a supplier order automatically.
+- **Removal**: do NOT delete this route once Supabase Auth/staff
+  roles/RLS are live — instead add a real session/role check in front of it.
+  The catalog read itself can stay static; only the restock-interest store
+  needs to move to a real Supabase-backed table. Only delete outright if the
+  catalog/restock feature itself is abandoned.
+
 ## Verification before merge
 
 - [ ] `app/admin/qr-test-sheet/` removed or gated to Preview only
 - [ ] `app/admin/pos-camera-test/` removed
 - [ ] `app/admin/pricing/` removed, or migrated to real Auth/RLS-backed data
       (see item 3 above — this one is not necessarily a deletion)
+- [ ] `app/admin/catalog-status/` removed, or migrated to real Auth/RLS-backed
+      data (see item 4 above — this one is not necessarily a deletion)
 - [ ] `grep -r "qr-test-sheet\|pos-camera-test"` across `app/`, `components/`
       returns no remaining references
 - [ ] Full test suite still passes after removal

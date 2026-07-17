@@ -13,6 +13,42 @@ import Footer from '@/components/layout/Footer';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { DEFAULT_SERVICE_ADDONS, BUILD_TO_ORDER_MESSAGE, type ServiceAddOnId } from '@/lib/pricing/serviceAddOns';
 import { calculateBoxedKitOrderTotal } from '@/lib/pricing/boxedKit';
+import { getPublicCatalogByCategory, type PublicCatalogItem } from '@/lib/pricing/catalogProducts';
+import { restockInterestStore, type ContactPreference } from '@/lib/pricing/restockInterest';
+
+// Adapts a curated-catalog item into the existing Supabase-order-shaped
+// Product type so the (unchanged) Reserve/order-placement modal below can
+// keep working unmodified for the rare item that is actually purchasable
+// (publicState IN_STOCK/PREORDER) — currently none of the 87 curated items
+// have real stock yet, so this path is dormant but future-proof.
+function toShopProduct(item: PublicCatalogItem): Product {
+  const r = item.raw;
+  return {
+    id: r.id,
+    name: r.name,
+    item_no: r.item_no,
+    category: r.category,
+    subcategory: r.subcategory,
+    chassis: r.chassis,
+    price_dkk: item.priceDkk ?? 0,
+    original_price_dkk: r.original_price_dkk || undefined,
+    stock_qty: r.stock_qty,
+    unbuilt_stock: r.stock_qty,
+    built_stock: 0,
+    status: r.status,
+    is_collectors_vault: r.is_collectors_vault,
+    description: r.description,
+    image_url: r.image_url,
+  };
+}
+
+// `_version` forces callers to recompute after a restock-interest submission
+// (see restockVersion state below) — the store is a plain mutable class, not
+// React state, so reading it during render alone won't trigger a re-render.
+function restockInterestCount(productId: string, version: number): number {
+  void version;
+  return restockInterestStore.countForProduct(productId);
+}
 
 const CATALOG_CACHE_KEY = 'shop_products';
 
@@ -70,13 +106,6 @@ function simplePricing(p: Product): { price: number; original: number | null } {
   const original = p.original_price_dkk && p.original_price_dkk > price ? p.original_price_dkk : null;
   return { price, original };
 }
-
-const STOCK_COLORS: Record<string, string> = {
-  'in stock': '#22C55E',
-  'preorder only': '#3B82F6',
-  'sold out': '#6B7280',
-  'coming soon': '#A855F7',
-};
 
 const FILTER_TABS = [
   { key: 'all', label: 'All Products' },
@@ -190,7 +219,6 @@ export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>(() => readCachedProducts<Product>(CATALOG_CACHE_KEY)?.data ?? []);
   const [loading, setLoading] = useState(() => readCachedProducts<Product>(CATALOG_CACHE_KEY) === null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
-  const [catalogLoadedOnce, setCatalogLoadedOnce] = useState(false);
   const [filter, setFilter] = useState('all');
   const [globalCaseStock, setGlobalCaseStock] = useState(0);
 
@@ -219,6 +247,16 @@ export default function ShopPage() {
   const [preorderTarget, setPreorderTarget] = useState<{ product: Product } | null>(null);
   const [preorderSending, setPreorderSending] = useState(false);
   const [preorderDone, setPreorderDone] = useState(false);
+
+  // REQUEST RESTOCK / NOTIFY ME / REGISTER INTEREST — Preview-safe, mock
+  // in-memory store only (lib/pricing/restockInterest.ts). Never creates an
+  // order, reserves stock, or writes to Supabase.
+  const [restockTarget, setRestockTarget] = useState<PublicCatalogItem | null>(null);
+  const [restockContact, setRestockContact] = useState<ContactPreference>('email');
+  const [restockQuantity, setRestockQuantity] = useState(1);
+  const [restockSending, setRestockSending] = useState(false);
+  const [restockDone, setRestockDone] = useState(false);
+  const [restockVersion, setRestockVersion] = useState(0); // bump to re-render interest counts
 
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
 
@@ -330,7 +368,6 @@ export default function ShopPage() {
     );
     setProducts(data);
     setCatalogError(error);
-    setCatalogLoadedOnce(true);
     setLoading(false);
   }
 
@@ -339,28 +376,29 @@ export default function ShopPage() {
     if (data) setGlobalCaseStock(data.case_stock ?? 0);
   }
 
-  // Only a successful query that genuinely returned zero published products counts as
-  // a real empty catalog — while loading, or after a failed refresh, we keep showing
-  // cached/current products instead (see fetchProducts above).
-  const catalogIsGenuinelyEmpty = catalogLoadedOnce && !catalogError && products.length === 0;
-
   const isCarProduct = (p: Product) => !p.category || p.category === 'cars';
 
-  const carsFiltered = products.filter(p => {
-    if (!isCarProduct(p)) return false;
-    const matchesStatus = filter === 'all' || p.status === filter;
-    const matchesChassis = !chassisFilter || p.chassis === chassisFilter;
+  // The complete curated catalog (docs/CATALOG-COSTING-AND-FREIGHT.md) —
+  // static/bundled, no Supabase dependency, no loading state needed. Every
+  // one of the 87 items is publicly visible regardless of stock/price/tier.
+  const catalogCars = getPublicCatalogByCategory('cars');
+  const catalogParts = getPublicCatalogByCategory('parts');
+
+  const STATE_FILTER_MAP: Record<string, string | null> = { all: null, 'in stock': 'IN_STOCK', 'preorder only': 'PREORDER' };
+  const carsFiltered = catalogCars.filter(item => {
+    const wantedState = STATE_FILTER_MAP[filter];
+    const matchesStatus = !wantedState || item.publicState === wantedState;
+    const matchesChassis = !chassisFilter || item.raw.chassis === chassisFilter;
     const q = carsSearch.trim().toLowerCase();
-    const matchesSearch = !q || p.name.toLowerCase().includes(q) || (p.item_no || '').toLowerCase().includes(q);
+    const matchesSearch = !q || item.raw.name.toLowerCase().includes(q) || item.raw.item_no.toLowerCase().includes(q);
     return matchesStatus && matchesChassis && matchesSearch;
   });
-  const collectors = products.filter(p => isCarProduct(p) && p.is_collectors_vault);
+  const collectors = catalogCars.filter(item => item.raw.is_collectors_vault);
 
-  const partsFiltered = products.filter(p => {
-    if (p.category !== 'parts') return false;
-    const matchesSub = !partsFilter || p.subcategory === partsFilter;
+  const partsFiltered = catalogParts.filter(item => {
+    const matchesSub = !partsFilter || item.raw.subcategory === partsFilter;
     const q = partsSearch.trim().toLowerCase();
-    const matchesSearch = !q || p.name.toLowerCase().includes(q) || (p.item_no || '').toLowerCase().includes(q);
+    const matchesSearch = !q || item.raw.name.toLowerCase().includes(q) || item.raw.item_no.toLowerCase().includes(q);
     return matchesSub && matchesSearch;
   });
 
@@ -407,6 +445,29 @@ export default function ShopPage() {
       setPreorderDone(true);
     } catch { setPreorderDone(true); }
     setPreorderSending(false);
+  };
+
+  const openRestockInterest = (item: PublicCatalogItem) => {
+    if (!isRegistered()) { window.location.href = '/register'; return; }
+    setRestockTarget(item);
+    setRestockContact('email');
+    setRestockQuantity(1);
+    setRestockDone(false);
+  };
+
+  const submitRestockInterest = () => {
+    if (!restockTarget || !member) return;
+    setRestockSending(true);
+    restockInterestStore.submit({
+      productId: restockTarget.raw.id,
+      itemNo: restockTarget.raw.item_no,
+      racerId: member.email ?? null,
+      contactPreference: restockContact,
+      requestedQuantity: restockQuantity,
+    });
+    setRestockVersion(v => v + 1);
+    setRestockDone(true);
+    setRestockSending(false);
   };
 
   // Display Case is independent; Standard Assembly and Ready-to-Race
@@ -572,14 +633,12 @@ export default function ShopPage() {
                 <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(250,204,21,0.3), transparent)' }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-                {collectors.map(p => {
-                  const boxedKitIsAvailable = boxedKitAvailable(p);
-                  const { price: unbuiltPrice, original: unbuiltOriginal } = boxedKitPricing(p);
+                {collectors.map(item => {
+                  const p = item.raw;
                   return (
                     <div key={p.id} id={`product-${p.id}`} style={{ background: 'linear-gradient(135deg, #0a0f1a, #071426)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 18, padding: 20, position: 'relative', overflow: 'hidden', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)' }} />
                       <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', gap: 6 }}>
-                        <button onClick={() => toggleWishlist(p)} style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 9px', fontSize: 12, color: wishlistIds.has(p.id) ? '#DC2626' : '#fff', cursor: 'pointer' }}>{wishlistIds.has(p.id) ? '♥' : '♡'}</button>
                         <button onClick={() => shareProduct(p)} style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer' }}>{copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}</button>
                       </div>
                       <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#FACC15', marginBottom: 4 }}>✦ COLLECTOR · LIMITED</div>
@@ -590,16 +649,19 @@ export default function ShopPage() {
                       <div style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC', marginBottom: 12 }}>{p.chassis} CHASSIS{p.item_no ? ` · #${p.item_no}` : ''}</div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                          <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#FACC15' }}>FROM</div>
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                            {unbuiltOriginal && <span style={{ ...FB, fontSize: 13, color: '#6B7280', textDecoration: 'line-through' }}>{unbuiltOriginal.toLocaleString()}</span>}
-                            <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{unbuiltPrice.toLocaleString()} kr</div>
-                          </div>
+                          <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#FACC15' }}>BOXED KIT</div>
+                          {item.priceDkk != null ? (
+                            <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{item.priceDkk.toLocaleString()} kr</div>
+                          ) : (
+                            <div style={{ ...F, fontWeight: 900, fontSize: 16, color: '#B8C1CC', letterSpacing: 1 }}>PRICE PENDING</div>
+                          )}
                         </div>
-                        {boxedKitIsAvailable ? (
-                          <button onClick={() => openModal(p)} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                        {item.ctaAction === 'reserve' ? (
+                          <button onClick={() => openModal(toShopProduct(item))} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                        ) : item.ctaAction === 'preorder' ? (
+                          <button onClick={() => openModal(toShopProduct(item))} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
                         ) : (
-                          <button onClick={() => openPreorder(p)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                          <button onClick={() => openRestockInterest(item)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 12, letterSpacing: 1, cursor: 'pointer' }}>{item.ctaLabel}</button>
                         )}
                       </div>
                     </div>
@@ -630,28 +692,26 @@ export default function ShopPage() {
               ))}
             </div>
 
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280', ...FB, fontSize: 14 }}>Loading products...</div>
-            ) : carsFiltered.length === 0 ? (
+            {carsFiltered.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280' }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🏎️</div>
-                <div style={{ ...FB, fontSize: 14 }}>{catalogIsGenuinelyEmpty ? 'No cars are published yet — check back soon.' : 'No cars match your search/filters.'}</div>
+                <div style={{ ...FB, fontSize: 14 }}>No cars match your search/filters.</div>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
-                {carsFiltered.map(p => {
-                  const sc = STOCK_COLORS[p.status] || '#6B7280';
+                {carsFiltered.map(item => {
+                  const p = item.raw;
                   const isCollector = !!p.is_collectors_vault;
+                  const tierBadge = { core: 'CORE STOCK', expansion: 'EXPANSION STOCK', special_order: 'SPECIAL ORDER' }[p.catalog_tier];
                   return (
                     <div key={p.id} id={`product-${p.id}`}
                       style={{ background: isCollector ? 'linear-gradient(135deg, #0a0f1a, #071426)' : '#071426', border: `1px solid ${isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.3s', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.5)' : 'rgba(220,38,38,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                       onMouseLeave={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
                       {isCollector && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)', zIndex: 1 }} />}
-                      {p.status === 'preorder only' && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>PREORDER</div>}
-                      {isCollector && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#FACC1522', color: '#FACC15', border: '1px solid #FACC1544' }}>COLLECTOR</div>}
+                      {item.badgeLabel && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>{item.badgeLabel}</div>}
+                      {isCollector && <div style={{ position: 'absolute', top: item.badgeLabel ? 40 : 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#FACC1522', color: '#FACC15', border: '1px solid #FACC1544' }}>COLLECTOR</div>}
                       <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', gap: 6 }}>
-                        <button onClick={() => toggleWishlist(p)} style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 9px', fontSize: 12, color: wishlistIds.has(p.id) ? '#DC2626' : '#fff', cursor: 'pointer' }}>{wishlistIds.has(p.id) ? '♥' : '♡'}</button>
                         <button onClick={() => shareProduct(p)} style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>{copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}</button>
                       </div>
 
@@ -663,37 +723,39 @@ export default function ShopPage() {
                         <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
                           <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#B8C1CC' }}>{p.chassis}</span>
                           {p.item_no && <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#FACC15' }}>#{p.item_no}</span>}
-                          <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: sc + '18', color: sc }}>● {p.status?.toUpperCase()}</span>
+                          <span style={{ ...F, fontSize: 9, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: '#6B7280' }}>{tierBadge}</span>
                         </div>
                         <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
                         <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, margin: '0 0 14px' }}>{p.description}</p>
 
-                        {(() => {
-                          const available = boxedKitAvailable(p);
-                          const { price, original } = boxedKitPricing(p);
-                          return (
-                            <div style={{ background: '#050505', border: `1px solid ${available ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.25)'}`, borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#B8C1CC' }}>📦 BOXED KIT</div>
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                                  {original && <span style={{ ...FB, fontSize: 12, color: '#6B7280', textDecoration: 'line-through' }}>{original.toLocaleString()}</span>}
-                                  <div style={{ ...F, fontWeight: 900, fontSize: 20, color: available ? (original ? '#22C55E' : (isCollector ? '#FACC15' : '#F5F5F5')) : '#6B7280' }}>{price.toLocaleString()} kr</div>
-                                </div>
-                              </div>
-                              {FEATURE_FLAGS.assemblyServicesEnabled && (
-                                <div style={{ ...FB, fontSize: 10, color: '#6B7280' }}>+ Display Case, Standard or Ready-to-Race Assembly available at checkout</div>
+                        <div style={{ background: '#050505', border: `1px solid ${item.purchasable ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.25)'}`, borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#B8C1CC' }}>📦 BOXED KIT</div>
+                            {item.priceDkk != null ? (
+                              <div style={{ ...F, fontWeight: 900, fontSize: 20, color: item.purchasable ? (isCollector ? '#FACC15' : '#F5F5F5') : '#6B7280' }}>{item.priceDkk.toLocaleString()} kr</div>
+                            ) : (
+                              <div style={{ ...F, fontWeight: 900, fontSize: 15, color: '#B8C1CC', letterSpacing: 1 }}>PRICE PENDING</div>
+                            )}
+                          </div>
+                          {FEATURE_FLAGS.assemblyServicesEnabled && item.purchasable && (
+                            <div style={{ ...FB, fontSize: 10, color: '#6B7280' }}>+ Display Case, Standard or Ready-to-Race Assembly available at checkout</div>
+                          )}
+                          {item.badgeLabel && item.ctaAction !== 'none' && (
+                            <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>{item.badgeLabel}</div>
+                          )}
+                          {item.ctaAction === 'reserve' ? (
+                            <button onClick={() => openModal(toShopProduct(item))} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '9px 0', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                          ) : item.ctaAction === 'preorder' ? (
+                            <button onClick={() => openModal(toShopProduct(item))} style={{ background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 6, padding: '9px 0', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                          ) : item.allowsRestockInterest ? (
+                            <>
+                              <button onClick={() => openRestockInterest(item)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '9px 0', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: 'pointer' }}>{item.ctaLabel}</button>
+                              {restockInterestCount(p.id, restockVersion) > 0 && (
+                                <div style={{ ...FB, fontSize: 10, color: '#6B7280', textAlign: 'center' }}>{restockInterestCount(p.id, restockVersion)} racer{restockInterestCount(p.id, restockVersion) === 1 ? '' : 's'} waiting</div>
                               )}
-                              {available ? (
-                                <button onClick={() => openModal(p)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '9px 0', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
-                              ) : (
-                                <>
-                                  <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>SOLD OUT</div>
-                                  <button onClick={() => openPreorder(p)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '9px 0', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
-                                </>
-                              )}
-                            </div>
-                          );
-                        })()}
+                            </>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   );
@@ -723,18 +785,53 @@ export default function ShopPage() {
               ))}
             </div>
 
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280', ...FB, fontSize: 14 }}>Loading products...</div>
-            ) : partsFiltered.length === 0 ? (
+            {partsFiltered.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280' }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🔧</div>
-                <div style={{ ...FB, fontSize: 14 }}>{catalogIsGenuinelyEmpty ? 'No parts are published yet — check back soon.' : 'No parts match your search/filters yet.'}</div>
+                <div style={{ ...FB, fontSize: 14 }}>No parts match your search/filters yet.</div>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20 }}>
-                {partsFiltered.map(p => (
-                  <SimpleProductCard key={p.id} p={p} wishlistIds={wishlistIds} toggleWishlist={toggleWishlist} shareProduct={shareProduct} copiedId={copiedId} openModal={openModal} openPreorder={openPreorder} setLightbox={setLightbox} highlightId={highlightId} />
-                ))}
+                {partsFiltered.map(item => {
+                  const p = item.raw;
+                  const tierBadge = { core: 'CORE STOCK', expansion: 'EXPANSION STOCK', special_order: 'SPECIAL ORDER' }[p.catalog_tier];
+                  return (
+                    <div key={p.id} id={`product-${p.id}`}
+                      style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}>
+                      {item.badgeLabel && <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 2, ...F, fontSize: 9, letterSpacing: 1.5, padding: '3px 8px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>{item.badgeLabel}</div>}
+                      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 2 }}>
+                        <button onClick={() => shareProduct(p)} style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '4px 9px', ...F, fontSize: 9, letterSpacing: 1, color: '#fff', cursor: 'pointer' }}>{copiedId === p.id ? '✓' : '🔗'}</button>
+                      </div>
+
+                      <div style={{ height: 140, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <ProductImage product={p} onClick={() => parseImages(p.image_url).length > 0 && setLightbox(p)} />
+                      </div>
+
+                      <div style={{ padding: '14px 16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
+                          {p.item_no && <span style={{ ...F, fontSize: 9, letterSpacing: 1.5, padding: '2px 7px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#FACC15' }}>#{p.item_no}</span>}
+                          <span style={{ ...F, fontSize: 8, letterSpacing: 1.5, padding: '2px 7px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: '#6B7280' }}>{tierBadge}</span>
+                        </div>
+                        <h3 style={{ ...F, fontWeight: 900, fontSize: 15, color: '#F5F5F5', margin: '0 0 10px', lineHeight: 1.2 }}>{p.name}</h3>
+
+                        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {item.priceDkk != null ? (
+                            <div style={{ ...F, fontWeight: 900, fontSize: 17, color: item.purchasable ? '#F5F5F5' : '#6B7280' }}>{item.priceDkk.toLocaleString()} kr</div>
+                          ) : (
+                            <div style={{ ...F, fontWeight: 900, fontSize: 13, color: '#B8C1CC', letterSpacing: 1 }}>PRICE PENDING</div>
+                          )}
+                          {item.ctaAction === 'reserve' ? (
+                            <button onClick={() => openModal(toShopProduct(item))} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 0', ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                          ) : item.ctaAction === 'preorder' ? (
+                            <button onClick={() => openModal(toShopProduct(item))} style={{ background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 0', ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                          ) : item.allowsRestockInterest ? (
+                            <button onClick={() => openRestockInterest(item)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '8px 0', ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: 'pointer' }}>{item.ctaLabel}</button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -966,6 +1063,49 @@ export default function ShopPage() {
                 <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5', marginBottom: 8 }}>REQUEST SENT!</div>
                 <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 20 }}>We'll reach out by email when it's available.</div>
                 <button onClick={() => setPreorderTarget(null)} style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: 14, ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', cursor: 'pointer' }}>CLOSE</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {restockTarget && (
+        <div onClick={() => setRestockTarget(null)} style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#071426', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 440, padding: '28px 24px 36px' }}>
+            {!restockDone ? (
+              <>
+                <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#3B82F6', marginBottom: 6 }}>{restockTarget.ctaLabel}</div>
+                <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#F5F5F5', marginBottom: 4 }}>{restockTarget.raw.name}</div>
+                <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 20 }}>{restockTarget.badgeLabel}</div>
+                <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#93C5FD', marginBottom: 20 }}>
+                  This registers your interest only — it does not place an order, reserve stock, or charge payment. We&apos;ll contact you when it&apos;s available.
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC', marginBottom: 8 }}>CONTACT PREFERENCE</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {(['email', 'sms', 'in_app'] as ContactPreference[]).map(pref => (
+                      <button key={pref} onClick={() => setRestockContact(pref)}
+                        style={{ flex: 1, ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, padding: '9px 0', borderRadius: 8, border: restockContact === pref ? 'none' : '1px solid rgba(255,255,255,0.1)', background: restockContact === pref ? '#3B82F6' : 'transparent', color: restockContact === pref ? '#fff' : '#B8C1CC', cursor: 'pointer', textTransform: 'uppercase' }}>
+                        {pref}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC', marginBottom: 8 }}>QUANTITY</div>
+                  <input type="number" min={1} value={restockQuantity} onChange={e => setRestockQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    style={{ width: '100%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', ...FB, fontSize: 14, color: '#F5F5F5' }} />
+                </div>
+                <button onClick={submitRestockInterest} disabled={restockSending} style={{ width: '100%', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 12, padding: 15, ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, cursor: 'pointer', opacity: restockSending ? 0.5 : 1 }}>
+                  {restockSending ? 'SENDING...' : `${restockTarget.ctaLabel} →`}
+                </button>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 44, marginBottom: 10 }}>✅</div>
+                <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5', marginBottom: 8 }}>REQUEST RECEIVED!</div>
+                <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 20 }}>We&apos;ll reach out when {restockTarget.raw.name} is available. No order was placed.</div>
+                <button onClick={() => setRestockTarget(null)} style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: 14, ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', cursor: 'pointer' }}>CLOSE</button>
               </div>
             )}
           </div>

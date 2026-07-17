@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateRegularPrice, REGULAR_PRICE_MARGIN_FLOOR, type SupplierCostSnapshot } from './regularPrice';
+import { calculateRegularPrice, REGULAR_PRICE_MARGIN_FLOOR, COLLECTOR_MARGIN_FLOOR, type SupplierCostSnapshot } from './regularPrice';
 import { dkkToOre } from './money';
 import { SHIPPING_CLASSES } from './shippingClasses';
 
@@ -77,5 +77,52 @@ describe('regularPrice — locked business rule: 50% margin floor', () => {
       overrideReason: 'Exceptionally bulky packaging for this specific SKU.',
     });
     expect(result.shippingOre).toBe(dkkToOre(60));
+  });
+});
+
+describe('regularPrice — Collector correction: 60% margin floor', () => {
+  it('exposes the locked 60% Collector margin floor constant', () => {
+    expect(COLLECTOR_MARGIN_FLOOR).toBe(0.6);
+  });
+
+  it('defaults to the normal 50% floor when no margin floor is passed', () => {
+    const cost: SupplierCostSnapshot = {
+      supplierCostAmount: 800, supplierCurrency: 'PHP', supplierName: 'Example', sourceNote: 'Example',
+      dateVerified: '2026-01-01', dkkPerForeignUnit: 0.115, exchangeRateSnapshotDate: '2026-01-01',
+    };
+    const result = calculateRegularPrice(cost, { shippingClass: 'complete_car_kit' });
+    expect(result.marginAtApprovedPrice).toBeGreaterThanOrEqual(0.5 - 1e-9);
+  });
+
+  it('a Collector product uses landed cost x2.5 as its exact minimum retail price', () => {
+    const cost: SupplierCostSnapshot = {
+      supplierCostAmount: 1000, supplierCurrency: 'PHP', supplierName: 'Example collector supplier', sourceNote: 'Example',
+      dateVerified: '2026-01-01', dkkPerForeignUnit: 0.1, exchangeRateSnapshotDate: '2026-01-01',
+    };
+    // 1000 PHP * 0.1 = 100 DKK + 80 DKK complete_car_kit freight = 180 DKK landed.
+    const result = calculateRegularPrice(cost, { shippingClass: 'complete_car_kit' }, COLLECTOR_MARGIN_FLOOR);
+    expect(result.landedCostOre).toBe(dkkToOre(180));
+    expect(result.minimumRetailOre).toBe(dkkToOre(180 * 2.5)); // landed cost x 2.5, exactly
+    expect(result.minimumRetailOre).toBe(dkkToOre(450));
+  });
+
+  it('produces a valid ending-in-9 price with margin >= 60% for a Collector product', () => {
+    const cost: SupplierCostSnapshot = {
+      supplierCostAmount: 900, supplierCurrency: 'PHP', supplierName: 'Example', sourceNote: 'Example',
+      dateVerified: '2026-01-01', dkkPerForeignUnit: 0.115, exchangeRateSnapshotDate: '2026-01-01',
+    };
+    const result = calculateRegularPrice(cost, { shippingClass: 'complete_car_kit' }, COLLECTOR_MARGIN_FLOOR);
+    expect(result.approvedRegularPriceOre % 1000).toBe(900); // ends in 9 (upward rounding, never below the floor)
+    expect(result.marginAtApprovedPrice).toBeGreaterThanOrEqual(0.6 - 1e-9);
+  });
+
+  it('a Collector floor produces a higher (or equal) price than the normal 50% floor for the same cost', () => {
+    const cost: SupplierCostSnapshot = {
+      supplierCostAmount: 900, supplierCurrency: 'PHP', supplierName: 'Example', sourceNote: 'Example',
+      dateVerified: '2026-01-01', dkkPerForeignUnit: 0.115, exchangeRateSnapshotDate: '2026-01-01',
+    };
+    const normal = calculateRegularPrice(cost, { shippingClass: 'complete_car_kit' }, REGULAR_PRICE_MARGIN_FLOOR);
+    const collector = calculateRegularPrice(cost, { shippingClass: 'complete_car_kit' }, COLLECTOR_MARGIN_FLOOR);
+    expect(collector.approvedRegularPriceOre).toBeGreaterThanOrEqual(normal.approvedRegularPriceOre);
   });
 });

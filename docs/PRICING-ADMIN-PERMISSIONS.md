@@ -31,6 +31,23 @@ Campaign/pricing **mutation stays disabled in Production** until Auth/RLS
 are live; only Preview may demonstrate the full interface, and only against
 non-production mock/seeded data.
 
+## Catalog-status / restock admin view (`app/admin/catalog-status/`)
+
+Same gating pattern: a Server Component checking
+`process.env.VERCEL_ENV === 'preview'` and calling `notFound()` everywhere
+else, confirmed by a static-source test
+(`app/admin/catalog-status/page.test.tsx`) asserting no Supabase import, no
+hardcoded admin password, and no automatic supplier-order call anywhere in
+the route. Unlike the campaign admin UI, it reads the **real curated
+catalog** (`lib/pricing/catalogProducts.ts`, the bundled
+`catalog/bmax-initial-catalog.json` — not a demo dataset), because that
+catalog is itself static/bundled data with no Supabase dependency; it
+combines this with the in-memory `restockInterestStore` (also shared with
+`/shop`). It is read-only over the catalog and never writes to Supabase or
+places a supplier order — it is a planning/visibility tool, not a mutation
+surface, so it does not need the Admin/Shop Manager/Viewer role simulator
+that the campaign admin UI uses.
+
 ## Target-state roles (once Auth/RLS land — Phase 14)
 
 | Role | Capability |
