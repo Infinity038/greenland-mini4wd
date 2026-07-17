@@ -24,13 +24,24 @@ change the boxed-kit stock count.
 
 | Add-on | Default price | Stock tracked? |
 |---|---|---|
-| Display Case | 99 DKK | Yes — separately (`shop_inventory.case_stock`) |
+| Display Case (bundled with a car) | 189 DKK | Yes — separately (`shop_inventory.case_stock`) |
 | Standard Assembly | 349 DKK (administrator-configurable) | No — a service |
 | Ready-to-Race Assembly | 449 DKK (administrator-configurable) | No — a service |
 
 Standard Assembly and Ready-to-Race Assembly are mutually exclusive per
 order (one build service, not both); Display Case is independent and can be
 combined with either.
+
+**Correction (Preview review):** the Display Case add-on previously carried
+a flat 99 DKK price with no supplier-cost or margin basis. It is now a real
+catalog accessory (`lib/pricing/displayCase.ts`, docs/CATALOG-COSTING-AND-FREIGHT.md
+§"Display case") with two locked, independently margin-verified prices for
+the same shared stock pool: **229 DKK standalone** (own catalog card, ≥50%
+margin) and **189 DKK bundled with a complete car kit** (this add-on, ≥40%
+margin) — a 40 DKK bundle saving. The 189 DKK figure above is exactly the
+`DEFAULT_SERVICE_ADDONS.display_case.defaultPriceDkk` value, sourced from
+`DISPLAY_CASE_BUNDLED_PRICE_DKK`, not a second independent number to keep in
+sync by hand.
 
 **Standard Assembly includes**: complete assembly following the kit
 instructions, appropriate lubrication, installation of included motor and

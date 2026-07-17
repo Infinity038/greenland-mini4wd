@@ -13,14 +13,15 @@ import Footer from '@/components/layout/Footer';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { DEFAULT_SERVICE_ADDONS, BUILD_TO_ORDER_MESSAGE, type ServiceAddOnId } from '@/lib/pricing/serviceAddOns';
 import { calculateBoxedKitOrderTotal } from '@/lib/pricing/boxedKit';
-import { getPublicCatalogByCategory, type PublicCatalogItem } from '@/lib/pricing/catalogProducts';
+import { getPublicCatalogByCategory, getDisplayCaseCatalogItem, SHOP_GROUP_LABEL, type PublicCatalogItem, type ShopGroup } from '@/lib/pricing/catalogProducts';
+import { DISPLAY_CASE_STANDALONE_PRICE_DKK, DISPLAY_CASE_BUNDLED_PRICE_DKK, DISPLAY_CASE_BUNDLE_SAVING_DKK } from '@/lib/pricing/displayCase';
 import { restockInterestStore, type ContactPreference } from '@/lib/pricing/restockInterest';
 
 // Adapts a curated-catalog item into the existing Supabase-order-shaped
 // Product type so the (unchanged) Reserve/order-placement modal below can
 // keep working unmodified for the rare item that is actually purchasable
-// (publicState IN_STOCK/PREORDER) — currently none of the 87 curated items
-// have real stock yet, so this path is dormant but future-proof.
+// (publicState IN_STOCK/PREORDER) — currently none of the 117 curated
+// records have real stock yet, so this path is dormant but future-proof.
 function toShopProduct(item: PublicCatalogItem): Product {
   const r = item.raw;
   return {
@@ -56,7 +57,7 @@ const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
 type ModalStep = 'confirm' | 'payment' | 'upload' | 'done';
-type ShopTab = 'cars' | 'parts' | 'merchandise';
+type ShopTab = 'cars' | 'parts' | 'accessories' | 'merchandise';
 
 interface Product {
   id: string;
@@ -113,7 +114,10 @@ const FILTER_TABS = [
   { key: 'preorder only', label: 'Preorder' },
 ];
 
-const CHASSIS_FILTERS = ['AR', 'EZ', 'FM-A', 'MA', 'ME', 'MS', 'Super II', 'Super XX', 'VS', 'VZ'];
+// Matches the exact chassis strings used in catalog/bmax-initial-catalog.json
+// (was previously 'Super II' with a space — never matched the catalog's
+// 'Super-II', silently hiding every Super-II car from the chassis filter).
+const CHASSIS_FILTERS = ['AR', 'FM-A', 'VZ', 'MA', 'MS', 'Super-II', 'Super TZ-X'];
 const PARTS_SUBCATEGORIES = ['Bearings', 'Brakes/Dampers', 'Chassis', 'Shafts/Gears', 'Motors', 'Plates', 'Rollers/Stabilizers', 'Screws/Nuts', 'Wheels/Tires', 'Accessories'];
 
 function ProductImage({ product, onClick }: { product: Product; onClick?: () => void }) {
@@ -223,6 +227,7 @@ export default function ShopPage() {
   const [globalCaseStock, setGlobalCaseStock] = useState(0);
 
   const [shopTab, setShopTab] = useState<ShopTab>('cars');
+  const [shopGroupFilter, setShopGroupFilter] = useState<ShopGroup | ''>('');
   const [chassisFilter, setChassisFilter] = useState('');
   const [partsFilter, setPartsFilter] = useState('');
   const [merchFilter, setMerchFilter] = useState('');
@@ -380,18 +385,44 @@ export default function ShopPage() {
 
   // The complete curated catalog (docs/CATALOG-COSTING-AND-FREIGHT.md) —
   // static/bundled, no Supabase dependency, no loading state needed. Every
-  // one of the 87 items is publicly visible regardless of stock/price/tier.
+  // one of the 117 records is publicly visible regardless of stock/price/tier.
   const catalogCars = getPublicCatalogByCategory('cars');
   const catalogParts = getPublicCatalogByCategory('parts');
+  const displayCase = getDisplayCaseCatalogItem();
+
+  // Unlike every other catalog-JSON item, the display case's real
+  // availability comes from the LIVE shop_inventory.case_stock (the same
+  // shared pool the car-order modal's Display Case add-on already reads),
+  // not the static catalog's stock_qty — so this adapter is built here,
+  // inside the component, where globalCaseStock is in scope.
+  const toDisplayCaseProduct = (): Product => {
+    const r = displayCase!.raw;
+    return {
+      id: r.id,
+      name: r.name,
+      item_no: '',
+      category: r.category,
+      subcategory: r.subcategory,
+      chassis: '',
+      price_dkk: DISPLAY_CASE_STANDALONE_PRICE_DKK,
+      stock_qty: globalCaseStock,
+      status: globalCaseStock > 0 ? 'in stock' : 'sold out',
+      is_collectors_vault: false,
+      description: r.description,
+      image_url: r.image_url,
+    };
+  };
 
   const STATE_FILTER_MAP: Record<string, string | null> = { all: null, 'in stock': 'IN_STOCK', 'preorder only': 'PREORDER' };
+  const CAR_SHOP_GROUPS: ShopGroup[] = ['beginner_basic', 'official_starter_pack', 'advanced_bmax', 'collector_limited', 'coming_soon_greenland'];
   const carsFiltered = catalogCars.filter(item => {
     const wantedState = STATE_FILTER_MAP[filter];
     const matchesStatus = !wantedState || item.publicState === wantedState;
     const matchesChassis = !chassisFilter || item.raw.chassis === chassisFilter;
+    const matchesShopGroup = !shopGroupFilter || item.shopGroup === shopGroupFilter;
     const q = carsSearch.trim().toLowerCase();
     const matchesSearch = !q || item.raw.name.toLowerCase().includes(q) || item.raw.item_no.toLowerCase().includes(q);
-    return matchesStatus && matchesChassis && matchesSearch;
+    return matchesStatus && matchesChassis && matchesShopGroup && matchesSearch;
   });
   const collectors = catalogCars.filter(item => item.raw.is_collectors_vault);
 
@@ -537,6 +568,13 @@ export default function ShopPage() {
           await supabase.from('shop_inventory').update({ case_stock: newCaseStock }).eq('id', 1);
           setGlobalCaseStock(newCaseStock);
         }
+      } else if (selected.id === 'display-case') {
+        // Standalone case purchase — deducts from the SAME shared pool a
+        // car-plus-case order deducts from (shop_inventory.case_stock), per
+        // "shared inventory across all cars, never a per-car SKU."
+        const newCaseStock = Math.max(0, (globalCaseStock ?? 0) - 1);
+        await supabase.from('shop_inventory').update({ case_stock: newCaseStock }).eq('id', 1);
+        setGlobalCaseStock(newCaseStock);
       } else {
         const newStock = Math.max(0, (selected.stock_qty ?? 1) - 1);
         await supabase.from('products').update({ stock_qty: newStock }).eq('id', selected.id);
@@ -615,7 +653,7 @@ export default function ShopPage() {
 
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 0' }}>
           <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-            {(['cars', 'parts', 'merchandise'] as ShopTab[]).map(t => (
+            {(['cars', 'parts', 'accessories', 'merchandise'] as ShopTab[]).map(t => (
               <button key={t} onClick={() => setShopTab(t)}
                 style={{ ...F, fontSize: 16, fontWeight: 900, letterSpacing: 1, color: shopTab === t ? '#DC2626' : '#B8C1CC', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px 12px', borderBottom: shopTab === t ? '3px solid #DC2626' : '3px solid transparent' }}>
                 {t.toUpperCase()}
@@ -677,6 +715,13 @@ export default function ShopPage() {
             <input value={carsSearch} onChange={e => setCarsSearch(e.target.value)} placeholder="Search by name or item no..." style={{ ...searchInputStyle, marginBottom: 20 }} />
 
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 16 }}>
+              <button onClick={() => setShopGroupFilter('')} style={filterBtn(!shopGroupFilter)}>ALL GROUPS</button>
+              {CAR_SHOP_GROUPS.map(g => (
+                <button key={g} onClick={() => setShopGroupFilter(g)} style={filterBtn(shopGroupFilter === g)}>{SHOP_GROUP_LABEL[g].toUpperCase()}</button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 16 }}>
               <button onClick={() => setChassisFilter('')} style={filterBtn(!chassisFilter)}>ALL CHASSIS</button>
               {CHASSIS_FILTERS.map(c => (
                 <button key={c} onClick={() => setChassisFilter(c)} style={filterBtn(chassisFilter === c)}>{c}</button>
@@ -709,8 +754,8 @@ export default function ShopPage() {
                       onMouseEnter={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.5)' : 'rgba(220,38,38,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                       onMouseLeave={e => { e.currentTarget.style.borderColor = isCollector ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
                       {isCollector && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #FACC15, transparent)', zIndex: 1 }} />}
-                      {item.badgeLabel && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>{item.badgeLabel}</div>}
-                      {isCollector && <div style={{ position: 'absolute', top: item.badgeLabel ? 40 : 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#FACC1522', color: '#FACC15', border: '1px solid #FACC1544' }}>COLLECTOR</div>}
+                      {item.customerStatusLabel && <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>{item.customerStatusLabel}</div>}
+                      {isCollector && <div style={{ position: 'absolute', top: item.customerStatusLabel ? 40 : 12, left: 12, zIndex: 2, ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 20, background: '#FACC1522', color: '#FACC15', border: '1px solid #FACC1544' }}>COLLECTOR</div>}
                       <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', gap: 6 }}>
                         <button onClick={() => shareProduct(p)} style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 10px', ...F, fontSize: 10, letterSpacing: 1, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>{copiedId === p.id ? '✓ COPIED' : '🔗 SHARE'}</button>
                       </div>
@@ -740,8 +785,8 @@ export default function ShopPage() {
                           {FEATURE_FLAGS.assemblyServicesEnabled && item.purchasable && (
                             <div style={{ ...FB, fontSize: 10, color: '#6B7280' }}>+ Display Case, Standard or Ready-to-Race Assembly available at checkout</div>
                           )}
-                          {item.badgeLabel && item.ctaAction !== 'none' && (
-                            <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>{item.badgeLabel}</div>
+                          {item.customerStatusLabel && item.ctaAction !== 'none' && (
+                            <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>{item.customerStatusLabel}</div>
                           )}
                           {item.ctaAction === 'reserve' ? (
                             <button onClick={() => openModal(toShopProduct(item))} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '9px 0', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
@@ -798,7 +843,7 @@ export default function ShopPage() {
                   return (
                     <div key={p.id} id={`product-${p.id}`}
                       style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}>
-                      {item.badgeLabel && <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 2, ...F, fontSize: 9, letterSpacing: 1.5, padding: '3px 8px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>{item.badgeLabel}</div>}
+                      {item.customerStatusLabel && <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 2, ...F, fontSize: 9, letterSpacing: 1.5, padding: '3px 8px', borderRadius: 20, background: '#3B82F622', color: '#3B82F6', border: '1px solid #3B82F644' }}>{item.customerStatusLabel}</div>}
                       <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 2 }}>
                         <button onClick={() => shareProduct(p)} style={{ background: copiedId === p.id ? '#22C55E' : 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '4px 9px', ...F, fontSize: 9, letterSpacing: 1, color: '#fff', cursor: 'pointer' }}>{copiedId === p.id ? '✓' : '🔗'}</button>
                       </div>
@@ -832,6 +877,47 @@ export default function ShopPage() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ACCESSORIES TAB ────────────────────────────────────── */}
+        {shopTab === 'accessories' && (
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
+            <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>ACCESSORIES</div>
+            <h2 style={{ ...F, fontWeight: 900, fontSize: 28, color: '#F5F5F5', margin: '0 0 20px' }}>DISPLAY CASE</h2>
+
+            {displayCase ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20, maxWidth: 360 }}>
+                <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ height: 180, background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <ProductImage product={displayCase.raw} />
+                  </div>
+                  <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#B8C1CC', alignSelf: 'flex-start', marginBottom: 10 }}>SHARED — ONE POOL FOR EVERY CAR</div>
+                    <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{displayCase.raw.name}</h3>
+                    <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, margin: '0 0 14px' }}>Buy standalone, or add it to any car order at checkout for {DISPLAY_CASE_BUNDLED_PRICE_DKK} kr instead — a {DISPLAY_CASE_BUNDLE_SAVING_DKK} kr saving.</p>
+                    <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#B8C1CC' }}>STANDALONE</div>
+                        <div style={{ ...F, fontWeight: 900, fontSize: 20, color: globalCaseStock > 0 ? '#F5F5F5' : '#6B7280' }}>{DISPLAY_CASE_STANDALONE_PRICE_DKK.toLocaleString()} kr</div>
+                      </div>
+                      {globalCaseStock > 0 ? (
+                        <button onClick={() => openModal(toDisplayCaseProduct())} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '9px 0', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                      ) : (
+                        <>
+                          <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>OUT OF STOCK</div>
+                          <button onClick={() => openRestockInterest(displayCase)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '9px 0', ...F, fontWeight: 700, fontSize: 12, letterSpacing: 1, cursor: 'pointer' }}>REQUEST RESTOCK</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6B7280' }}>
+                <div style={{ ...FB, fontSize: 14 }}>No accessories available yet.</div>
               </div>
             )}
           </div>
@@ -900,6 +986,24 @@ export default function ShopPage() {
                       <div style={{ ...F, fontWeight: 900, fontSize: 32, color: modalPricing.original ? '#22C55E' : '#FACC15' }}>{modalPrice.toLocaleString()} DKK</div>
                     </div>
                   </div>
+
+                  {isSelectedCar && (modalBoxedKitTotal?.addOnLines.length ?? 0) > 0 && (
+                    <div style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#B8C1CC', marginBottom: 4 }}>ORDER BREAKDOWN</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', ...FB, fontSize: 13, color: '#F5F5F5' }}>
+                        <span>Boxed Kit</span><span>{Math.round(boxedKitPricing(selected).price).toLocaleString()} DKK</span>
+                      </div>
+                      {modalBoxedKitTotal!.addOnLines.map(l => (
+                        <div key={l.addOn} style={{ display: 'flex', justifyContent: 'space-between', ...FB, fontSize: 13, color: '#F5F5F5' }}>
+                          <span>+ {l.label}{l.addOn === 'display_case' ? ` (${DISPLAY_CASE_BUNDLE_SAVING_DKK} DKK saving vs. standalone)` : ''}</span>
+                          <span>{(l.priceOre / 100).toLocaleString()} DKK</span>
+                        </div>
+                      ))}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', ...F, fontWeight: 900, fontSize: 15, color: '#FACC15', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 6, marginTop: 2 }}>
+                        <span>TOTAL</span><span>{(modalBoxedKitTotal!.totalOre / 100).toLocaleString()} DKK</span>
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ background: 'rgba(250,204,21,0.07)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 12, padding: 16 }}>
                     <div style={{ ...F, fontWeight: 700, fontSize: 13, letterSpacing: 2, color: '#FACC15', marginBottom: 12 }}>💳 PAYMENT OPTION</div>

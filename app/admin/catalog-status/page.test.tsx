@@ -62,10 +62,10 @@ describe('CatalogStatusPage — no Supabase dependency (static source check)', (
 });
 
 describe('CatalogStatusClient.tsx — renders the full curated catalog with required admin columns', () => {
-  it('shows all 87 catalog items and the required column headers', () => {
+  it('shows all 117 catalog records and the required column headers', () => {
     process.env.VERCEL_ENV = 'preview';
     render(<CatalogStatusPage />);
-    expect(screen.getByText(/87 of 87 catalog items/)).toBeInTheDocument();
+    expect(screen.getByText(/117 of 117 catalog items/)).toBeInTheDocument();
     for (const header of ['Product', 'SKU', 'Category', 'Chassis', 'Tier', 'Public state', 'Stock', 'Supplier cost', 'Currency', 'Source note', 'Retail price', 'Pricing status', 'Restock interest', 'Suggested reorder', 'Missing-data reason']) {
       expect(screen.getByText(header)).toBeInTheDocument();
     }

@@ -2,6 +2,15 @@
 // services, never a second car SKU: choosing an add-on does not create
 // inventory, and the car-kit stock count is reduced only for the underlying
 // Boxed Kit (see lib/pricing/boxedKit.ts).
+//
+// Display Case is the one exception to "service, not a SKU" — it IS a real,
+// physical, separately-stocked accessory (lib/pricing/displayCase.ts), sold
+// either standalone (229 DKK, its own catalog card) or, as modeled here, as
+// a car-order add-on at the bundled price (189 DKK). The 99 DKK flat price
+// this field used to carry was a placeholder with no cost/margin basis
+// behind it — corrected to the margin-verified bundled price.
+
+import { DISPLAY_CASE_BUNDLED_PRICE_DKK } from './displayCase';
 
 export type ServiceAddOnId = 'display_case' | 'standard_assembly' | 'ready_to_race_assembly';
 
@@ -17,9 +26,9 @@ export const DEFAULT_SERVICE_ADDONS: Record<ServiceAddOnId, ServiceAddOnDefiniti
   display_case: {
     id: 'display_case',
     label: 'Display Case',
-    defaultPriceDkk: 99,
+    defaultPriceDkk: DISPLAY_CASE_BUNDLED_PRICE_DKK, // 189 DKK — the bundled-with-a-car price
     isPhysicalStock: true,
-    includes: ['A display case for the assembled or boxed kit.'],
+    includes: ['A shared display case for the boxed kit (standalone price 229 DKK — this bundled price applies only inside a car order).'],
   },
   standard_assembly: {
     id: 'standard_assembly',

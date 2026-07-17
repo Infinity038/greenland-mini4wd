@@ -13,7 +13,7 @@ import type { ShippingClass } from './shippingClasses';
 export interface RawCatalogItem {
   item_no: string;
   name: string;
-  category: 'cars' | 'parts';
+  category: 'cars' | 'parts' | 'accessories';
   subcategory: string;
   chassis: string;
   compatibility: string[];
@@ -39,7 +39,39 @@ export interface RawCatalogItem {
   is_archived_by_admin: boolean;
   is_preorder_enabled: boolean;
   force_coming_soon: boolean;
+  shop_group: ShopGroup;
+  // Image infrastructure (docs/CATALOG-COSTING-AND-FREIGHT.md
+  // §"Image system") — additive metadata. image_path/thumbnail_path/
+  // promotional_image_path are null until a real, permitted image file
+  // exists; a null/placeholder value here must never break rendering (see
+  // components/ProductImage.tsx's durable fallback).
+  image_path: string | null;
+  thumbnail_path: string | null;
+  promotional_image_path: string | null;
+  image_source_type: 'user_owned_photo' | 'authorized_supplier_asset' | 'official_authorized_asset' | 'original_generated_background' | 'placeholder' | 'unknown';
+  image_source_reference: string;
+  image_permission_status: 'not_applicable' | 'pending' | 'granted' | 'denied';
+  image_alt_text: string;
 }
+
+export type ShopGroup =
+  | 'beginner_basic'
+  | 'official_starter_pack'
+  | 'advanced_bmax'
+  | 'collector_limited'
+  | 'coming_soon_greenland'
+  | 'parts_upgrades'
+  | 'accessories';
+
+export const SHOP_GROUP_LABEL: Record<ShopGroup, string> = {
+  beginner_basic: 'Beginner / Basic',
+  official_starter_pack: 'Official Starter Packs',
+  advanced_bmax: 'Advanced / B-MAX',
+  collector_limited: "Collector's Vault",
+  coming_soon_greenland: 'Coming Soon to Greenland',
+  parts_upgrades: 'Parts & Upgrades',
+  accessories: 'Accessories',
+};
 
 export interface PublicCatalogItem {
   raw: RawCatalogItem;
@@ -55,6 +87,14 @@ export interface PublicCatalogItem {
   // shown to customers — see PUBLIC_STATE_DISPLAY for the customer-facing
   // PRICE PENDING label instead. null when the product has an approved price.
   missingDataReason: string | null;
+  shopGroup: ShopGroup;
+  // "Coming Soon to Greenland" is a customer-facing distinction, not a
+  // separate PublicProductState — a coming_soon_greenland item is still
+  // technically PRICE_PENDING (see publicProductState.ts), but the badge
+  // shown to customers should read "COMING SOON TO GREENLAND", never the
+  // generic "PRICE PENDING", to make clear this is a real Tamiya release
+  // Greenland simply hasn't stocked yet — not an unidentified/unverified item.
+  customerStatusLabel: string;
 }
 
 function toPublicCatalogItem(raw: RawCatalogItem): PublicCatalogItem {
@@ -97,6 +137,8 @@ function toPublicCatalogItem(raw: RawCatalogItem): PublicCatalogItem {
     // as not-yet-recorded rather than invented, which is exactly what this
     // reason string is for.
     missingDataReason: missingDataReason({ pricingSource: raw.pricing_source, supplierCostAmount: null, exchangeRateSnapshot: null }),
+    shopGroup: raw.shop_group,
+    customerStatusLabel: raw.shop_group === 'coming_soon_greenland' && publicState === 'PRICE_PENDING' ? 'COMING SOON TO GREENLAND' : display.badgeLabel,
   };
 }
 
@@ -119,6 +161,17 @@ export function getPublicCatalog(): PublicCatalogItem[] {
   return getAllCatalogItems().filter(item => item.visible);
 }
 
-export function getPublicCatalogByCategory(category: 'cars' | 'parts'): PublicCatalogItem[] {
+export function getPublicCatalogByCategory(category: 'cars' | 'parts' | 'accessories'): PublicCatalogItem[] {
   return getPublicCatalog().filter(item => item.raw.category === category);
+}
+
+export function getPublicCatalogByShopGroup(shopGroup: ShopGroup): PublicCatalogItem[] {
+  return getPublicCatalog().filter(item => item.shopGroup === shopGroup);
+}
+
+// The one shared display-case accessory record — a thin, named convenience
+// over getPublicCatalogByCategory('accessories'), since there is currently
+// exactly one accessory in the catalog.
+export function getDisplayCaseCatalogItem(): PublicCatalogItem | undefined {
+  return getPublicCatalogByCategory('accessories')[0];
 }

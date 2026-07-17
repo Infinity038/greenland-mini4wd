@@ -5,7 +5,7 @@
 // lib/pricing/auditLog.ts) and shown to the admin as a warning, never applied
 // silently.
 
-export type ShippingClass = 'small_part' | 'boxed_body_chassis' | 'bulky_upgrade' | 'complete_car_kit';
+export type ShippingClass = 'small_part' | 'boxed_body_chassis' | 'bulky_upgrade' | 'complete_car_kit' | 'accessory_large';
 
 export interface ShippingClassDefinition {
   id: ShippingClass;
@@ -40,6 +40,13 @@ export const SHIPPING_CLASSES: Record<ShippingClass, ShippingClassDefinition> = 
     label: 'Complete Car Kit',
     allocatedDkk: 80,
     description: 'Complete boxed Mini 4WD kits, complete Starter Packs.',
+  },
+  accessory_large: {
+    id: 'accessory_large',
+    label: 'Large Accessory',
+    allocatedDkk: 80,
+    description:
+      'The shared display-case accessory. Gets its own 80 DKK freight allocation because of its larger dimensions — never combined or averaged with a car\'s own complete_car_kit allocation when sold together (docs/CATALOG-COSTING-AND-FREIGHT.md §"Display case").',
   },
 };
 

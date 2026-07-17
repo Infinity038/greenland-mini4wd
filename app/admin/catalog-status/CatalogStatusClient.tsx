@@ -41,7 +41,7 @@ function suggestedReorderQty(item: PublicCatalogItem, interestCount: number): nu
 
 export default function CatalogStatusClient() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
-  const [categoryFilter, setCategoryFilter] = useState<'' | 'cars' | 'parts'>('');
+  const [categoryFilter, setCategoryFilter] = useState<'' | 'cars' | 'parts' | 'accessories'>('');
   const [chassisFilter, setChassisFilter] = useState('');
   const [search, setSearch] = useState('');
   const [restockVersion, setRestockVersion] = useState(0); // bump to re-render interest counts after a fire_trigger-style refresh
@@ -101,10 +101,11 @@ export default function CatalogStatusClient() {
         </div>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
-          <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value as '' | 'cars' | 'parts')} style={selectStyle}>
+          <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value as '' | 'cars' | 'parts' | 'accessories')} style={selectStyle}>
             <option value="">All categories</option>
             <option value="cars">Cars</option>
             <option value="parts">Parts</option>
+            <option value="accessories">Accessories</option>
           </select>
           <select value={chassisFilter} onChange={e => setChassisFilter(e.target.value)} style={selectStyle}>
             <option value="">All chassis</option>
