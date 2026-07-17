@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { awardForPayment, clawbackForPayment } from '@/lib/loyalty';
 import { parseImages } from '@/lib/images';
+import { assertCommerceMutationAllowed, PREVIEW_GUARD_USER_MESSAGE } from '@/lib/commercePreviewGuard';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -133,6 +134,14 @@ export default function AdminOrders() {
 
   async function updateStatus(id: string, status: string) {
     setSaving(id);
+    try {
+      await assertCommerceMutationAllowed();
+    } catch (e: unknown) {
+      setMsg('🔒 ' + (e instanceof Error ? e.message : PREVIEW_GUARD_USER_MESSAGE));
+      setSaving(null);
+      setTimeout(() => setMsg(''), 5000);
+      return;
+    }
     const order = orders.find((o: any) => o.id === id);
     const updates: any = { payment_status: status };
 
@@ -168,6 +177,13 @@ export default function AdminOrders() {
 
   async function deleteOrder(id: string) {
     if (!confirm('Delete this order permanently?')) return;
+    try {
+      await assertCommerceMutationAllowed();
+    } catch (e: unknown) {
+      setMsg('🔒 ' + (e instanceof Error ? e.message : PREVIEW_GUARD_USER_MESSAGE));
+      setTimeout(() => setMsg(''), 5000);
+      return;
+    }
     await supabase.from('orders').delete().eq('id', id);
     loadData();
   }

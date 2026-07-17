@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { assertCommerceMutationAllowed, PREVIEW_GUARD_USER_MESSAGE } from '@/lib/commercePreviewGuard';
 
 const ADMIN_PASSWORD = 'mini4wd2026';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
@@ -75,6 +76,7 @@ export default function AdminOrdersPage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState('all');
   const [tab, setTab] = useState<'orders' | 'members'>('orders');
+  const [guardMsg, setGuardMsg] = useState('');
 
   useEffect(() => { const ok = checkAuth(); setAuthed(ok); setChecked(true); if (ok) fetchData(); }, []);
 
@@ -91,15 +93,25 @@ export default function AdminOrdersPage() {
     setLoading(false);
   };
 
-  const updateOrder = async (id: string, updates: any) => { setSaving(id); await supabase.from('orders').update(updates).eq('id', id); await fetchData(); setSaving(null); };
+  const guardBlocked = async (): Promise<boolean> => {
+    try { await assertCommerceMutationAllowed(); return false; }
+    catch (e: unknown) { setGuardMsg('🔒 ' + (e instanceof Error ? e.message : PREVIEW_GUARD_USER_MESSAGE)); setTimeout(() => setGuardMsg(''), 5000); return true; }
+  };
+  const updateOrder = async (id: string, updates: any) => {
+    setSaving(id);
+    if (await guardBlocked()) { setSaving(null); return; }
+    await supabase.from('orders').update(updates).eq('id', id); await fetchData(); setSaving(null);
+  };
   const confirmPayment = async (order: any) => {
     setSaving(order.id);
+    if (await guardBlocked()) { setSaving(null); return; }
     await supabase.from('orders').update({ payment_status: 'payment_confirmed', status: 'reserved' }).eq('id', order.id);
     if (proofs[order.id]) await supabase.from('payment_proofs').update({ status: 'confirmed', reviewed_at: new Date().toISOString() }).eq('order_id', order.id);
     await fetchData(); setSaving(null);
   };
   const rejectProof = async (id: string) => {
     setSaving(id);
+    if (await guardBlocked()) { setSaving(null); return; }
     await supabase.from('orders').update({ payment_status: 'rejected' }).eq('id', id);
     if (proofs[id]) await supabase.from('payment_proofs').update({ status: 'rejected' }).eq('order_id', id);
     await fetchData(); setSaving(null);
@@ -125,6 +137,9 @@ export default function AdminOrdersPage() {
       </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px' }}>
+        {guardMsg && (
+          <div style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.35)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, ...FB, fontSize: 13, color: '#93C5FD' }}>{guardMsg}</div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, marginBottom: 24 }}>
           {[
             { label: 'Total Orders', value: orders.length, color: '#F5F5F5' },

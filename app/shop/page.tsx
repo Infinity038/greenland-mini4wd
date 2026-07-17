@@ -16,6 +16,7 @@ import { calculateBoxedKitOrderTotal } from '@/lib/pricing/boxedKit';
 import { getPublicCatalogByCategory, getDisplayCaseCatalogItem, SHOP_GROUP_LABEL, type PublicCatalogItem, type ShopGroup } from '@/lib/pricing/catalogProducts';
 import { DISPLAY_CASE_STANDALONE_PRICE_DKK, DISPLAY_CASE_BUNDLED_PRICE_DKK, DISPLAY_CASE_BUNDLE_SAVING_DKK } from '@/lib/pricing/displayCase';
 import { restockInterestStore, type ContactPreference } from '@/lib/pricing/restockInterest';
+import { assertCommerceMutationAllowed, PREVIEW_GUARD_USER_MESSAGE, PreviewCommerceMutationBlockedError } from '@/lib/commercePreviewGuard';
 
 // Adapts a curated-catalog item into the existing Supabase-order-shaped
 // Product type so the (unchanged) Reserve/order-placement modal below can
@@ -245,6 +246,12 @@ export default function ShopPage() {
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  // Surfaced by assertCommerceMutationAllowed() when a mutation was blocked
+  // on Preview — a small top-of-page banner so the message is visible
+  // regardless of which tab/card triggered it (not every mutation, e.g.
+  // wishlist toggle, has an open modal to show `error` in).
+  const [previewGuardMessage, setPreviewGuardMessage] = useState('');
+  const showPreviewGuardMessage = (msg: string) => { setPreviewGuardMessage(msg); setTimeout(() => setPreviewGuardMessage(''), 5000); };
   const [paymentOption, setPaymentOption] = useState<'full' | 'deposit'>('deposit');
   const [lightbox, setLightbox] = useState<Product | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -281,6 +288,19 @@ export default function ShopPage() {
     fetchWishlist();
   }, []);
 
+  // UI-only hint, fetched once on mount from the same authoritative endpoint
+  // every mutation function re-checks before writing — never the actual
+  // enforcement itself, just lets browsing/reading behave normally while
+  // showing mutation buttons as disabled up front instead of only after a
+  // failed attempt.
+  const [previewMode, setPreviewMode] = useState(false);
+  useEffect(() => {
+    fetch('/api/commerce-guard', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(s => setPreviewMode(!!s.blocked))
+      .catch(() => {});
+  }, []);
+
   // Read ?tab= and ?filter= from URL once on first load (homepage deep-links land here)
   useEffect(() => {
     if (didInitFromUrl.current) return;
@@ -305,6 +325,7 @@ export default function ShopPage() {
 
   const toggleWishlist = async (p: Product) => {
     if (!isRegistered() || !member) { window.location.href = '/register'; return; }
+    try { await assertCommerceMutationAllowed(); } catch (e: unknown) { showPreviewGuardMessage(e instanceof Error ? e.message : PREVIEW_GUARD_USER_MESSAGE); return; }
     const has = wishlistIds.has(p.id);
     if (has) {
       await supabase.from('wishlist').delete().eq('member_email', member.email).eq('product_id', p.id);
@@ -444,6 +465,11 @@ export default function ShopPage() {
 
   const openModal = (p: Product) => {
     if (!isRegistered()) { window.location.href = '/register'; return; }
+    // Client-side hint only, checked here to avoid opening the multi-step
+    // order modal just to block it later — the real enforcement is the
+    // server round-trip placeOrder()/uploadProof() await before writing
+    // anything to Supabase, regardless of this flag's value.
+    if (previewMode) { showPreviewGuardMessage(PREVIEW_GUARD_USER_MESSAGE); return; }
     if (isCarProduct(p)) {
       if (!boxedKitAvailable(p)) return;
     } else {
@@ -457,6 +483,7 @@ export default function ShopPage() {
 
   const openPreorder = (p: Product) => {
     if (!isRegistered()) { window.location.href = '/register'; return; }
+    if (previewMode) { showPreviewGuardMessage(PREVIEW_GUARD_USER_MESSAGE); return; }
     setPreorderTarget({ product: p });
     setPreorderDone(false);
   };
@@ -465,6 +492,7 @@ export default function ShopPage() {
     if (!preorderTarget || !member) return;
     setPreorderSending(true);
     try {
+      await assertCommerceMutationAllowed();
       await supabase.from('preorders').insert({
         product_id: preorderTarget.product.id,
         product_name: preorderTarget.product.name,
@@ -474,7 +502,14 @@ export default function ShopPage() {
         status: 'pending',
       });
       setPreorderDone(true);
-    } catch { setPreorderDone(true); }
+    } catch (e: unknown) {
+      if (e instanceof PreviewCommerceMutationBlockedError) {
+        setPreorderTarget(null);
+        showPreviewGuardMessage(e.message);
+      } else {
+        setPreorderDone(true);
+      }
+    }
     setPreorderSending(false);
   };
 
@@ -516,6 +551,13 @@ export default function ShopPage() {
   const placeOrder = async () => {
     if (!selected || !member) return;
     setUploading(true); setError('');
+    try {
+      await assertCommerceMutationAllowed();
+    } catch (e: unknown) {
+      setUploading(false);
+      setError(e instanceof Error ? e.message : PREVIEW_GUARD_USER_MESSAGE);
+      return;
+    }
     const isCar = isCarProduct(selected);
     const addOnsForOrder = isCar && FEATURE_FLAGS.assemblyServicesEnabled ? selectedAddOns : [];
     const boxedKitTotal = isCar
@@ -597,6 +639,13 @@ export default function ShopPage() {
   const uploadProof = async () => {
     if (!proofFile || !orderId) return;
     setUploading(true); setError('');
+    try {
+      await assertCommerceMutationAllowed();
+    } catch (e: unknown) {
+      setUploading(false);
+      setError(e instanceof Error ? e.message : PREVIEW_GUARD_USER_MESSAGE);
+      return;
+    }
     const r = new FileReader();
     r.onloadend = async () => {
       try {
@@ -641,6 +690,22 @@ export default function ShopPage() {
             <div style={{ ...FB, fontSize: 12, color: '#6B7280' }}>📦 Display cases in stock: <strong style={{ color: globalCaseStock > 0 ? '#22C55E' : '#DC2626' }}>{globalCaseStock}</strong> (shared across all car models)</div>
           </div>
         </section>
+
+        {previewMode && (
+          <div style={{ maxWidth: 1100, margin: '16px auto 0', padding: '0 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.35)', borderRadius: 10, padding: '12px 16px' }}>
+              <span style={{ ...F, fontSize: 11, letterSpacing: 2, fontWeight: 900, color: '#3B82F6' }}>PREVIEW</span>
+              <span style={{ ...FB, fontSize: 13, color: '#93C5FD', flex: 1, minWidth: 200 }}>{PREVIEW_GUARD_USER_MESSAGE}</span>
+            </div>
+          </div>
+        )}
+        {previewGuardMessage && (
+          <div style={{ maxWidth: 1100, margin: '16px auto 0', padding: '0 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.35)', borderRadius: 10, padding: '12px 16px' }}>
+              <span style={{ ...FB, fontSize: 13, color: '#FCA5A5', flex: 1, minWidth: 200 }}>⚠ {previewGuardMessage}</span>
+            </div>
+          </div>
+        )}
 
         {catalogError && (
           <div style={{ maxWidth: 1100, margin: '16px auto 0', padding: '0 24px' }}>
@@ -1084,8 +1149,9 @@ export default function ShopPage() {
                     Your preorder will be received. We will contact you for payment and pickup confirmation.
                   </div>
                   {error && <div style={{ ...FB, fontSize: 12, color: '#DC2626' }}>{error}</div>}
-                  <button onClick={placeOrder} disabled={uploading} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 12, padding: '15px', ...F, fontWeight: 900, fontSize: 17, letterSpacing: 2, cursor: 'pointer', opacity: uploading ? 0.5 : 1 }}>
-                    {uploading ? 'PLACING ORDER...' : 'CONFIRM PREORDER →'}
+                  {previewMode && <div style={{ ...FB, fontSize: 12, color: '#3B82F6' }}>🔒 {PREVIEW_GUARD_USER_MESSAGE}</div>}
+                  <button onClick={placeOrder} disabled={uploading || previewMode} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 12, padding: '15px', ...F, fontWeight: 900, fontSize: 17, letterSpacing: 2, cursor: previewMode ? 'not-allowed' : 'pointer', opacity: uploading || previewMode ? 0.5 : 1 }}>
+                    {previewMode ? 'PREVIEW — ORDERS DISABLED' : uploading ? 'PLACING ORDER...' : 'CONFIRM PREORDER →'}
                   </button>
                 </div>
               )}
@@ -1124,8 +1190,9 @@ export default function ShopPage() {
                   </div>
                   <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
                   {error && <div style={{ ...FB, fontSize: 12, color: '#DC2626' }}>{error}</div>}
-                  <button onClick={uploadProof} disabled={!proofFile || uploading} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 12, padding: '15px', ...F, fontWeight: 900, fontSize: 17, letterSpacing: 2, cursor: 'pointer', opacity: !proofFile || uploading ? 0.4 : 1 }}>
-                    {uploading ? 'UPLOADING...' : 'SUBMIT PROOF →'}
+                  {previewMode && <div style={{ ...FB, fontSize: 12, color: '#3B82F6' }}>🔒 {PREVIEW_GUARD_USER_MESSAGE}</div>}
+                  <button onClick={uploadProof} disabled={!proofFile || uploading || previewMode} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 12, padding: '15px', ...F, fontWeight: 900, fontSize: 17, letterSpacing: 2, cursor: previewMode ? 'not-allowed' : 'pointer', opacity: !proofFile || uploading || previewMode ? 0.4 : 1 }}>
+                    {previewMode ? 'PREVIEW — DISABLED' : uploading ? 'UPLOADING...' : 'SUBMIT PROOF →'}
                   </button>
                 </div>
               )}
@@ -1157,8 +1224,8 @@ export default function ShopPage() {
                 <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, padding: 14, ...FB, fontSize: 13, color: '#93C5FD', marginBottom: 20 }}>
                   We'll notify you the moment this is back in stock. No payment needed now.
                 </div>
-                <button onClick={sendPreorder} disabled={preorderSending} style={{ width: '100%', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 12, padding: 15, ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, cursor: 'pointer', opacity: preorderSending ? 0.5 : 1 }}>
-                  {preorderSending ? 'SENDING...' : 'NOTIFY ME →'}
+                <button onClick={sendPreorder} disabled={preorderSending || previewMode} style={{ width: '100%', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 12, padding: 15, ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, cursor: previewMode ? 'not-allowed' : 'pointer', opacity: preorderSending || previewMode ? 0.5 : 1 }}>
+                  {previewMode ? 'PREVIEW — DISABLED' : preorderSending ? 'SENDING...' : 'NOTIFY ME →'}
                 </button>
               </>
             ) : (
