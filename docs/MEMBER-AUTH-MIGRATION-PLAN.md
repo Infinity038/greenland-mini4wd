@@ -16,6 +16,42 @@ against `auth.*` tables. `phase1_auth_foundation_forward.sql` now performs
 only public-schema changes (`members.auth_user_id`, its partial unique index,
 `current_member_id()`); it does not create or touch a single Auth user.
 
+**Safety hardening (Phase B.2.1):** the importer script itself now enforces
+several controls beyond the design above, all covered by mocked tests
+(`scripts/migrateMembersToSupabaseAuth.test.ts`):
+
+- An unscoped `--apply` (no `--member-id`) is **always** refused unless
+  `--confirm-bulk` is also passed — refused unconditionally, never inferred
+  from how many rows happen to be writable (even a run with exactly one
+  writable row is refused without `--confirm-bulk`).
+- `--member-id` is validated as a well-formed UUID that actually exists in
+  the members table; a missing value, malformed UUID, or nonexistent id is a
+  fatal error with zero writes — never silently treated as "no `--member-id`
+  was given" (which would otherwise turn a rejected pilot into an unscoped
+  bulk run).
+- Duplicate-email detection (§4 below) always runs against the **full**
+  members dataset before `--member-id` scoping is applied, so a one-member
+  pilot can never bypass a duplicate sitting elsewhere in the table.
+- An Auth-lookup failure (`auth.admin.listUsers()` erroring, throwing, or
+  returning a malformed response) fails the **entire run** closed — it is
+  never classified as "no existing user," and the run stops before any
+  `createUser`/`inviteUserByEmail`/members write, for that member or any
+  member not yet checked.
+- Sending a real invitation email (`auth.admin.inviteUserByEmail`) requires
+  **both** `--apply` and the separate `--send-invitations` flag.
+  `--confirm-bulk` does not imply invitation consent — a mixed bulk run
+  applies Path A (bcrypt) writes normally but reports Path B rows as
+  `invitation_not_authorized` unless `--send-invitations` is also passed.
+- Every report, error, and duplicate/collision listing uses `maskedEmail`
+  only — no output ever includes a full member email address.
+- Unknown CLI flags are rejected outright rather than silently ignored, and
+  `--help`/`-h` prints full usage without touching any environment variable
+  or creating a Supabase client.
+
+**No command below is currently approved for execution** — see
+`docs/PRE-MIGRATION-BACKUP-AND-VALIDATION.md` §7 for the required
+backup/branch/pilot sequence that must precede running any of them for real.
+
 ## 1. Compatibility analysis
 
 Source (`app/register/page.tsx:54-55,112-113`, read for logic only, no data
@@ -101,6 +137,28 @@ bcrypt shape check, or is otherwise unusable, the same script:
 3. Sending a real invitation email is gated behind `--apply` like every
    other write this script performs; dry-run output identifies these rows
    (`path: invitation_required`) without contacting anyone.
+
+## 3a. Safe example commands (reference only — none approved for execution)
+
+These are the only command shapes this plan endorses. Every one of them
+still requires `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` (or
+`NEXT_PUBLIC_SUPABASE_URL`) in the environment (never committed), and every
+one of them is still subject to the full backup/branch/pilot sequence in
+`docs/PRE-MIGRATION-BACKUP-AND-VALIDATION.md` §7 before it may ever run
+against anything other than an isolated branch. **No command below has been
+run — this table is documentation, not a green light.**
+
+| # | Command | What it does |
+|---|---|---|
+| 1 | `node scripts/migrateMembersToSupabaseAuth.mjs` | Dry run, no flags. Reports the full Path A/B/skip split for every member. No Admin API call, no write, no email sent. |
+| 2 | `node scripts/migrateMembersToSupabaseAuth.mjs --member-id=<uuid> --apply` | Single-member pilot, Path A (bcrypt). Writes exactly one `auth.users` row via `createUser({ password_hash })` and links that one `members.auth_user_id` — only if that member's `password_hash` is a valid bcrypt hash. No `--confirm-bulk` needed for a scoped single-member run. |
+| 3 | `node scripts/migrateMembersToSupabaseAuth.mjs --member-id=<uuid> --apply --send-invitations` | Single-member pilot, Path B (invitation). Sends **one real invitation email** to that member via `inviteUserByEmail`. `--send-invitations` is required in addition to `--apply` for this member to be contacted at all — omitting it reports the row as `invitation_not_authorized` and sends nothing. |
+| 4 | `node scripts/migrateMembersToSupabaseAuth.mjs --apply --confirm-bulk` | Bulk run, Path A only. Writes every eligible bcrypt-hash member's Auth account and link. Any `invitation_required` row is reported as `invitation_not_authorized` and **not contacted**, since `--send-invitations` is absent. |
+| 5 | `node scripts/migrateMembersToSupabaseAuth.mjs --apply --confirm-bulk --send-invitations` | Bulk run, Path A and Path B together. Writes every eligible bcrypt-hash member's Auth account and link, **and sends a real invitation email to every `invitation_required` member**. This is the only command shape that ever sends bulk invitation email — it requires deliberately combining three separate flags, none of which alone is sufficient. |
+
+`--help` (or `-h`) prints the full flag reference without requiring any
+environment variable or creating a Supabase client — safe to run at any
+time, including with no `.env` configured at all.
 
 ## 4. Duplicate-email handling
 

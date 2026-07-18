@@ -117,7 +117,12 @@ the specific check that failed.
 Phase 1 is two separate mechanisms that must run in this exact order — the
 schema-only SQL migration, then the separate Admin-API-based importer script
 (`scripts/migrateMembersToSupabaseAuth.mjs`) — never the other way around,
-and never skipping the single-member pilot in the middle:
+and never skipping the single-member pilot in the middle. The importer
+itself enforces write-scope, duplicate-detection-ordering, fail-closed
+Auth-lookup, and invitation-consent controls (see
+`docs/MEMBER-AUTH-MIGRATION-PLAN.md`'s "Safety hardening (Phase B.2.1)" note
+and §3a for the five approved command shapes) — the sequence below assumes
+those controls, not an earlier, less-strict version of the script.
 
 1. Create a Supabase database branch or an otherwise fully isolated test
    environment (§1) — never the live project for any step below except the
@@ -136,7 +141,14 @@ and never skipping the single-member pilot in the middle:
    anything is written.
 5. Migrate exactly one selected test member
    (`node scripts/migrateMembersToSupabaseAuth.mjs --member-id=<id> --apply`)
-   — a single-member run does not require `--confirm-bulk`.
+   — a single-member run does not require `--confirm-bulk`. `--member-id`
+   must be that member's real UUID; a missing, malformed, or nonexistent
+   value is refused outright with zero writes, never silently treated as an
+   unscoped run. If the test member's `password_hash` is not a usable
+   bcrypt hash (Path B), the pilot instead requires
+   `--member-id=<id> --apply --send-invitations` and will send that one
+   member a real invitation email — confirm that is intended before running
+   it.
 6. Verify that member can sign in with their existing password
    (`supabase.auth.signInWithPassword({ email, password })`, using their
    real, already-known password — never a newly-invented one) against the
@@ -149,7 +161,14 @@ and never skipping the single-member pilot in the middle:
    user id from step 7.
 9. Only after steps 4-8 all pass does the remaining member set get
    considered — re-run the importer with `--apply --confirm-bulk` (still on
-   the branch first, per §1, before ever touching the live project).
+   the branch first, per §1, before ever touching the live project). This
+   bulk form alone only performs Path A (bcrypt) writes; any
+   `invitation_required` member is reported `invitation_not_authorized` and
+   left uncontacted unless `--send-invitations` is also passed
+   (`--apply --confirm-bulk --send-invitations`) — a separate, deliberate
+   decision to send bulk invitation email, distinct from authorizing the
+   bulk run itself. See `docs/MEMBER-AUTH-MIGRATION-PLAN.md` §3a for the
+   full set of approved command shapes.
 10. Apply Phase 2 (`phase2_staff_roles_forward.sql`, including
     `current_staff_roles()`) only after Phase 1 is fully verified per steps
     1-9 — Phase 2's staff-role resolution assumes `members.auth_user_id` /

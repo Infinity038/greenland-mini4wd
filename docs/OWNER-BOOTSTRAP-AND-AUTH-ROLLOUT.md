@@ -61,6 +61,19 @@ committed.
   and `docs/PRE-MIGRATION-BACKUP-AND-VALIDATION.md` §7 for the full,
   required execution sequence. This script has not been run — dry-run or
   otherwise — against anything.
+- **Phase B.2.1 fix — the importer's safety controls were hardened further:**
+  an unscoped `--apply` is now refused unconditionally (never inferred from
+  how many rows are writable); `--member-id` is validated as a real,
+  existing UUID rather than silently degrading to an unscoped run;
+  duplicate-email detection always runs against the full members dataset
+  before `--member-id` scoping; an Auth-lookup failure now fails the entire
+  run closed instead of risking being read as "no existing user"; and
+  sending a real invitation email now requires a separate, explicit
+  `--send-invitations` flag in addition to `--apply` (`--confirm-bulk` alone
+  no longer authorizes contacting anyone). See
+  `docs/MEMBER-AUTH-MIGRATION-PLAN.md`'s "Safety hardening (Phase B.2.1)"
+  note and §3a for the approved command shapes — still none of them
+  approved for actual execution.
 
 None of this alone grants anyone admin access, changes Production behavior,
 or touches live data. The steps below are what turns this scaffolding into a
