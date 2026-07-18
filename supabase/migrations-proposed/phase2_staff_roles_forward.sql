@@ -20,16 +20,34 @@
 --
 -- TESTING: docs/PRE-MIGRATION-BACKUP-AND-VALIDATION.md — verify has_staff_role()
 --   and is_admin() both return false for a random authenticated user with no
---   staff_roles row, and true only after the bootstrap INSERT.
+--   staff_roles row, and true only after the bootstrap INSERT. Also verify
+--   current_staff_roles() (below) returns zero rows for that same random
+--   user, and the correct role rows only for the bootstrap admin's own
+--   session — never for another user's id, since it takes no argument at all.
 --
 -- VERIFICATION QUERIES:
---   select * from public.staff_roles;  -- as service role only, post-bootstrap
---   select public.is_admin();          -- run as the bootstrap admin's session
+--   select * from public.staff_roles;      -- as service role only, post-bootstrap
+--   select public.is_admin();               -- run as the bootstrap admin's session
+--   select * from public.current_staff_roles(); -- run as the bootstrap admin's session; expect one row, role = 'admin'
 --
 -- RISKS: staff_roles has RLS enabled with NO policies in this phase — by
 --   design (see below), so it is unreadable/unwritable by anon/authenticated
 --   until Phase 3 adds the Group D admin-only policy. This is intentionally
 --   the safe default-deny direction, not a gap.
+--
+-- CLIENT/APP COMPATIBILITY (Phase B.1 fix — do not regress): a client-side
+--   session resolver must never query `staff_roles` directly with
+--   `.from('staff_roles').select('role').eq('user_id', ...)` — RLS on this
+--   table is default-deny with no SELECT policy in this phase (and Phase 3
+--   only ever adds an admin-only read policy, never a general authenticated
+--   self-read policy, see docs/RLS-POLICY-MATRIX.md Group D), so that query
+--   would be denied for every legitimate staff account, not just intruders.
+--   `current_staff_roles()` below is the sanctioned read path: SECURITY
+--   DEFINER lets it read the table despite RLS, while `auth.uid()`-only
+--   filtering (no argument) makes it impossible for any caller to ask for
+--   another user's roles. lib/supabaseAuth/resolveStaffSession.ts calls this
+--   RPC, never the table directly — see that file for the client side of
+--   this fix.
 --
 -- STOP CONDITIONS: none — purely additive, no existing table touched.
 --
@@ -104,6 +122,37 @@ set search_path = public
 as $$
   select public.has_staff_role(array['admin']::public.staff_role[]);
 $$;
+
+-- Sanctioned client-facing read path for "what are my own staff roles" —
+-- see the CLIENT/APP COMPATIBILITY note above for why this exists instead
+-- of a direct `.from('staff_roles')` query. Takes no argument at all: the
+-- only identity it can ever resolve is auth.uid(), so no caller — no matter
+-- what it sends — can request another user's roles. SECURITY DEFINER lets
+-- it read past staff_roles' default-deny RLS without adding any SELECT
+-- policy to the table itself; the function's own row-filter is the entire
+-- access boundary, not RLS. When auth.uid() is null (no authenticated
+-- session), the `= null` comparison is never true, so this naturally
+-- returns zero rows with no special-cased null check needed. Returns only
+-- `role` — never id/granted_at/granted_by or any other staff_roles column.
+create or replace function public.current_staff_roles()
+returns table (role public.staff_role)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select sr.role
+  from public.staff_roles sr
+  where sr.user_id = auth.uid();
+$$;
+
+-- Postgres grants EXECUTE to PUBLIC by default on function creation —
+-- explicitly close that, then open only to authenticated. Mirrors the
+-- explicit-revoke-then-grant style already used for table privileges
+-- elsewhere in this migration set (e.g. phase4_remove_hardcoded_admin_forward.sql).
+revoke execute on function public.current_staff_roles() from public;
+revoke execute on function public.current_staff_roles() from anon;
+grant execute on function public.current_staff_roles() to authenticated;
 
 commit;
 

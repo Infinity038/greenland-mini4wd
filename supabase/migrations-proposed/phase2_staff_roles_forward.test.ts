@@ -48,6 +48,133 @@ describe('phase2_staff_roles_forward.sql — approved owner decisions', () => {
   });
 });
 
+describe('current_staff_roles() — RLS-compatible client read path (Phase B.1 fix)', () => {
+  const src = read(DIR, 'phase2_staff_roles_forward.sql');
+  // Isolate just the function definition (from its CREATE up to its closing
+  // `$$;`) so assertions below can't accidentally match unrelated text
+  // elsewhere in the file (e.g. has_staff_role's own `security definer`).
+  const fnStart = src.indexOf('create or replace function public.current_staff_roles()');
+  const fnEnd = src.indexOf('$$;', fnStart) + '$$;'.length;
+  const fnBlock = src.slice(fnStart, fnEnd);
+  // Grant/revoke statements sit just after the function body.
+  const privilegeBlock = src.slice(fnEnd, src.indexOf('commit;', fnEnd));
+
+  it('exists as a function named current_staff_roles', () => {
+    expect(fnStart).toBeGreaterThan(-1);
+  });
+
+  it('accepts no user identifier — empty parameter list', () => {
+    expect(fnBlock).toMatch(/create or replace function public\.current_staff_roles\(\)/);
+  });
+
+  it('filters using auth.uid(), never a passed-in argument', () => {
+    expect(fnBlock).toMatch(/auth\.uid\(\)/);
+    // No parameter name (e.g. p_user_id, user_id_param) appears anywhere in
+    // the function signature or body that could accept a caller-supplied id.
+    expect(fnBlock).not.toMatch(/\(\s*\w+\s+uuid\s*\)/);
+  });
+
+  it('is language sql and stable', () => {
+    expect(fnBlock).toMatch(/language sql/);
+    expect(fnBlock).toMatch(/\bstable\b/);
+  });
+
+  it('is SECURITY DEFINER', () => {
+    expect(fnBlock).toMatch(/security definer/);
+  });
+
+  it('has a fixed search_path', () => {
+    expect(fnBlock).toMatch(/set search_path = public/);
+  });
+
+  it('returns only a role column, shaped as public.staff_role', () => {
+    expect(fnBlock).toMatch(/returns table \(role public\.staff_role\)/);
+    // The query body selects only the role column off the staff_roles alias
+    // — not granted_by/granted_at/id/user_id or `select *`.
+    expect(fnBlock).toMatch(/select sr\.role/);
+    expect(fnBlock).not.toMatch(/select \*/);
+    expect(fnBlock).not.toMatch(/granted_by|granted_at/);
+  });
+
+  it('fully qualifies the table and type it references', () => {
+    expect(fnBlock).toMatch(/public\.staff_roles/);
+    expect(fnBlock).toMatch(/public\.staff_role\)/);
+  });
+
+  it('revokes EXECUTE from public', () => {
+    expect(privilegeBlock).toMatch(/revoke execute on function public\.current_staff_roles\(\) from public;/);
+  });
+
+  it('revokes EXECUTE from anon', () => {
+    expect(privilegeBlock).toMatch(/revoke execute on function public\.current_staff_roles\(\) from anon;/);
+  });
+
+  it('grants EXECUTE to authenticated', () => {
+    expect(privilegeBlock).toMatch(/grant execute on function public\.current_staff_roles\(\) to authenticated;/);
+  });
+
+  it('the revoke-from-public/anon statements precede the grant-to-authenticated statement', () => {
+    const revokePublicIdx = privilegeBlock.indexOf('revoke execute on function public.current_staff_roles() from public;');
+    const revokeAnonIdx = privilegeBlock.indexOf('revoke execute on function public.current_staff_roles() from anon;');
+    const grantIdx = privilegeBlock.indexOf('grant execute on function public.current_staff_roles() to authenticated;');
+    expect(revokePublicIdx).toBeGreaterThan(-1);
+    expect(revokeAnonIdx).toBeGreaterThan(-1);
+    expect(grantIdx).toBeGreaterThan(revokePublicIdx);
+    expect(grantIdx).toBeGreaterThan(revokeAnonIdx);
+  });
+});
+
+describe('staff_roles RLS remains default-deny in Phase 2 — no self-read policy added', () => {
+  const src = read(DIR, 'phase2_staff_roles_forward.sql');
+
+  it('still enables RLS on staff_roles', () => {
+    expect(src).toMatch(/alter table public\.staff_roles enable row level security;/);
+  });
+
+  it('adds no CREATE POLICY statement of any kind in this phase', () => {
+    expect(src).not.toMatch(/create policy/i);
+  });
+
+  it('current_staff_roles() is the only new read path added for this table — no other new SELECT-shaped grant on staff_roles itself', () => {
+    // The only "grant"/"revoke" statements in this file target the function,
+    // never the staff_roles table directly.
+    const grantOrRevokeLines = src.split('\n').filter(line => /^\s*(grant|revoke)\b/i.test(line));
+    for (const line of grantOrRevokeLines) {
+      expect(line).toMatch(/current_staff_roles/);
+    }
+  });
+});
+
+describe('phase2_staff_roles_rollback.sql — drops current_staff_roles() in correct dependency order', () => {
+  const src = read(DIR, 'phase2_staff_roles_rollback.sql');
+
+  it('drops current_staff_roles()', () => {
+    expect(src).toMatch(/drop function if exists public\.current_staff_roles\(\);/);
+  });
+
+  it('drops current_staff_roles() before is_admin(), has_staff_role(), the staff_roles table, and the staff_role enum', () => {
+    const idx = {
+      currentStaffRoles: src.indexOf('drop function if exists public.current_staff_roles();'),
+      isAdmin: src.indexOf('drop function if exists public.is_admin();'),
+      hasStaffRole: src.indexOf('drop function if exists public.has_staff_role(public.staff_role[]);'),
+      table: src.indexOf('drop table if exists public.staff_roles;'),
+      enumType: src.indexOf('drop type if exists public.staff_role;'),
+    };
+    for (const [name, position] of Object.entries(idx)) {
+      expect(position, `expected to find the drop statement for ${name}`).toBeGreaterThan(-1);
+    }
+    expect(idx.currentStaffRoles).toBeLessThan(idx.isAdmin);
+    expect(idx.currentStaffRoles).toBeLessThan(idx.hasStaffRole);
+    expect(idx.currentStaffRoles).toBeLessThan(idx.table);
+    expect(idx.currentStaffRoles).toBeLessThan(idx.enumType);
+    // The table must still come after both functions, and the enum after
+    // the table — unchanged ordering requirements from before this fix.
+    expect(idx.isAdmin).toBeLessThan(idx.table);
+    expect(idx.hasStaffRole).toBeLessThan(idx.table);
+    expect(idx.table).toBeLessThan(idx.enumType);
+  });
+});
+
 describe('every reviewed forward migration proposal has a matching rollback file', () => {
   const forwardFiles = [
     'phase1_auth_foundation_forward.sql',

@@ -25,6 +25,22 @@ committed.
 - `phase1_auth_foundation_forward.sql` / `phase2_staff_roles_forward.sql` —
   reviewed, still unapplied, with clarifying comments added (owner
   designation, refund-is-admin-only) but no structural change.
+- **Phase B.1 fix — `staff_roles` stays directly unreadable, even from the
+  client's own authenticated session.** `phase2_staff_roles_forward.sql`
+  enables RLS on `staff_roles` with no policies at all in Phase 2, and Phase
+  3 (`phase3_rls_policies_forward.sql`) only ever adds an **admin-only**
+  read policy to it — never a general "authenticated users may read their
+  own row" policy (see `docs/RLS-POLICY-MATRIX.md`, Group D). A client-side
+  `.from('staff_roles').select('role').eq('user_id', ...)` query would
+  therefore be denied for every legitimate staff account once Phase 2 is
+  applied, not just for intruders. Staff identity resolution instead calls
+  the `current_staff_roles()` RPC (added to `phase2_staff_roles_forward.sql`
+  in this fix): `SECURITY DEFINER`, no arguments, filters only by
+  `auth.uid()` server-side, returns just the `role` column. No caller can
+  ever request another user's roles through it, and no new SELECT policy
+  was added to `staff_roles` itself — the function is the entire read
+  boundary. `lib/supabaseAuth/resolveStaffSession.ts` calls this RPC, never
+  the table directly.
 
 None of this alone grants anyone admin access, changes Production behavior,
 or touches live data. The steps below are what turns this scaffolding into a
@@ -74,25 +90,48 @@ or errors, stop — do not proceed to step 5 until this is resolved.
 
 ### 5. Enable the Auth feature flag in Preview first
 
-Set `NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=true` on the **Preview** Vercel
-environment only. Production stays unset/`false` until every later step
-below is complete and separately approved. This is the only environment
-variable this rollout ever needs the owner to set by hand — no code change
-is required to flip it.
+`NEXT_PUBLIC_SUPABASE_AUTH_ENABLED` must remain **disabled** — in every
+environment, including Preview — until all five of the following are true:
+
+1. Phase 1 (`phase1_auth_foundation_forward.sql`) is applied.
+2. Phase 2 (`phase2_staff_roles_forward.sql`), **including
+   `current_staff_roles()`**, is applied — not just the table/enum/
+   `has_staff_role()`/`is_admin()` from an earlier pass of this phase; the
+   RPC is what makes staff-role resolution actually work once RLS is on
+   (see the Phase B.1 fix above). `resolveStaffSession.ts` fails closed
+   (`authenticated_no_staff_role`) if this RPC doesn't exist yet, so
+   enabling the flag before this step doesn't break anything unsafely — it
+   just means nobody, including the real owner, can reach the dashboard.
+3. The owner's Auth user exists (step 1 above).
+4. The owner's `admin` row is bootstrapped in `staff_roles` (step 3 above).
+5. Both `current_staff_roles()` and `is_admin()` are verified using the
+   owner's own authenticated session (step 4 above, extended to also check
+   `select * from public.current_staff_roles();` returns the expected
+   `admin` row) — not merely confirmed to exist in the schema.
+
+Only once all five hold does setting
+`NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=true` on the **Preview** Vercel
+environment actually let the owner reach the dashboard. Production stays
+unset/`false` until every later step below is complete and separately
+approved. This is the only environment variable this rollout ever needs the
+owner to set by hand — no code change is required to flip it.
 
 ### 6. Confirm admin login and logout
 
 On the Preview deployment, visit `/admin/login`, sign in with the owner's
 real credentials, and confirm:
 
-- a valid staff (admin) session reaches the "signed in as staff" screen and
-  lists `admin` among its roles;
-- **Sign Out** clears the session and returns to the login form;
+- a valid staff (admin) session redirects straight to `/admin` (via
+  `router.replace`, per `SupabaseAuthLoginScreen.tsx`) and the dashboard
+  header lists `admin` among the resolved roles;
+- **Sign Out** (from the dashboard) clears the session and returns to the
+  login form;
 - a second, non-staff Supabase Auth account (any ordinary racer account,
-  once Phase 1's member migration is live) is **denied** — see
+  once Phase 1's member migration is live) is **denied** — sees
+  `AccessDeniedScreen`, never the dashboard — see
   `resolveStaffSession.ts`'s fail-closed handling of
   `authenticated_no_staff_role`, and that this codebase's own tests
-  (`app/admin/login/SupabaseAuthLoginScreen.test.tsx`,
+  (`app/admin/login/SupabaseAuthLoginScreen.test.tsx`, `app/admin/page.test.tsx`,
   `lib/supabaseAuth/roles.test.ts`) already assert this without needing a
   live account to check it manually first.
 
