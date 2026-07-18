@@ -1,0 +1,68 @@
+[
+  {
+    "item_no": "18099",
+    "product_name": "Ray Spear",
+    "deployment_filename": "18099-ray-spear.webp",
+    "sha256": "68a063cc493b32524fbee06ce24a0c046c06e07bd442aabe176e5e1d20460513"
+  },
+  {
+    "item_no": "18704",
+    "product_name": "Shadow Shark",
+    "deployment_filename": "18704-shadow-shark.webp",
+    "sha256": "4bd7e27d7712d853d8a39c18e8b4ada5dac5b9304ae4f0a5062049d2a628502a"
+  },
+  {
+    "item_no": "18705",
+    "product_name": "Flame Astute",
+    "deployment_filename": "18705-flame-astute.webp",
+    "sha256": "073eb22f43401bd1b21a5d69f3892462809aafbe0a7d89415546b878295ca65a"
+  },
+  {
+    "item_no": "18710",
+    "product_name": "Mini 4WD Starter Pack FM-A Balanced Spec Rowdy Bull",
+    "deployment_filename": "18710-mini-4wd-starter-pack-fm-a-balanced-spec-rowdy-bull.webp",
+    "sha256": "0fea15cb43c62abe36162ff1bb1afaac0e90cc9316ac9c10b3758eeb7e5e9934"
+  },
+  {
+    "item_no": "19431",
+    "product_name": "Magnum Saber Premium",
+    "deployment_filename": "19431-magnum-saber-premium.webp",
+    "sha256": "d1b1329381b4bd9e4560847e90bef50fe028a3a4ea6f9b62c7524fed32f0e49f"
+  },
+  {
+    "item_no": "19443",
+    "product_name": "Diospada Premium",
+    "deployment_filename": "19443-diospada-premium.webp",
+    "sha256": "f518104d7e510503054d929e0182baad5397539b57e193fbe55331d02a473bec"
+  },
+  {
+    "item_no": "19447",
+    "product_name": "Beak Stinger G",
+    "deployment_filename": "19447-beak-stinger-g.webp",
+    "sha256": "76b604ad98863030fe6c2d407b66978db9339b633e94bee366f8f881fe4ac95e"
+  },
+  {
+    "item_no": "19451",
+    "product_name": "Gun Bluster XTO Premium",
+    "deployment_filename": "19451-gun-bluster-xto-premium.webp",
+    "sha256": "dfc77f777ae8bae453164182b8ff724067422b1f51944a73ad684d8ab32c4f89"
+  },
+  {
+    "item_no": "92462",
+    "product_name": "Mach Frame Philippine Cup Special",
+    "deployment_filename": "92462-mach-frame-philippine-cup-special.webp",
+    "sha256": "a7e0eee6e06412277f76fa1138e0eeb6b98d4d80b217d7c82f41483639719ec6"
+  },
+  {
+    "item_no": "95571",
+    "product_name": "Exflowly Polycarbonate Body Special Purple",
+    "deployment_filename": "95571-exflowly-polycarbonate-body-special-purple.webp",
+    "sha256": "7bc8b80a4224dfedd3cc7851d41c3808520f851a62ae0fc2de459b082965ca1c"
+  },
+  {
+    "item_no": "95706",
+    "product_name": "Geo Glider Asia Challenge 2026 Special",
+    "deployment_filename": "95706-geo-glider-asia-challenge-2026-special.webp",
+    "sha256": "2f05b8d4a9bb0ef7e630ebec8ba71b36fb93d584332a6e3148d6be0cab8f2aed"
+  }
+]
