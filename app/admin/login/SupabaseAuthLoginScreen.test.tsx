@@ -4,7 +4,7 @@
 // resolveStaffSession are both replaced with test doubles below). Uses only
 // fireEvent (already part of the installed @testing-library/react) rather
 // than adding a new @testing-library/user-event dependency.
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import SupabaseAuthLoginScreen from './SupabaseAuthLoginScreen';
@@ -15,9 +15,11 @@ import {
   staffSession,
   type StaffSession,
 } from '@/lib/supabaseAuth/roles';
+import { DEFAULT_STAFF_REDIRECT_PATH } from '@/lib/supabaseAuth/safeNextPath';
 
 const signInWithPassword = vi.fn();
 const signOut = vi.fn();
+const routerReplace = vi.fn();
 
 vi.mock('@/lib/supabaseAuth/browserClient', () => ({
   createSupabaseBrowserClient: () => ({
@@ -30,10 +32,21 @@ vi.mock('@/lib/supabaseAuth/resolveStaffSession', () => ({
   resolveStaffSession: vi.fn(async () => resolvedSession),
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: routerReplace, push: vi.fn() }),
+}));
+
+const originalUrl = window.location.href;
+
 beforeEach(() => {
   signInWithPassword.mockReset();
   signOut.mockReset();
+  routerReplace.mockReset();
   resolvedSession = UNAUTHENTICATED_SESSION;
+});
+
+afterEach(() => {
+  window.history.pushState({}, '', originalUrl);
 });
 
 describe('SupabaseAuthLoginScreen — initial session check', () => {
@@ -49,26 +62,45 @@ describe('SupabaseAuthLoginScreen — initial session check', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/session has expired/i);
   });
 
-  it('shows a denied message for an authenticated racer with no staff role, not the staff panel', async () => {
+  it('shows a denied message for an authenticated racer with no staff role, and never redirects to the dashboard', async () => {
     resolvedSession = noStaffRoleSession('racer-1');
     render(<SupabaseAuthLoginScreen />);
     expect(await screen.findByRole('alert')).toHaveTextContent(/not authorized/i);
-    expect(screen.queryByText(/SIGN OUT/i)).not.toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalled();
   });
 
-  it('shows the staff panel for an already-authenticated staff session', async () => {
+  it('redirects an already-authorized staff session straight to /admin, never showing a signed-in panel', async () => {
     resolvedSession = staffSession('admin-1', ['admin']);
     render(<SupabaseAuthLoginScreen />);
-    expect(await screen.findByText(/SIGN OUT/i)).toBeInTheDocument();
-    // Scope the "admin" check to the subtitle line specifically — the page
-    // title "ADMIN ACCESS" also matches a bare /admin/i, so assert against
-    // the subtitle node's own text content rather than the whole document.
-    expect(screen.getByText(/Signed in as staff/i)).toHaveTextContent(/admin/i);
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith(DEFAULT_STAFF_REDIRECT_PATH));
+    expect(screen.queryByText(/SIGN OUT/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Redirecting/i)).toBeInTheDocument();
+  });
+
+  it('redirects an already-authorized staff session to a safe validated ?next= path instead of the default', async () => {
+    window.history.pushState({}, '', '/admin/login?next=/admin/orders');
+    resolvedSession = staffSession('shop-1', ['shop_staff']);
+    render(<SupabaseAuthLoginScreen />);
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/admin/orders'));
+  });
+
+  it('falls back to the default redirect path when ?next= is an external open-redirect attempt', async () => {
+    window.history.pushState({}, '', '/admin/login?next=' + encodeURIComponent('https://evil.example.com'));
+    resolvedSession = staffSession('shop-1', ['shop_staff']);
+    render(<SupabaseAuthLoginScreen />);
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith(DEFAULT_STAFF_REDIRECT_PATH));
+  });
+
+  it('falls back to the default redirect path when ?next= is a protocol-relative open-redirect attempt', async () => {
+    window.history.pushState({}, '', '/admin/login?next=' + encodeURIComponent('//evil.example.com'));
+    resolvedSession = staffSession('shop-1', ['shop_staff']);
+    render(<SupabaseAuthLoginScreen />);
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith(DEFAULT_STAFF_REDIRECT_PATH));
   });
 });
 
 describe('SupabaseAuthLoginScreen — sign-in flow', () => {
-  it('shows an error for invalid credentials and never reaches the staff panel', async () => {
+  it('shows an error for invalid credentials and never redirects', async () => {
     resolvedSession = UNAUTHENTICATED_SESSION;
     signInWithPassword.mockResolvedValue({ error: { message: 'Invalid login credentials' } });
     render(<SupabaseAuthLoginScreen />);
@@ -78,10 +110,10 @@ describe('SupabaseAuthLoginScreen — sign-in flow', () => {
     fireEvent.click(screen.getByRole('button', { name: /SIGN IN/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/invalid email or password/i);
-    expect(screen.queryByText(/SIGN OUT/i)).not.toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalled();
   });
 
-  it('denies a valid racer account with no staff role after successful Auth sign-in, and signs it back out', async () => {
+  it('denies a valid racer account with no staff role after successful Auth sign-in, signs it back out, and never redirects', async () => {
     signInWithPassword.mockResolvedValue({ error: null });
     render(<SupabaseAuthLoginScreen />);
 
@@ -97,10 +129,10 @@ describe('SupabaseAuthLoginScreen — sign-in flow', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/not authorized/i);
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
-    expect(screen.queryByText(/SIGN OUT/i)).not.toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalled();
   });
 
-  it('reaches the staff panel for a valid admin sign-in', async () => {
+  it('redirects to /admin (router.replace) after a valid staff sign-in', async () => {
     signInWithPassword.mockResolvedValue({ error: null });
     render(<SupabaseAuthLoginScreen />);
 
@@ -110,7 +142,7 @@ describe('SupabaseAuthLoginScreen — sign-in flow', () => {
     resolvedSession = staffSession('admin-1', ['admin']);
     fireEvent.click(screen.getByRole('button', { name: /SIGN IN/i }));
 
-    expect(await screen.findByText(/SIGN OUT/i)).toBeInTheDocument();
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith(DEFAULT_STAFF_REDIRECT_PATH));
     expect(signOut).not.toHaveBeenCalled();
   });
 });

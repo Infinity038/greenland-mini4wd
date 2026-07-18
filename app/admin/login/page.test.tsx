@@ -10,12 +10,14 @@ import { join } from 'node:path';
 import '@testing-library/jest-dom/vitest';
 import { UNAUTHENTICATED_SESSION } from '@/lib/supabaseAuth/roles';
 
-// The legacy screen unconditionally calls useRouter() (unused by the
-// Supabase Auth branch) — provide a minimal mock so rendering either branch
-// works outside a real Next.js App Router tree. No navigation actually
-// occurs in any test below.
+// Both branches call useRouter() (legacy: push on password success; Auth
+// screen: replace on staff redirect) — provide a minimal mock covering both
+// so rendering either branch works outside a real Next.js App Router tree.
+// No navigation actually occurs in any test below (resolveStaffSession is
+// mocked to always resolve unauthenticated, so the Auth screen never
+// reaches its redirect branch here).
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
 vi.mock('@/lib/supabaseAuth/browserClient', () => ({

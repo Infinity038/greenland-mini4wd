@@ -8,10 +8,18 @@
 // manual bootstrap process this screen depends on (staff_roles is not
 // migrated live yet — see resolveStaffSession.ts for how that fails safely
 // in the meantime).
+//
+// Reads `?next=` from window.location.search directly (never Next's
+// useSearchParams()) specifically to avoid requiring a Suspense boundary
+// around this already-client-only screen — resolveSafeNextPath() is only
+// ever called from an effect/handler, never during render, so `window` is
+// always defined by the time it runs.
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabaseAuth/browserClient';
 import { resolveStaffSession } from '@/lib/supabaseAuth/resolveStaffSession';
-import { isAdmin, type StaffSession } from '@/lib/supabaseAuth/roles';
+import { type StaffSession } from '@/lib/supabaseAuth/roles';
+import { resolveSafeNextPath } from '@/lib/supabaseAuth/safeNextPath';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -20,11 +28,17 @@ type ScreenState =
   | { phase: 'checking' }
   | { phase: 'form' }
   | { phase: 'signing_in' }
+  | { phase: 'redirecting' }
   | { phase: 'error'; message: string }
-  | { phase: 'denied'; message: string }
-  | { phase: 'staff'; session: StaffSession };
+  | { phase: 'denied'; message: string };
+
+function currentSafeNextPath(): string {
+  if (typeof window === 'undefined') return resolveSafeNextPath(null);
+  return resolveSafeNextPath(new URLSearchParams(window.location.search).get('next'));
+}
 
 export default function SupabaseAuthLoginScreen() {
+  const router = useRouter();
   const [state, setState] = useState<ScreenState>({ phase: 'checking' });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,12 +54,18 @@ export default function SupabaseAuthLoginScreen() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function applySessionResult(session: StaffSession) {
     switch (session.status) {
       case 'staff':
-        setState({ phase: 'staff', session });
+        // Already-authorized staff never sees a "signed in" panel here —
+        // redirect straight to /admin (or the validated ?next= target)
+        // with router.replace so the login screen doesn't stay in browser
+        // history behind the dashboard.
+        setState({ phase: 'redirecting' });
+        router.replace(currentSafeNextPath());
         return;
       case 'expired':
         setState({ phase: 'error', message: 'Your session has expired. Please sign in again.' });
@@ -79,14 +99,6 @@ export default function SupabaseAuthLoginScreen() {
       await client.auth.signOut();
     }
     applySessionResult(session);
-  }
-
-  async function handleSignOut() {
-    const client = createSupabaseBrowserClient();
-    await client.auth.signOut();
-    setEmail('');
-    setPassword('');
-    setState({ phase: 'form' });
   }
 
   const wrap = {
@@ -135,27 +147,12 @@ export default function SupabaseAuthLoginScreen() {
   } as const;
   const errorBox = { ...FB, fontSize: 13, color: '#DC2626', marginBottom: 14 } as const;
 
-  if (state.phase === 'checking') {
+  if (state.phase === 'checking' || state.phase === 'redirecting') {
     return (
       <div style={wrap}>
         <div style={card}>
           <div style={title}>ADMIN ACCESS</div>
-          <div style={subtitle}>Checking session…</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (state.phase === 'staff') {
-    return (
-      <div style={wrap}>
-        <div style={card}>
-          <div style={title}>ADMIN ACCESS</div>
-          <div style={subtitle}>
-            Signed in as staff — role{state.session.roles.length > 1 ? 's' : ''}: {state.session.roles.join(', ')}
-            {isAdmin(state.session) ? ' (admin)' : ''}
-          </div>
-          <button style={button} onClick={handleSignOut}>SIGN OUT</button>
+          <div style={subtitle}>{state.phase === 'redirecting' ? 'Redirecting…' : 'Checking session…'}</div>
         </div>
       </div>
     );
