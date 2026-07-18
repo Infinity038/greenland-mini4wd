@@ -6,6 +6,15 @@ import { getMemberData, isRegistered, generatePaymentRef } from '@/lib/member';
 import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import { resilientCatalogFetch } from '@/lib/resilientCatalogFetch';
+import { parseImages } from '@/lib/images';
+import { ProductImage as SharedProductImage } from '@/components/ProductImage';
+
+// public.products is the runtime source of truth for every category (Cars,
+// Parts, Merchandise) — the static catalog import-seed JSON under
+// catalog/ is never read here; it is import-seed/dry-run/test-fixture
+// data only, wired up solely in the admin dry-run panel.
+const CATALOG_CACHE_KEY = 'shop_products';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -90,68 +99,23 @@ const FILTER_TABS = [
 const CHASSIS_FILTERS = ['AR', 'EZ', 'FM-A', 'MA', 'ME', 'MS', 'Super II', 'Super XX', 'VS', 'VZ'];
 const PARTS_SUBCATEGORIES = ['Bearings', 'Brakes/Dampers', 'Chassis', 'Shafts/Gears', 'Motors', 'Plates', 'Rollers/Stabilizers', 'Screws/Nuts', 'Wheels/Tires', 'Accessories'];
 
-function fixImageUrl(url: string): string {
-  if (!url) return url;
-  const drilldown = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
-  if (drilldown) {
-    try { url = drilldown[1] + atob(drilldown[2]); } catch { /* leave as-is */ }
-  }
-  url = url.replace(
-    /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
-    'res.cloudinary.com/$1/image/upload/'
-  );
-  if (/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/[^./]+$/.test(url)) {
-    url = url + '.png';
-  }
-  return url;
-}
-
-function parseImages(url: string): string[] {
-  if (!url) return [];
-  return url.split(',').map(u => fixImageUrl(u.trim())).filter(Boolean);
-}
-
+// Thin adapter over the shared, durable-fallback ProductImage component —
+// preserves this file's existing `<ProductImage product={p} onClick={...} />`
+// call shape (used throughout the cars/parts/merch grids and the collectors
+// vault card) while delegating actual rendering/fallback/carousel behavior
+// to components/ProductImage.tsx (also used by the admin catalog tooling),
+// so there is exactly one implementation of "how a product image renders,"
+// not a second copy that can drift.
 function ProductImage({ product, onClick }: { product: Product; onClick?: () => void }) {
-  const images = parseImages(product.image_url);
-  const [idx, setIdx] = useState(0);
-  const [failed, setFailed] = useState<Record<number, boolean>>({});
-
-  const current = images[idx];
-  const isFailed = failed[idx];
-
-  if (!current || isFailed) return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-      <span style={{ ...F, fontWeight: 900, fontSize: 40, color: 'rgba(255,255,255,0.06)', letterSpacing: 2 }}>{product.chassis || product.subcategory || ''}</span>
-      <span style={{ ...FB, fontSize: 10, color: 'rgba(255,255,255,0.15)' }}>Image coming soon</span>
-    </div>
-  );
-
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <img
-        src={current}
-        alt={product.name}
-        onError={() => setFailed(f => ({ ...f, [idx]: true }))}
-        onClick={onClick}
-        style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', cursor: onClick ? 'zoom-in' : 'default' }}
-      />
-      {images.length > 1 && (
-        <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 4 }}>
-          {images.map((_, i) => (
-            <button key={i} onClick={e => { e.stopPropagation(); setIdx(i); }}
-              style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 3, border: 'none', background: i === idx ? '#DC2626' : 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, transition: 'all 0.2s' }} />
-          ))}
-        </div>
-      )}
-      {images.length > 1 && idx > 0 && (
-        <button onClick={e => { e.stopPropagation(); setIdx(i => i - 1); }}
-          style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
-      )}
-      {images.length > 1 && idx < images.length - 1 && (
-        <button onClick={e => { e.stopPropagation(); setIdx(i => i + 1); }}
-          style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
-      )}
-    </div>
+    <SharedProductImage
+      imageUrl={product.image_url}
+      name={product.name}
+      category={product.category}
+      itemNo={product.item_no}
+      chassis={product.chassis}
+      onClick={onClick}
+    />
   );
 }
 
@@ -244,6 +208,7 @@ export default function ShopPage() {
   const [member, setMember] = useState<any>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [filter, setFilter] = useState('all');
   const [globalCaseStock, setGlobalCaseStock] = useState(0);
 
@@ -377,9 +342,17 @@ export default function ShopPage() {
   };
 
   async function fetchProducts() {
+    // Cache-first: a failed refresh keeps showing the last successfully
+    // loaded catalog (with a dismissible retry banner) instead of a blank
+    // shop — see lib/resilientCatalogFetch.ts. Supabase public.products
+    // remains the only data source for every category; this only changes
+    // how fetch failures are handled, not what data is used.
     setLoading(true);
-    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: true });
-    setProducts(data || []);
+    const { data, error } = await resilientCatalogFetch<Product>(CATALOG_CACHE_KEY, () =>
+      supabase.from('products').select('*').order('created_at', { ascending: true })
+    );
+    setProducts(data);
+    setCatalogError(error);
     setLoading(false);
   }
 
@@ -559,6 +532,18 @@ export default function ShopPage() {
             <div style={{ ...FB, fontSize: 12, color: '#6B7280' }}>📦 Display cases in stock: <strong style={{ color: globalCaseStock > 0 ? '#22C55E' : '#DC2626' }}>{globalCaseStock}</strong> (shared across all car models)</div>
           </div>
         </section>
+
+        {catalogError && (
+          <div style={{ maxWidth: 1100, margin: '16px auto 0', padding: '0 24px' }}>
+            <div style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ ...FB, fontSize: 13, color: '#FCA5A5' }}>{catalogError}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => fetchProducts()} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', ...F, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>RETRY</button>
+                <button onClick={() => setCatalogError(null)} style={{ background: 'transparent', color: '#B8C1CC', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '6px 14px', ...F, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>DISMISS</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 0' }}>
           <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
