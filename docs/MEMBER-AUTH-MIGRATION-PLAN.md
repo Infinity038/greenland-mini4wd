@@ -48,6 +48,40 @@ several controls beyond the design above, all covered by mocked tests
   `--help`/`-h` prints full usage without touching any environment variable
   or creating a Supabase client.
 
+**Trusted provenance + error sanitization (Phase B.2.2):** two further
+corrections, also covered by mocked tests:
+
+- Automatic relinking of an existing Auth user (`relink_existing`) is
+  authorized **only** by a matching
+  `auth.users.app_metadata.migrated_from_members_id` value.
+  `user_metadata` is editable by the account owner themselves and is
+  **never** read for this purpose — a matching key found only in
+  `user_metadata` is ignored outright, and that Auth user is still treated
+  as `collision_manual_review`, never auto-attached. `app_metadata` is only
+  ever writable through the Admin API (`auth.admin.updateUserById`), which
+  is exactly why it — and only it — is trusted as proof an Auth user was
+  created by this importer for a specific member.
+- `createUser()`/`inviteUserByEmail()` payloads carry no provenance at all.
+  Provenance is stamped as a **separate, subsequent**
+  `auth.admin.updateUserById()` call, merging `migrated_from_members_id`
+  onto whatever `app_metadata` Supabase Auth already set (e.g.
+  `provider`/`providers`) — never overwriting it — and `members.auth_user_id`
+  is linked **only** after that stamp is written **and verified** from the
+  Admin API's own response (matching user id, matching
+  `migrated_from_members_id`); an `updateUserById()` call that returns no
+  error is not, by itself, treated as proof the stamp took effect. A failed
+  or unverifiable stamp (`partial_auth_created_provenance_failed`) leaves
+  `members.auth_user_id` unlinked and requires manual review — an
+  administrator must deliberately repair that Auth user's `app_metadata`
+  before any rerun will trust it. See §10a below for the full failure-state
+  breakdown.
+- No raw Admin API/PostgREST error or thrown exception is ever written to a
+  report, a log line, or console output — every one passes through
+  `sanitizeImporterError()` first, which redacts email addresses, bcrypt
+  hashes, JWT/access/refresh-token-shaped strings, any explicitly-known
+  secret value, and control/ANSI escape sequences, and caps the output
+  length.
+
 **No command below is currently approved for execution** — see
 `docs/PRE-MIGRATION-BACKUP-AND-VALIDATION.md` §7 for the required
 backup/branch/pilot sequence that must precede running any of them for real.
@@ -100,17 +134,26 @@ For every `members` row where `password_hash` is non-null and matches the
 bcrypt shape check above, `scripts/migrateMembersToSupabaseAuth.mjs`:
 
 1. Calls `supabase.auth.admin.createUser({ email: lower(members.email),
-   password_hash: members.password_hash, email_confirm: true, user_metadata:
-   { migrated_from_members_id: members.id } })` — the **existing** hash
-   travels as `password_hash`, never as `password` (there is no `password`
-   key in the payload at all — see the script's `buildCreateUserPayload()`
-   and its own tests asserting this shape). `email_confirmed_at` is set by
-   `email_confirm: true`: they are already an existing, real member — this is
-   not a new signup that needs email verification.
-2. Only after the Admin API call succeeds and returns a real Auth user id,
-   updates that exact `members.auth_user_id` to the returned id — never
-   before, never speculatively, never for a different row.
-3. Result: the member's **existing password continues to work unchanged**
+   password_hash: members.password_hash, email_confirm: true })` — the
+   **existing** hash travels as `password_hash`, never as `password` (there
+   is no `password` key in the payload at all — see the script's
+   `buildCreateUserPayload()` and its own tests asserting this shape).
+   `email_confirmed_at` is set by `email_confirm: true`: they are already an
+   existing, real member — this is not a new signup that needs email
+   verification. The payload carries **no** migration provenance — see
+   step 2.
+2. Only after that call succeeds, calls `supabase.auth.admin.updateUserById(
+   authUserId, { app_metadata: { ...existingAppMetadata,
+   migrated_from_members_id: members.id } })` to stamp trusted provenance
+   (`buildAppMetadataStamp()`), merged on top of whatever `app_metadata`
+   Supabase Auth already set — never overwritten — and **verifies** the
+   response actually reflects it (`verifyAppMetadataStamp()`: matching user
+   id, matching `migrated_from_members_id`) before trusting it.
+3. Only after that stamp is written **and verified**, updates that exact
+   `members.auth_user_id` to the returned id — never before, never
+   speculatively, never for a different row. See §10a for what happens if
+   any of these three steps fails partway through.
+4. Result: the member's **existing password continues to work unchanged**
    the next time they use `supabase.auth.signInWithPassword({ email,
    password })` — no reset required, no email sent, because GoTrue's bcrypt
    compare succeeds against the imported hash exactly as it would have
@@ -128,14 +171,20 @@ For every non-guest `members` row where `password_hash` is null, fails the
 bcrypt shape check, or is otherwise unusable, the same script:
 
 1. Calls `supabase.auth.admin.inviteUserByEmail(email, { data: {
-   migrated_from_members_id: members.id, requires_password_reset: true } })`
-   — no password or hash of any kind is ever sent for this path; Supabase's
-   own invitation email is what lets the member set their own password.
-   **Never generate or assign a password on their behalf.**
-2. Only after the invitation call succeeds and returns a real Auth user id,
-   updates that exact `members.auth_user_id` — same rule as Path A.
-3. Sending a real invitation email is gated behind `--apply` like every
-   other write this script performs; dry-run output identifies these rows
+   requires_password_reset: true } })` — no password or hash of any kind is
+   ever sent for this path; Supabase's own invitation email is what lets
+   the member set their own password. **Never generate or assign a
+   password on their behalf.** `requires_password_reset` is a non-sensitive
+   UX hint only — it is never read to authorize anything. The payload
+   carries no migration provenance; invite data is never treated as trusted
+   provenance.
+2. Only after the invitation call succeeds, stamps and verifies trusted
+   `app_metadata` provenance exactly as Path A step 2 does.
+3. Only after that stamp is written and verified, updates that exact
+   `members.auth_user_id` — same rule as Path A.
+4. Sending a real invitation email is gated behind **both** `--apply` and
+   the separate `--send-invitations` consent flag, like every other write
+   this script performs; dry-run output identifies these rows
    (`path: invitation_required`) without contacting anyone.
 
 ## 3a. Safe example commands (reference only — none approved for execution)
@@ -272,16 +321,12 @@ Every real run of `scripts/migrateMembersToSupabaseAuth.mjs` (dry-run or
 no name, no hash value, no service-role key, no Auth token
 (`buildReportEntry()`, and its own tests, enforce this shape):
 
-| memberId | maskedEmail | currentLinkage | path | outcome |
-|---|---|---|---|---|
-| `<uuid>` | `ra***@example.com` | linked / unlinked | existing_bcrypt / invitation_required / guest_skipped / already_linked / collision_manual_review / relink_existing | created / invited / relinked / skipped / failed_creation / failed_linking / partial_migration_manual_repair |
+| memberId | maskedEmail | currentLinkage | path | outcome | errorCode |
+|---|---|---|---|---|---|
+| `<uuid>` | `ra***@example.com` | linked / unlinked | existing_bcrypt / invitation_required / guest_skipped / already_linked / collision_manual_review / relink_existing | created / invited / relinked / skipped / invitation_not_authorized / auth_creation_failed / auth_invitation_failed / partial_auth_created_provenance_failed / partial_migration_link_failed | (present only on a failure outcome) |
 
-`partial_migration_manual_repair` means the Admin API call succeeded (a real
-Auth user id is included in the report for manual reference) but the
-subsequent `members.auth_user_id` write failed — this is reported plainly,
-not silently retried or hidden; the next run safely relinks that exact
-member via verified `migrated_from_members_id` metadata (`relink_existing`)
-rather than creating a second Auth user.
+Any `error` value that accompanies a failure outcome has always already
+passed through `sanitizeImporterError()` — see §10a.
 
 ## 10. Rule preventing duplicate Auth accounts
 
@@ -302,15 +347,46 @@ Enforced at two independent layers:
 
 2. **Importer level**: before writing anything, the script looks up whether
    an Auth user already exists for the target email
-   (`findExistingAuthUser`). If one exists with `user_metadata` verifying it
+   (`findExistingAuthUser`). If one exists with `app_metadata` verifying it
    was created by this script *for this exact member* (`relink_existing`),
-   it is safely relinked rather than duplicated. If one exists with no such
-   metadata — an unrelated account that happens to share an email —
-   **it is never auto-attached**; the row is flagged `collision_manual_review`
-   and left untouched until a human resolves it.
+   it is safely relinked rather than duplicated. `user_metadata` is never
+   read for this check — a matching key found only there is ignored, since
+   it is editable by the account owner and proves nothing about who created
+   the account. If no such **trusted** `app_metadata` exists — whether
+   because the account is genuinely unrelated, or because a prior run's
+   provenance stamp failed (§10a) — **it is never auto-attached**; the row
+   is flagged `collision_manual_review` and left untouched until a human
+   resolves it.
 
 Combined with the §4 pre-migration duplicate-email checks, this closes every
 direction of the "duplicate account" risk without ever guessing.
+
+## 10a. Partial-failure states (provenance stamping is a separate, verified step)
+
+Because linking a member spans up to three independent calls — create/invite,
+stamp `app_metadata`, link `members.auth_user_id` — each stage's real outcome
+is reported individually, and each implies a different safe rerun behavior:
+
+- **`auth_creation_failed` / `auth_invitation_failed`** — the Admin API call
+  itself failed. Nothing was created. Safe to retry from scratch on a
+  rerun.
+- **`partial_auth_created_provenance_failed`** — `createUser()`/
+  `inviteUserByEmail()` succeeded (the report includes the real `authUserId`
+  for manual reference), but the subsequent `updateUserById()` app_metadata
+  stamp either errored or could not be **verified** from its response
+  (`errorCode: auth_provenance_update_failed` or
+  `auth_provenance_verification_failed`). `members.auth_user_id` is **never**
+  linked in this state. Because trusted provenance was never established,
+  this Auth user has no `app_metadata.migrated_from_members_id` — a rerun's
+  lookup will (correctly) classify it as `collision_manual_review`, never
+  reuse or duplicate it. An administrator must deliberately repair that Auth
+  user's `app_metadata` by hand before any rerun will trust it.
+- **`partial_migration_link_failed`** — the `app_metadata` stamp was written
+  **and verified**, but the `members.auth_user_id` write itself failed
+  (`errorCode: member_link_failed`). Because provenance is already verified,
+  a rerun's lookup finds the matching `app_metadata` and safely selects
+  `relink_existing` — it never calls `createUser()`/`inviteUserByEmail()`
+  again for that member.
 
 Full forward/rollback SQL for the schema-only portion of this phase:
 `supabase/migrations-proposed/phase1_auth_foundation_forward.sql` /

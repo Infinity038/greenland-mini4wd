@@ -74,6 +74,25 @@ committed.
   `docs/MEMBER-AUTH-MIGRATION-PLAN.md`'s "Safety hardening (Phase B.2.1)"
   note and §3a for the approved command shapes — still none of them
   approved for actual execution.
+- **Phase B.2.2 fix — migration ownership is now proven only by
+  server-managed `app_metadata`, never by user-editable `user_metadata`.**
+  A prior draft trusted `user.user_metadata.migrated_from_members_id` to
+  decide whether an existing Auth user could be safely relinked — but
+  `user_metadata` can be edited by the account owner themselves, so a
+  matching key there proves nothing about who actually created the
+  account. `createUser()`/`inviteUserByEmail()` payloads no longer carry
+  any migration provenance at all; the importer now stamps
+  `app_metadata.migrated_from_members_id` in a separate, subsequent
+  `auth.admin.updateUserById()` call (the only Admin API surface that can
+  write `app_metadata`), and **verifies** the response actually reflects it
+  before ever linking `members.auth_user_id`. A failed or unverifiable
+  stamp leaves the member unlinked and the Auth user
+  `collision_manual_review` until an administrator repairs it by hand — see
+  `docs/MEMBER-AUTH-MIGRATION-PLAN.md` §10a. Every raw Admin API/PostgREST
+  error is also now redacted (`sanitizeImporterError()`) before it can ever
+  reach a log line or report — no email address, hash, or token-shaped
+  string is printed in the clear. This script has still not been run —
+  dry-run or otherwise — against anything.
 
 None of this alone grants anyone admin access, changes Production behavior,
 or touches live data. The steps below are what turns this scaffolding into a

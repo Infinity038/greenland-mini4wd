@@ -121,8 +121,12 @@ and never skipping the single-member pilot in the middle. The importer
 itself enforces write-scope, duplicate-detection-ordering, fail-closed
 Auth-lookup, and invitation-consent controls (see
 `docs/MEMBER-AUTH-MIGRATION-PLAN.md`'s "Safety hardening (Phase B.2.1)" note
-and §3a for the five approved command shapes) — the sequence below assumes
-those controls, not an earlier, less-strict version of the script.
+and §3a for the five approved command shapes), and links `members.auth_user_id`
+only after migration ownership is stamped to `app_metadata` (never
+`user_metadata`) and verified from the Admin API's own response (see
+"Trusted provenance + error sanitization (Phase B.2.2)" and §10a) — the
+sequence below assumes those controls, not an earlier, less-strict version
+of the script.
 
 1. Create a Supabase database branch or an otherwise fully isolated test
    environment (§1) — never the live project for any step below except the
@@ -156,9 +160,19 @@ those controls, not an earlier, less-strict version of the script.
 7. Verify `auth.users` and `auth.identities` rows were created **by
    Supabase Auth itself** (i.e., exist and look normal via the dashboard or
    a read-only `select`) — not by inspecting any SQL this repo ran, since
-   none touches those tables directly.
+   none touches those tables directly. Also verify that Auth user's
+   `app_metadata.migrated_from_members_id` equals the test member's id —
+   this is the same check the importer itself performs before it will link
+   `members.auth_user_id` (`verifyAppMetadataStamp()`), and if it is
+   missing or mismatched, the report will already show
+   `partial_auth_created_provenance_failed` rather than a clean success —
+   do not proceed past that outcome without investigating.
 8. Verify `members.auth_user_id` linkage for that one row matches the Auth
-   user id from step 7.
+   user id from step 7. If the report instead showed
+   `partial_migration_link_failed`, provenance was already verified but the
+   `members` write failed — re-running the importer with the same
+   `--member-id` is safe (it will relink via the verified `app_metadata`,
+   never create a second Auth user).
 9. Only after steps 4-8 all pass does the remaining member set get
    considered — re-run the importer with `--apply --confirm-bulk` (still on
    the branch first, per §1, before ever touching the live project). This

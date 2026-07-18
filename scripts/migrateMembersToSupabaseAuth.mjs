@@ -41,6 +41,43 @@
 //   - Unknown CLI flags are rejected outright. --help prints usage without
 //     ever touching an environment variable or creating a Supabase client.
 //
+// SAFETY MODEL (Phase B.2.2 — trusted provenance + error sanitization):
+//   - Automatic relinking of an existing Auth user is authorized ONLY by a
+//     matching auth.users.app_metadata.migrated_from_members_id value.
+//     user_metadata is caller/user-editable and is NEVER read for this
+//     purpose — a matching key found only in user_metadata is ignored, and
+//     that Auth user is still treated as collision_manual_review.
+//   - app_metadata is the account owner's privileged metadata: it can only
+//     be set through the Admin API (auth.admin.updateUserById), never by the
+//     end user themselves, which is exactly why it — and only it — is
+//     trusted as migration provenance.
+//   - createUser()/inviteUserByEmail() payloads no longer carry
+//     migrated_from_members_id in user_metadata at all. Provenance is
+//     stamped as a separate, subsequent auth.admin.updateUserById() call,
+//     merged on top of whatever app_metadata Supabase Auth already set
+//     (e.g. provider/providers) — never overwritten.
+//   - members.auth_user_id is linked ONLY after the app_metadata stamp is
+//     written AND verified from the Admin API's own response (matching
+//     user id, matching migrated_from_members_id) — an update call
+//     returning no error is not, by itself, treated as proof it worked.
+//   - Every failure stage is reported under its own outcome so a rerun
+//     behaves safely and predictably: auth_creation_failed /
+//     auth_invitation_failed (nothing was created — safe to retry from
+//     scratch), partial_auth_created_provenance_failed (an Auth user exists
+//     but is NOT trusted yet — members is never linked, and the account
+//     stays collision_manual_review until an administrator repairs its
+//     app_metadata by hand), partial_migration_link_failed (provenance is
+//     verified — a rerun safely relinks via relink_existing, never creates
+//     a second Auth user).
+//   - No raw Admin API/PostgREST error, and no raw thrown exception, is
+//     ever written to a report, a log line, or console output directly —
+//     every one is passed through sanitizeImporterError() first, which
+//     redacts email addresses, bcrypt hashes, JWT/access/refresh-token
+//     shaped strings, any explicitly-known secret value, and control/ANSI
+//     escape sequences, and caps the output length. Stable internal error
+//     codes (see IMPORTER_ERROR_CODE) are reported instead of raw messages
+//     wherever a stable code exists.
+//
 // See docs/MEMBER-AUTH-MIGRATION-PLAN.md for the full operational procedure
 // this script is one step of, and docs/PRE-MIGRATION-BACKUP-AND-VALIDATION.md
 // for the required backup/branch/pilot sequence before running this for
@@ -72,9 +109,10 @@ export function isValidUuid(value) {
 }
 
 // The single metadata key used to prove "this Auth user was created by this
-// script for this exact member row" — the only thing that ever justifies
-// relinking an existing Auth user instead of treating it as an unrelated
-// collision requiring manual review.
+// script for this exact member row." Trusted ONLY when found in
+// auth.users.app_metadata (server/Admin-API-managed) — never in
+// user_metadata (caller-editable). See planMigration() below, which is the
+// only place this trust decision is made.
 export const MIGRATION_METADATA_KEY = 'migrated_from_members_id';
 
 // Discriminated outcomes for an existing-Auth-user-by-email lookup — see
@@ -86,6 +124,19 @@ export const AUTH_LOOKUP_STATUS = {
   FOUND: 'user_found',
   NOT_FOUND: 'user_not_found',
   ERROR: 'lookup_error',
+};
+
+// Stable, non-sensitive internal error codes — reported instead of (or
+// alongside) a sanitized diagnostic message, so a report can always be
+// machine-read/triaged even if the underlying Admin API/PostgREST message
+// text ever changes.
+export const IMPORTER_ERROR_CODE = {
+  AUTH_LOOKUP_FAILED: 'auth_lookup_failed',
+  AUTH_CREATION_FAILED: 'auth_creation_failed',
+  AUTH_INVITATION_FAILED: 'auth_invitation_failed',
+  AUTH_PROVENANCE_UPDATE_FAILED: 'auth_provenance_update_failed',
+  AUTH_PROVENANCE_VERIFICATION_FAILED: 'auth_provenance_verification_failed',
+  MEMBER_LINK_FAILED: 'member_link_failed',
 };
 
 export function normalizeEmail(email) {
@@ -101,6 +152,73 @@ export function maskEmail(email) {
   const [local, domain] = normalized.split('@');
   const visible = local.length > 2 ? local.slice(0, 2) : '';
   return `${visible}***@${domain}`;
+}
+
+// ── Error sanitization ───────────────────────────────────────────────────
+// Every raw Admin API / PostgREST error or thrown exception passes through
+// here before it is allowed anywhere near a report, a log line, or
+// console output. Never returns the original Error object — always a
+// plain, bounded string.
+
+const ANSI_ESCAPE_PATTERN = /\x1B\[[0-9;]*[a-zA-Z]/g;
+// Removes control characters other than newline/tab (which are left alone
+// since they don't enable terminal escape tricks on their own and keep
+// multi-line messages readable).
+const CONTROL_CHAR_PATTERN = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+const BCRYPT_PATTERN_GLOBAL = /\$2[aby]\$\d{2}\$[A-Za-z0-9./]{53}/g;
+// JWT-shaped: three dot-separated base64url segments. Also incidentally
+// catches most other long dot-delimited token formats, which is an
+// acceptable (safe-direction) over-redaction for an error message.
+const JWT_PATTERN = /[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g;
+const MAX_SANITIZED_ERROR_LENGTH = 300;
+
+function coerceErrorToString(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object') {
+    if (typeof error.message === 'string') return error.message;
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
+    }
+  }
+  return String(error);
+}
+
+/**
+ * Produces a bounded, redacted string safe to log or place in a report.
+ * @param {unknown} error
+ * @param {string[]} [sensitiveValues] Known-sensitive literal strings (e.g.
+ *   the member's normalized email, the service-role key) redacted by exact
+ *   substring match, in addition to the generic pattern-based redaction
+ *   below. Never required for correctness — the generic patterns alone
+ *   already catch email/bcrypt/JWT shapes — but closes the gap for secrets
+ *   with no fixed public shape (the service-role key).
+ * @returns {string}
+ */
+export function sanitizeImporterError(error, sensitiveValues = []) {
+  let message = coerceErrorToString(error);
+
+  for (const value of sensitiveValues) {
+    if (typeof value === 'string' && value.length > 0) {
+      message = message.split(value).join('[REDACTED]');
+    }
+  }
+
+  message = message
+    .replace(ANSI_ESCAPE_PATTERN, '')
+    .replace(BCRYPT_PATTERN_GLOBAL, '[REDACTED_HASH]')
+    .replace(JWT_PATTERN, '[REDACTED_TOKEN]')
+    .replace(EMAIL_PATTERN, '[REDACTED_EMAIL]')
+    .replace(CONTROL_CHAR_PATTERN, '');
+
+  if (message.length > MAX_SANITIZED_ERROR_LENGTH) {
+    message = `${message.slice(0, MAX_SANITIZED_ERROR_LENGTH)}…[truncated]`;
+  }
+
+  return message;
 }
 
 const KNOWN_FLAGS = new Set(['--apply', '--confirm-bulk', '--send-invitations', '--help', '-h']);
@@ -196,11 +314,21 @@ REQUIREMENTS
   must be set in the environment for any run other than --help. The
   service-role key is never logged.
 
+PROVENANCE
+  A migrated Auth user is only ever recognized as "ours" via
+  app_metadata.migrated_from_members_id, stamped through
+  auth.admin.updateUserById() after creation/invitation and verified from
+  the Admin API's own response. user_metadata is never trusted for this —
+  it is editable by the account owner and proves nothing about who created
+  the account.
+
 OUTPUT
   Every report line is built from a fixed, reviewed set of non-sensitive
   fields only. password_hash, plaintext passwords, the service-role key,
-  Auth tokens, and full email addresses are never printed — email
-  addresses are always masked (e.g. "ra***@example.com").
+  Auth tokens, full email addresses, and raw user_metadata are never
+  printed — email addresses are always masked (e.g. "ra***@example.com"),
+  and any underlying Admin API/PostgREST error is redacted and length
+  capped before it is ever logged or included in a report.
 `;
 
 // Pure, network-free classification of a single member row. Does not know
@@ -246,7 +374,7 @@ export function detectDuplicateMemberEmails(members) {
 
 // Builds the full migration plan for a set of members. `findExistingAuthUser`
 // is an injectable async lookup, (normalizedEmail) => one of:
-//   { status: 'user_found', user: { id, user_metadata } }
+//   { status: 'user_found', user: { id, app_metadata, user_metadata } }
 //   { status: 'user_not_found' }
 //   { status: 'lookup_error', error: string }
 // kept injectable so tests never need a real Supabase Admin API or network
@@ -282,7 +410,7 @@ export async function planMigration(members, { findExistingAuthUser }) {
       // this or any later member in this run.
       return {
         ok: false,
-        fatalError: 'auth_lookup_failed',
+        fatalError: IMPORTER_ERROR_CODE.AUTH_LOOKUP_FAILED,
         duplicates: [],
         entries: [],
         failedMemberId: member.id,
@@ -292,15 +420,17 @@ export async function planMigration(members, { findExistingAuthUser }) {
     }
 
     if (lookup.status === AUTH_LOOKUP_STATUS.FOUND) {
-      const linkedMemberId = lookup.user.user_metadata?.[MIGRATION_METADATA_KEY];
-      if (linkedMemberId === member.id) {
-        // A prior run's Admin API call succeeded but the subsequent
-        // members.auth_user_id write did not — this is our own partial
-        // migration, verified by metadata, not a stranger's account. Safe
-        // to relink without creating anything new.
-        entries.push({ member, path: 'relink_existing', reason: 'A matching Auth user already exists with verified migration metadata from a prior partial run.', existingAuthUserId: lookup.user.id });
+      // Trust ONLY app_metadata (server/Admin-API-managed) as proof this
+      // Auth user was created by this script for this exact member.
+      // user_metadata is caller-editable and is deliberately never read
+      // here — a key that matches only in user_metadata is indistinguishable
+      // from an account owner typing it in themselves, and must never
+      // authorize an automatic relink.
+      const trustedLinkedMemberId = lookup.user.app_metadata?.[MIGRATION_METADATA_KEY];
+      if (trustedLinkedMemberId === member.id) {
+        entries.push({ member, path: 'relink_existing', reason: 'A matching Auth user already exists with verified migration provenance (app_metadata) from a prior partial run.', existingAuthUserId: lookup.user.id });
       } else {
-        entries.push({ member, path: 'collision_manual_review', reason: 'An Auth user already exists for this email with no verified migration metadata linking it to this member. Never auto-attached.' });
+        entries.push({ member, path: 'collision_manual_review', reason: 'An Auth user already exists for this email with no trusted app_metadata provenance linking it to this member. Never auto-attached.' });
       }
       continue;
     }
@@ -313,8 +443,9 @@ export async function planMigration(members, { findExistingAuthUser }) {
 }
 
 // Non-sensitive dry-run/execution report line — never includes
-// password_hash, plaintext password, service-role key, full email, or any
-// Auth token.
+// password_hash, plaintext password, service-role key, full email, raw
+// user_metadata, or any Auth token. `error`, when present, has always
+// already passed through sanitizeImporterError().
 /**
  * @typedef {Object} ReportEntry
  * @property {string} memberId
@@ -324,6 +455,7 @@ export async function planMigration(members, { findExistingAuthUser }) {
  * @property {string} [reason]
  * @property {string} [outcome]
  * @property {string} [authUserId]
+ * @property {string} [errorCode]
  * @property {string} [error]
  */
 /**
@@ -347,31 +479,132 @@ export function buildReportEntry(entry, extra = {}) {
 // Path A payload — the bcrypt hash travels as `password_hash`, verbatim,
 // never as `password`. Asserted by this shape alone: there is no
 // `password` key anywhere in this object, so it is structurally impossible
-// for this function to submit the hash as a plaintext password.
+// for this function to submit the hash as a plaintext password. Carries no
+// migration provenance — that is stamped separately, after creation,
+// through buildAppMetadataStamp()/updateUserById(), never here.
 export function buildCreateUserPayload(member) {
   return {
     email: normalizeEmail(member.email),
     password_hash: member.password_hash,
     email_confirm: true,
-    user_metadata: { [MIGRATION_METADATA_KEY]: member.id },
   };
 }
 
 // Path B — no password/hash of any kind is sent; Supabase Auth's invitation
 // flow is what lets the member set their own password. Sending this is
 // gated on --send-invitations, enforced by the caller (runMigration), not
-// here — this function only builds the payload.
+// here — this function only builds the payload. `requires_password_reset`
+// is a non-sensitive UX hint, not a trust/provenance claim — it is never
+// read to authorize anything; only app_metadata (stamped separately) is.
 export function buildInvitePayload(member) {
   return {
     email: normalizeEmail(member.email),
     options: {
-      data: { [MIGRATION_METADATA_KEY]: member.id, requires_password_reset: true },
+      data: { requires_password_reset: true },
     },
   };
 }
 
+// Merges the migration-provenance marker into whatever app_metadata the
+// Auth user already carries (e.g. provider/providers, set by Supabase Auth
+// itself) — never replaces it wholesale. This is the only place
+// migrated_from_members_id is ever written, and it is always written to
+// app_metadata, never user_metadata.
+export function buildAppMetadataStamp(existingAppMetadata, memberId) {
+  return {
+    ...(existingAppMetadata && typeof existingAppMetadata === 'object' ? existingAppMetadata : {}),
+    [MIGRATION_METADATA_KEY]: memberId,
+  };
+}
+
+// Verifies an updateUserById() response actually proves the stamp took
+// effect — never trusts "no error object" alone. Requires the response to
+// (a) exist, (b) carry no error, (c) return a user whose id matches the
+// Auth user we just stamped, and (d) whose app_metadata now contains
+// exactly this member's id under MIGRATION_METADATA_KEY. Any deviation —
+// missing user, mismatched id, missing/mismatched app_metadata — is
+// treated as a failed stamp, never a partial success.
+export function verifyAppMetadataStamp(updateResult, expectedAuthUserId, expectedMemberId) {
+  if (!updateResult || updateResult.error) return false;
+  const user = updateResult.data?.user;
+  if (!user || typeof user !== 'object') return false;
+  if (user.id !== expectedAuthUserId) return false;
+  if (!user.app_metadata || typeof user.app_metadata !== 'object') return false;
+  return user.app_metadata[MIGRATION_METADATA_KEY] === expectedMemberId;
+}
+
+// Stamps trusted provenance onto a just-created/just-invited Auth user, and
+// only then links members.auth_user_id. Returns null on full success, or a
+// ready-to-report failure entry — the two failure shapes matter because
+// they authorize very different follow-up behavior:
+//   - partial_auth_created_provenance_failed: the Auth user exists but is
+//     NOT trusted. members is never linked. On any rerun, this account has
+//     no matching app_metadata, so planMigration() will (correctly) treat
+//     it as collision_manual_review, not attempt to reuse or recreate it.
+//   - partial_migration_link_failed: provenance IS verified, only the
+//     members write failed. On rerun, planMigration() finds the verified
+//     app_metadata and safely selects relink_existing — never a second
+//     createUser()/inviteUserByEmail() call.
+async function stampProvenanceAndLink(client, entry, authUserId, existingAppMetadata) {
+  const memberEmail = normalizeEmail(entry.member.email);
+  const appMetadata = buildAppMetadataStamp(existingAppMetadata, entry.member.id);
+
+  let updateResult;
+  try {
+    updateResult = await client.auth.admin.updateUserById(authUserId, { app_metadata: appMetadata });
+  } catch (thrown) {
+    return buildReportEntry(entry, {
+      outcome: 'partial_auth_created_provenance_failed',
+      authUserId,
+      errorCode: IMPORTER_ERROR_CODE.AUTH_PROVENANCE_UPDATE_FAILED,
+      error: sanitizeImporterError(thrown, [memberEmail]),
+    });
+  }
+
+  if (updateResult?.error) {
+    return buildReportEntry(entry, {
+      outcome: 'partial_auth_created_provenance_failed',
+      authUserId,
+      errorCode: IMPORTER_ERROR_CODE.AUTH_PROVENANCE_UPDATE_FAILED,
+      error: sanitizeImporterError(updateResult.error, [memberEmail]),
+    });
+  }
+
+  if (!verifyAppMetadataStamp(updateResult, authUserId, entry.member.id)) {
+    return buildReportEntry(entry, {
+      outcome: 'partial_auth_created_provenance_failed',
+      authUserId,
+      errorCode: IMPORTER_ERROR_CODE.AUTH_PROVENANCE_VERIFICATION_FAILED,
+      error: 'updateUserById() returned no error but the response did not verify (missing/mismatched user id or app_metadata).',
+    });
+  }
+
+  let linkResult;
+  try {
+    linkResult = await client.from('members').update({ auth_user_id: authUserId }).eq('id', entry.member.id);
+  } catch (thrown) {
+    return buildReportEntry(entry, {
+      outcome: 'partial_migration_link_failed',
+      authUserId,
+      errorCode: IMPORTER_ERROR_CODE.MEMBER_LINK_FAILED,
+      error: sanitizeImporterError(thrown, [memberEmail]),
+    });
+  }
+
+  if (linkResult?.error) {
+    return buildReportEntry(entry, {
+      outcome: 'partial_migration_link_failed',
+      authUserId,
+      errorCode: IMPORTER_ERROR_CODE.MEMBER_LINK_FAILED,
+      error: sanitizeImporterError(linkResult.error, [memberEmail]),
+    });
+  }
+
+  return null;
+}
+
 // Applies one plan entry. `client` is the Supabase Admin client (or a test
-// double shaped like one: `{ auth: { admin: { createUser, inviteUserByEmail } }, from(table) }`).
+// double shaped like one: `{ auth: { admin: { createUser, inviteUserByEmail, updateUserById } }, from(table) }`).
 // Never called at all unless the caller has already confirmed the write is
 // authorized (apply + correct scope + — for invitation_required —
 // --send-invitations) — this function itself has no dry-run/consent branch
@@ -379,44 +612,79 @@ export function buildInvitePayload(member) {
 // write, not several that could drift apart.
 async function applyEntry(client, entry) {
   const { member, path } = entry;
+  const memberEmail = normalizeEmail(member.email);
 
   if (path === 'relink_existing') {
-    const { error } = await client.from('members').update({ auth_user_id: entry.existingAuthUserId }).eq('id', member.id);
-    if (error) {
-      return buildReportEntry(entry, { outcome: 'failed_linking', authUserId: entry.existingAuthUserId, error: error.message });
+    // Provenance was already verified (app_metadata) in planMigration() —
+    // the only remaining step is the members-side link.
+    let linkResult;
+    try {
+      linkResult = await client.from('members').update({ auth_user_id: entry.existingAuthUserId }).eq('id', member.id);
+    } catch (thrown) {
+      return buildReportEntry(entry, {
+        outcome: 'partial_migration_link_failed',
+        authUserId: entry.existingAuthUserId,
+        errorCode: IMPORTER_ERROR_CODE.MEMBER_LINK_FAILED,
+        error: sanitizeImporterError(thrown, [memberEmail]),
+      });
+    }
+    if (linkResult?.error) {
+      return buildReportEntry(entry, {
+        outcome: 'partial_migration_link_failed',
+        authUserId: entry.existingAuthUserId,
+        errorCode: IMPORTER_ERROR_CODE.MEMBER_LINK_FAILED,
+        error: sanitizeImporterError(linkResult.error, [memberEmail]),
+      });
     }
     return buildReportEntry(entry, { outcome: 'relinked', authUserId: entry.existingAuthUserId });
   }
 
   if (path === 'existing_bcrypt') {
-    const { data, error } = await client.auth.admin.createUser(buildCreateUserPayload(member));
-    if (error || !data?.user?.id) {
-      return buildReportEntry(entry, { outcome: 'failed_creation', error: error?.message ?? 'no user id returned' });
+    let created;
+    try {
+      created = await client.auth.admin.createUser(buildCreateUserPayload(member));
+    } catch (thrown) {
+      return buildReportEntry(entry, {
+        outcome: 'auth_creation_failed',
+        errorCode: IMPORTER_ERROR_CODE.AUTH_CREATION_FAILED,
+        error: sanitizeImporterError(thrown, [memberEmail]),
+      });
     }
-    const authUserId = data.user.id;
-    const { error: linkError } = await client.from('members').update({ auth_user_id: authUserId }).eq('id', member.id);
-    if (linkError) {
-      // Auth creation succeeded but the members write did not — a genuine
-      // partial migration, not a failure to roll back. Report it clearly;
-      // never attempt a second createUser for this member on a later run
-      // (planMigration's relink_existing path — verified by metadata —
-      // is what completes this safely next time).
-      return buildReportEntry(entry, { outcome: 'partial_migration_manual_repair', authUserId, error: linkError.message });
+    if (created?.error || !created?.data?.user?.id) {
+      return buildReportEntry(entry, {
+        outcome: 'auth_creation_failed',
+        errorCode: IMPORTER_ERROR_CODE.AUTH_CREATION_FAILED,
+        error: sanitizeImporterError(created?.error ?? 'no user id returned', [memberEmail]),
+      });
     }
+    const authUserId = created.data.user.id;
+    const failure = await stampProvenanceAndLink(client, entry, authUserId, created.data.user.app_metadata);
+    if (failure) return failure;
     return buildReportEntry(entry, { outcome: 'created', authUserId });
   }
 
   if (path === 'invitation_required') {
     const payload = buildInvitePayload(member);
-    const { data, error } = await client.auth.admin.inviteUserByEmail(payload.email, payload.options);
-    if (error || !data?.user?.id) {
-      return buildReportEntry(entry, { outcome: 'failed_creation', error: error?.message ?? 'no user id returned' });
+    let invited;
+    try {
+      invited = await client.auth.admin.inviteUserByEmail(payload.email, payload.options);
+    } catch (thrown) {
+      return buildReportEntry(entry, {
+        outcome: 'auth_invitation_failed',
+        errorCode: IMPORTER_ERROR_CODE.AUTH_INVITATION_FAILED,
+        error: sanitizeImporterError(thrown, [memberEmail]),
+      });
     }
-    const authUserId = data.user.id;
-    const { error: linkError } = await client.from('members').update({ auth_user_id: authUserId }).eq('id', member.id);
-    if (linkError) {
-      return buildReportEntry(entry, { outcome: 'partial_migration_manual_repair', authUserId, error: linkError.message });
+    if (invited?.error || !invited?.data?.user?.id) {
+      return buildReportEntry(entry, {
+        outcome: 'auth_invitation_failed',
+        errorCode: IMPORTER_ERROR_CODE.AUTH_INVITATION_FAILED,
+        error: sanitizeImporterError(invited?.error ?? 'no user id returned', [memberEmail]),
+      });
     }
+    const authUserId = invited.data.user.id;
+    const failure = await stampProvenanceAndLink(client, entry, authUserId, invited.data.user.app_metadata);
+    if (failure) return failure;
     return buildReportEntry(entry, { outcome: 'invited', authUserId });
   }
 
@@ -447,7 +715,8 @@ function dryRunOutcome(entry, options) {
 // operation is transactionally atomic — it spans two independent systems
 // (Supabase Auth and the members table) with no shared transaction. Each
 // step's real outcome is reported individually
-// (created/invited/relinked/partial_migration_manual_repair/failed_*)
+// (created/invited/relinked/auth_creation_failed/auth_invitation_failed/
+// partial_auth_created_provenance_failed/partial_migration_link_failed)
 // instead.
 export async function runMigration({ client, members, options, findExistingAuthUser }) {
   // 1. --member-id format validation — independent of any data, checked
@@ -539,7 +808,9 @@ export async function runMigration({ client, members, options, findExistingAuthU
 // Only ever used by main() below; tests inject their own
 // findExistingAuthUser instead. Every branch returns one of the three
 // AUTH_LOOKUP_STATUS shapes — never a bare null, which would otherwise
-// conflate "definitely no such user" with "we don't actually know."
+// conflate "definitely no such user" with "we don't actually know." Any
+// error is sanitized before it leaves this function — nothing upstream
+// ever sees a raw Admin API/PostgREST error or thrown exception.
 async function searchAuthUsersByEmail(client, normalizedEmail) {
   let page = 1;
   const perPage = 200;
@@ -548,11 +819,11 @@ async function searchAuthUsersByEmail(client, normalizedEmail) {
     try {
       response = await client.auth.admin.listUsers({ page, perPage });
     } catch (thrown) {
-      return { status: AUTH_LOOKUP_STATUS.ERROR, error: thrown instanceof Error ? thrown.message : String(thrown) };
+      return { status: AUTH_LOOKUP_STATUS.ERROR, error: sanitizeImporterError(thrown, [normalizedEmail]) };
     }
     const { data, error } = response ?? {};
     if (error) {
-      return { status: AUTH_LOOKUP_STATUS.ERROR, error: error.message ?? String(error) };
+      return { status: AUTH_LOOKUP_STATUS.ERROR, error: sanitizeImporterError(error, [normalizedEmail]) };
     }
     if (!data || !Array.isArray(data.users)) {
       return { status: AUTH_LOOKUP_STATUS.ERROR, error: 'Malformed listUsers() response — no users array.' };
@@ -616,7 +887,7 @@ async function main() {
     .from('members')
     .select('id, email, password_hash, member_status, auth_user_id');
   if (membersError) {
-    console.error('Failed to read members:', membersError.message);
+    console.error('Failed to read members:', sanitizeImporterError(membersError));
     process.exitCode = 1;
     return;
   }
