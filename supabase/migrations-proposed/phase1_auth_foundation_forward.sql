@@ -1,16 +1,40 @@
 -- DO NOT RUN — REVIEWED PROPOSAL ONLY
 --
--- PHASE 1 — SUPABASE AUTH FOUNDATION
+-- PHASE 1 — SUPABASE AUTH FOUNDATION (public-schema changes only)
+--
+-- SCOPE CORRECTION (Phase B.2 — do not regress): this file previously
+-- inserted migrated members directly into `auth.users`/`auth.identities`
+-- via raw SQL `insert`/`update` statements. That is not an approved
+-- execution path — creating or linking Supabase Auth identities must only
+-- ever happen through the Supabase Auth Admin API (`auth.admin.createUser`,
+-- `auth.admin.inviteUserByEmail`), which is the only interface that
+-- correctly creates the paired `auth.identities` row, sets up the
+-- password/identity provider state Supabase Auth itself expects, and keeps
+-- that mechanism upgrade-safe against future Supabase schema changes this
+-- repo does not control. This file now performs ONLY public-schema
+-- changes:
+--
+--   - add public.members.auth_user_id (nullable FK to auth.users(id));
+--   - add the partial unique index enforcing at most one member per
+--     linked Auth user;
+--   - define public.current_member_id() (SECURITY DEFINER, auth.uid()-scoped);
+--   - grant/revoke that function's execute privilege correctly.
+--
+-- The actual member-to-Auth-user migration (Path A: existing bcrypt hash
+-- via auth.admin.createUser({ password_hash }); Path B: no usable hash via
+-- auth.admin.inviteUserByEmail()) is performed by the separate, server-only,
+-- dry-run-by-default script `scripts/migrateMembersToSupabaseAuth.mjs` —
+-- see that script and docs/MEMBER-AUTH-MIGRATION-PLAN.md for the full
+-- procedure. That script is the only thing that ever writes
+-- `members.auth_user_id`, using the real Auth user id the Admin API
+-- returns — never a value this SQL file invents or assumes.
 --
 -- PREREQUISITES:
 --   - Phase 0 read (no schema dependency, informational only).
---   - Run docs/PRE-MIGRATION-BACKUP-AND-VALIDATION.md in full on a Supabase
---     branch first: apply this file to the branch, run the Path A/B import
---     against ONE test member row, confirm supabase.auth.signInWithPassword
---     succeeds with that member's real existing password, THEN proceed.
---   - Read docs/MEMBER-AUTH-MIGRATION-PLAN.md in full before running the
---     Path A/B blocks below — they are not auto-conditional; each has real
---     row-selection criteria you must re-review against the current data.
+--   - Read docs/MEMBER-AUTH-MIGRATION-PLAN.md and
+--     docs/PRE-MIGRATION-BACKUP-AND-VALIDATION.md in full before running
+--     this file or the importer script — both describe the required
+--     branch-first, backup-first, one-member-pilot-first sequence.
 --
 -- CODE DEPENDENCIES (not applied in this pass):
 --   - app/register/page.tsx: replace the bcryptjs hash/compare block with
@@ -21,38 +45,47 @@
 --   - Every `.select('*')` on `members` (lib/member.ts, lib/loyalty.ts,
 --     app/orders/page.tsx, app/admin/members/page.tsx) needs an explicit
 --     column list once `password_hash` stops being the live credential (it
---     becomes a legacy/inert column after this phase — see rollback note).
+--     becomes a legacy/inert column after the importer script runs — see
+--     the rollback file's note on why this SQL never touches those rows).
 --
--- DATA BACKFILL: Path A/B below, against the 7 live `members` rows. Expected
---   split (recompute at run time, do not assume): count of password_hash
---   values matching `^\$2[aby]\$` = Path A; remainder = Path B. Zero rows are
---   silently dropped — every members row gets EITHER an imported password
---   (Path A) OR an invite/reset path (Path B).
+-- DATA BACKFILL: none in this file — this file adds an empty, nullable
+--   column only. Every actual member row is linked later, one write at a
+--   time, by scripts/migrateMembersToSupabaseAuth.mjs (dry-run by default,
+--   `--apply` required, `--confirm-bulk` required beyond a single
+--   `--member-id` pilot row). This file does not, and must not, populate
+--   `members.auth_user_id` for any row itself.
 --
 -- TESTING: docs/PRE-MIGRATION-BACKUP-AND-VALIDATION.md §1 (branch), §4
---   (per-phase gate). Additionally: confirm §4 duplicate-email query in
---   docs/MEMBER-AUTH-MIGRATION-PLAN.md returns zero rows before running the
---   bulk INSERT below.
+--   (per-phase gate) — apply this file on a branch, confirm
+--   `current_member_id()` returns null for a session with no linked member,
+--   THEN run the importer script in dry-run mode, THEN a single
+--   `--member-id` pilot with `--apply`, THEN confirm that one member can
+--   sign in with their existing password before considering the rest.
 --
--- VERIFICATION QUERIES: see docs/MEMBER-AUTH-MIGRATION-PLAN.md §8.
+-- VERIFICATION QUERIES:
+--   select column_name from information_schema.columns where table_name = 'members' and column_name = 'auth_user_id';
+--   select public.current_member_id(); -- run as any authenticated session; expect null until the importer links that member
 --
 -- RISKS:
---   - Writing directly into auth.users is a privileged operation (requires
---     the service role / SQL editor, not the anon or authenticated role).
---     A mistake here can lock out real members from Auth-based login even
---     though their old localStorage-based "session" still nominally works
---     until app code is switched over — test on a branch first, always.
+--   - This file alone grants no one Auth access to anything — it only adds
+--     an empty column, an index, and a function that returns null until a
+--     row is actually linked. All the real risk is in the importer script
+--     (service-role Admin API calls), not here — see that script's own
+--     safety controls.
 --   - bcrypt truncates input over 72 bytes; this is pre-existing behavior
---     inherited from the original hash, not a new issue introduced here.
+--     inherited from the original hash, not a new issue introduced here or
+--     by the importer.
 --
--- STOP CONDITIONS:
---   - The duplicate-email check (docs/MEMBER-AUTH-MIGRATION-PLAN.md §4)
---     returns any row — resolve manually before running the bulk INSERT.
---   - The single test-account sign-in (prerequisite above) fails.
+-- STOP CONDITIONS: none for this file specifically — purely additive, no
+--   existing table touched, no row written. See
+--   scripts/migrateMembersToSupabaseAuth.mjs for the importer's own stop
+--   conditions (duplicate member emails, ambiguous existing-Auth-user
+--   collisions, etc.).
 --
--- ROLLBACK TRIGGERS: any member reports they can no longer log in with
--- their existing password after this phase ships to Production, and the
--- cause traces to the import (not to a code bug in the new sign-in call).
+-- ROLLBACK TRIGGERS: see phase1_auth_foundation_rollback.sql. Run this
+-- before rolling back Phase 2/3 if any of those have shipped since — later
+-- phases depend on auth_user_id and staff_roles, so they must be unwound
+-- first.
 
 begin;
 
@@ -64,6 +97,12 @@ create unique index if not exists members_auth_user_id_key
   on public.members (auth_user_id)
   where auth_user_id is not null;
 
+-- Returns only the calling session's own linked member id — auth.uid()
+-- only, never a passed-in argument, so no caller can resolve another
+-- user's member id through this function. Returns null (not an error) when
+-- the authenticated user has no linked members row yet, which is the
+-- normal state for every member until the importer script actually links
+-- them.
 create or replace function public.current_member_id()
 returns uuid
 language sql
@@ -71,73 +110,17 @@ stable
 security definer
 set search_path = public
 as $$
-  select id from public.members where auth_user_id = auth.uid();
+  select m.id
+  from public.members m
+  where m.auth_user_id = auth.uid();
 $$;
 
--- ── Path A: bulk-import members with a valid bcrypt hash ───────────────
--- REVIEW ROW SELECTION BEFORE RUNNING. Preserves each member's existing
--- password unchanged — no reset email needed for these rows.
-insert into auth.users (
-  instance_id, id, aud, role, email, encrypted_password,
-  email_confirmed_at, created_at, updated_at,
-  raw_user_meta_data, raw_app_meta_data
-)
-select
-  '00000000-0000-0000-0000-000000000000'::uuid,
-  gen_random_uuid(),
-  'authenticated',
-  'authenticated',
-  lower(m.email),
-  m.password_hash,
-  now(),
-  now(),
-  now(),
-  jsonb_build_object('migrated_from_members_id', m.id::text),
-  jsonb_build_object('provider', 'email', 'providers', array['email'])
-from public.members m
-where m.auth_user_id is null
-  and m.password_hash ~ '^\$2[aby]\$'
-on conflict do nothing
-returning id;
-
-update public.members m
-set auth_user_id = u.id
-from auth.users u
-where u.raw_user_meta_data ->> 'migrated_from_members_id' = m.id::text
-  and m.auth_user_id is null;
-
--- ── Path B: members with no usable hash — account shell only ──────────
--- No password is set here. After this runs, use the Supabase Admin API
--- (auth.admin.inviteUserByEmail) — outside SQL — to actually send each of
--- these members a password-setup email. This block only creates the row
--- so there is something to invite.
-insert into auth.users (
-  instance_id, id, aud, role, email,
-  email_confirmed_at, created_at, updated_at,
-  raw_user_meta_data, raw_app_meta_data
-)
-select
-  '00000000-0000-0000-0000-000000000000'::uuid,
-  gen_random_uuid(),
-  'authenticated',
-  'authenticated',
-  lower(m.email),
-  now(),
-  now(),
-  now(),
-  jsonb_build_object('migrated_from_members_id', m.id::text, 'requires_password_reset', true),
-  jsonb_build_object('provider', 'email', 'providers', array['email'])
-from public.members m
-where m.auth_user_id is null
-  and (m.password_hash is null or m.password_hash !~ '^\$2[aby]\$')
-  and m.member_status <> 'guest'  -- guests never had a password; leave unmigrated
-on conflict do nothing
-returning id;
-
-update public.members m
-set auth_user_id = u.id
-from auth.users u
-where u.raw_user_meta_data ->> 'migrated_from_members_id' = m.id::text
-  and m.auth_user_id is null;
+-- Postgres grants EXECUTE to PUBLIC by default on function creation —
+-- explicitly close that, then open only to authenticated. Mirrors the same
+-- explicit-revoke-then-grant style already used for
+-- public.current_staff_roles() (phase2_staff_roles_forward.sql).
+revoke execute on function public.current_member_id() from public;
+revoke execute on function public.current_member_id() from anon;
+grant execute on function public.current_member_id() to authenticated;
 
 commit;

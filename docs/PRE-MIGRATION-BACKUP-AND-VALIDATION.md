@@ -111,3 +111,57 @@ unnecessary PII:
 If any stop condition is hit, do not proceed to the next phase and do not
 apply the current phase's forward SQL to the live project — report back with
 the specific check that failed.
+
+## 7. Phase 1 / member-Auth-import specific sequence (required execution order)
+
+Phase 1 is two separate mechanisms that must run in this exact order — the
+schema-only SQL migration, then the separate Admin-API-based importer script
+(`scripts/migrateMembersToSupabaseAuth.mjs`) — never the other way around,
+and never skipping the single-member pilot in the middle:
+
+1. Create a Supabase database branch or an otherwise fully isolated test
+   environment (§1) — never the live project for any step below except the
+   final, separately-approved one.
+2. Back up current member data (§2) — both the automatic-backup timestamp
+   check and an explicit logical export.
+3. Apply the public-schema-only Phase 1 migration
+   (`phase1_auth_foundation_forward.sql` — `members.auth_user_id`, its
+   partial unique index, `current_member_id()`) to the branch. This step
+   creates zero Auth users; it only adds an empty column and a function that
+   returns null until something links a row.
+4. Dry-run the importer (`node scripts/migrateMembersToSupabaseAuth.mjs`,
+   no `--apply`) against the branch. Read the report (§9 of
+   `docs/MEMBER-AUTH-MIGRATION-PLAN.md`) — confirm the expected
+   `existing_bcrypt`/`invitation_required`/`guest_skipped` split before
+   anything is written.
+5. Migrate exactly one selected test member
+   (`node scripts/migrateMembersToSupabaseAuth.mjs --member-id=<id> --apply`)
+   — a single-member run does not require `--confirm-bulk`.
+6. Verify that member can sign in with their existing password
+   (`supabase.auth.signInWithPassword({ email, password })`, using their
+   real, already-known password — never a newly-invented one) against the
+   branch.
+7. Verify `auth.users` and `auth.identities` rows were created **by
+   Supabase Auth itself** (i.e., exist and look normal via the dashboard or
+   a read-only `select`) — not by inspecting any SQL this repo ran, since
+   none touches those tables directly.
+8. Verify `members.auth_user_id` linkage for that one row matches the Auth
+   user id from step 7.
+9. Only after steps 4-8 all pass does the remaining member set get
+   considered — re-run the importer with `--apply --confirm-bulk` (still on
+   the branch first, per §1, before ever touching the live project).
+10. Apply Phase 2 (`phase2_staff_roles_forward.sql`, including
+    `current_staff_roles()`) only after Phase 1 is fully verified per steps
+    1-9 — Phase 2's staff-role resolution assumes `members.auth_user_id` /
+    Supabase Auth sessions already work correctly.
+11. Create and bootstrap the owner separately (see
+    `docs/OWNER-BOOTSTRAP-AND-AUTH-ROLLOUT.md`) — not folded into the bulk
+    member migration; the owner is a staff account, not a migrated member
+    row, even though both ultimately end up as `auth.users` rows.
+12. Keep `NEXT_PUBLIC_SUPABASE_AUTH_ENABLED` disabled — in every
+    environment, including Preview — until every check above passes, on the
+    branch, and the same phases are then separately re-applied and
+    re-verified against the live project before the flag is ever considered.
+
+This sequence is authoritative for Phase 1; it supersedes any earlier,
+less-specific ordering implied elsewhere in this document.

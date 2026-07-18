@@ -41,6 +41,26 @@ committed.
   was added to `staff_roles` itself — the function is the entire read
   boundary. `lib/supabaseAuth/resolveStaffSession.ts` calls this RPC, never
   the table directly.
+- **Phase B.2 fix — member Auth accounts are created only through the
+  Supabase Auth Admin API, never by inserting/updating
+  `auth.users`/`auth.identities` with raw SQL.** An earlier draft of
+  `phase1_auth_foundation_forward.sql` migrated existing members by
+  `insert`ing directly into `auth.users` (and, implicitly, relying on
+  Supabase to backfill `auth.identities`) inside the migration transaction
+  itself. That is not an approved execution path — it bypasses the Admin
+  API's own identity-provider bookkeeping and is not something this repo
+  should be doing with raw SQL against a schema Supabase owns and evolves.
+  `phase1_auth_foundation_forward.sql` now performs **only** public-schema
+  changes (`members.auth_user_id`, its partial unique index,
+  `current_member_id()`) and creates zero Auth users itself. The actual
+  member-to-Auth-user linking is performed by the separate, server-only,
+  dry-run-by-default script `scripts/migrateMembersToSupabaseAuth.mjs`,
+  which calls `auth.admin.createUser({ password_hash })` for members with a
+  usable existing bcrypt hash, or `auth.admin.inviteUserByEmail()` for
+  members without one — see `docs/MEMBER-AUTH-MIGRATION-PLAN.md` (updated)
+  and `docs/PRE-MIGRATION-BACKUP-AND-VALIDATION.md` §7 for the full,
+  required execution sequence. This script has not been run — dry-run or
+  otherwise — against anything.
 
 None of this alone grants anyone admin access, changes Production behavior,
 or touches live data. The steps below are what turns this scaffolding into a
@@ -51,14 +71,20 @@ approval before execution.
 
 ### 1. Create or invite the owner through Supabase Auth
 
-Once Phase 1 is applied on a branch and verified, create the real owner's
-account via Supabase Auth — either a normal sign-up, or
-`auth.admin.inviteUserByEmail(...)` run from the Supabase dashboard/Admin
-API (not from app code, and not as part of any committed script). This is
-the "owner" purely as an operational designation — there is no separate
-`owner` database role; the owner is simply the first `admin`-role row in
-`staff_roles` (see `phase2_staff_roles_forward.sql`'s OWNER DESIGNATION
-note).
+Once Phase 1 (the public-schema-only migration) is applied on a branch and
+verified, create the real owner's account via Supabase Auth — either a
+normal sign-up, or `auth.admin.inviteUserByEmail(...)` run from the Supabase
+dashboard/Admin API (not from app code, and not as part of any committed
+script). Exactly like the bulk member importer
+(`scripts/migrateMembersToSupabaseAuth.mjs`), this is Admin-API-only — never
+a raw SQL `insert into auth.users`. The owner is a **one-off, manual**
+Admin API action, distinct from the bulk importer script: the owner is not
+necessarily an existing `members` row with a bcrypt hash to import, so
+running the bulk script is neither required nor the right tool for this
+step. This is the "owner" purely as an operational designation — there is
+no separate `owner` database role; the owner is simply the first
+`admin`-role row in `staff_roles` (see `phase2_staff_roles_forward.sql`'s
+OWNER DESIGNATION note).
 
 ### 2. Obtain the real `auth.users` UUID
 
@@ -93,7 +119,10 @@ or errors, stop — do not proceed to step 5 until this is resolved.
 `NEXT_PUBLIC_SUPABASE_AUTH_ENABLED` must remain **disabled** — in every
 environment, including Preview — until all five of the following are true:
 
-1. Phase 1 (`phase1_auth_foundation_forward.sql`) is applied.
+1. Phase 1 (`phase1_auth_foundation_forward.sql` — public-schema changes
+   only: `members.auth_user_id`, its partial unique index,
+   `current_member_id()`) is applied. This step alone creates zero Auth
+   users.
 2. Phase 2 (`phase2_staff_roles_forward.sql`), **including
    `current_staff_roles()`**, is applied — not just the table/enum/
    `has_staff_role()`/`is_admin()` from an earlier pass of this phase; the
@@ -176,12 +205,16 @@ authoritative.
 If the owner's account becomes inaccessible (lost credentials, compromised
 account) and no second admin exists to grant a replacement:
 
-1. Access the Supabase project dashboard or SQL editor directly (this
-   requires whatever access already protects the Supabase project itself —
-   organization membership, not anything this app controls).
-2. Create or identify a replacement `auth.users` account.
-3. Run the same bootstrap `INSERT` pattern from step 3 above for the
-   replacement UUID.
+1. Access the Supabase project dashboard directly (this requires whatever
+   access already protects the Supabase project itself — organization
+   membership, not anything this app controls).
+2. Create or identify a replacement Auth account **through the dashboard or
+   the Admin API** (`auth.admin.createUser`/a dashboard invite) — never a
+   raw SQL `insert into auth.users`, consistent with the Phase B.2
+   correction above.
+3. Run the same bootstrap `staff_roles` `INSERT` pattern from step 3 above
+   (a plain `public.staff_roles` row — an ordinary public-schema table, not
+   `auth.*`) for the replacement UUID.
 4. Optionally revoke the old `staff_roles` row for the compromised account
    (`delete from public.staff_roles where user_id = '<old-uuid>'`).
 
