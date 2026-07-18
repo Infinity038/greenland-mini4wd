@@ -35,4 +35,14 @@ export const FEATURE_FLAGS = {
   saleCampaignsEnabled: process.env.NEXT_PUBLIC_SALE_CAMPAIGNS_ENABLED === 'true',
   assemblyServicesEnabled: process.env.NEXT_PUBLIC_ASSEMBLY_SERVICES_ENABLED === 'true',
   inventoryAgingEnabled: process.env.NEXT_PUBLIC_INVENTORY_AGING_ENABLED === 'true',
+
+  // Supabase Auth admin login (docs/OWNER-BOOTSTRAP-AND-AUTH-ROLLOUT.md).
+  // Defaults to false/off in every environment, including Production and
+  // Preview, until explicitly set. While off, app/admin/login/page.tsx keeps
+  // its current hardcoded-password behavior completely unchanged — flipping
+  // this flag on is required before the Supabase Auth login screen renders
+  // anywhere, and it is intended to be turned on in Preview first, never in
+  // Production before the owner bootstrap (docs/OWNER-BOOTSTRAP-AND-AUTH-ROLLOUT.md)
+  // has actually run.
+  supabaseAuthEnabled: process.env.NEXT_PUBLIC_SUPABASE_AUTH_ENABLED === 'true',
 } as const;

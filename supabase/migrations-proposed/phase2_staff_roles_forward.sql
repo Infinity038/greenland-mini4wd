@@ -35,6 +35,27 @@
 --
 -- ROLLBACK TRIGGERS: none expected; only relevant once Phase 3/4 depend on
 -- these functions, at which point roll those back first.
+--
+-- OWNER DESIGNATION (reviewed decision — do not add an 'owner' enum value):
+--   "Owner" is an operational designation, not a database role. The owner is
+--   simply the first bootstrap 'admin' row inserted below. There is exactly
+--   one enum value above 'admin' in the privilege sense — no separate
+--   'owner' value exists or should be added. If a hard distinction between
+--   the bootstrap admin and later admins is ever needed (e.g. "only the
+--   owner may grant admin to someone else"), that is a future, separately
+--   reviewed change — not assumed here.
+--
+-- PERMISSION MODEL NOTE — REFUNDS ARE ADMIN-ONLY (reviewed decision):
+--   shop_staff may review payment proofs and approve ordinary payments
+--   (once the payment-approval RPC milestone lands — still blocked on this
+--   phase and Phase 3 RLS being live first, see phase9_inventory_after_payment).
+--   shop_staff must NOT be able to execute a refund. Any future
+--   refund_order_payment()-style RPC must gate on public.is_admin() alone,
+--   never on has_staff_role(array['shop_staff','admin']) — refunds move
+--   money and inventory back and are intentionally a narrower grant than
+--   routine order approval. This note documents the requirement for the
+--   RPC that will be written in that later, still-blocked milestone; no
+--   refund function exists yet in this phase.
 
 begin;
 

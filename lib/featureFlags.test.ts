@@ -33,3 +33,31 @@ describe('FEATURE_FLAGS.openTournamentEnabled', () => {
     expect(FEATURE_FLAGS.openTournamentEnabled).toBe(true);
   });
 });
+
+const AUTH_ENV_KEY = 'NEXT_PUBLIC_SUPABASE_AUTH_ENABLED';
+const originalAuthValue = process.env[AUTH_ENV_KEY];
+
+afterEach(() => {
+  if (originalAuthValue === undefined) delete process.env[AUTH_ENV_KEY];
+  else process.env[AUTH_ENV_KEY] = originalAuthValue;
+});
+
+describe('FEATURE_FLAGS.supabaseAuthEnabled', () => {
+  it('defaults to false when the env var is unset', async () => {
+    delete process.env[AUTH_ENV_KEY];
+    const { FEATURE_FLAGS } = await loadFlags();
+    expect(FEATURE_FLAGS.supabaseAuthEnabled).toBe(false);
+  });
+
+  it('is false for any value other than the literal string "true"', async () => {
+    process.env[AUTH_ENV_KEY] = 'yes';
+    const { FEATURE_FLAGS } = await loadFlags();
+    expect(FEATURE_FLAGS.supabaseAuthEnabled).toBe(false);
+  });
+
+  it('is true only when set to the literal string "true"', async () => {
+    process.env[AUTH_ENV_KEY] = 'true';
+    const { FEATURE_FLAGS } = await loadFlags();
+    expect(FEATURE_FLAGS.supabaseAuthEnabled).toBe(true);
+  });
+});

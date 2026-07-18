@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
+import SupabaseAuthLoginScreen from './SupabaseAuthLoginScreen';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -9,6 +11,9 @@ const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const ADMIN_PASSWORD = 'mini4wd2026';
 
 export default function AdminLoginPage() {
+  // All hooks below are declared unconditionally, exactly as before this
+  // milestone, so the Rules of Hooks are unaffected by the feature-flag
+  // branch — see the early `return` right before the legacy JSX, not here.
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -32,6 +37,15 @@ export default function AdminLoginPage() {
     }
     setLoading(false);
   };
+
+  // Feature-flagged Supabase Auth login (docs/OWNER-BOOTSTRAP-AND-AUTH-ROLLOUT.md).
+  // Defaults to false everywhere — while off, every line above and below
+  // this branch (the legacy hardcoded-password screen and its hooks) is
+  // completely unchanged. All hooks are declared unconditionally above this
+  // point, so this early return does not violate the Rules of Hooks.
+  if (FEATURE_FLAGS.supabaseAuthEnabled) {
+    return <SupabaseAuthLoginScreen />;
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, position: 'relative', overflow: 'hidden' }}>
