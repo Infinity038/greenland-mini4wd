@@ -30,8 +30,10 @@ jobs:
         run: npm run auth:scan
       - name: Run UI and Auth tests
         run: npm run test:ui
-      - name: Run catalog and SQL tests
-        run: npm run test:catalog
+      - name: Run catalog reconciliation tests
+        run: npx vitest run catalog/bmaxCatalogReconciliation.test.ts --config vitest.catalog.config.ts
+      - name: Run description and inquiry tests
+        run: npx vitest run catalog/catalogDescriptionSecurity.test.ts --config vitest.catalog.config.ts
       - name: Type-check
         run: npx tsc --noEmit
       - name: Compile Next.js application
