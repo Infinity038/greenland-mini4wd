@@ -1,15 +1,20 @@
 name: Admin Auth cleanup
 
 on:
-  push:
+  pull_request:
     branches:
-      - auth/secure-admin-rollout
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 permissions:
   contents: write
 
 jobs:
   cleanup:
+    if: github.head_ref == 'auth/secure-admin-rollout' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,20 +27,28 @@ jobs:
           cache: npm
       - name: Update dependency lock
         run: npm install --package-lock-only --ignore-scripts
-      - name: Remove legacy page gates
-        run: node scripts/admin-page-cleanup.mjs
-      - name: Remove temporary compatibility bridge
-        run: rm app/admin/layout.tsx
+      - name: Persist validated legacy-auth cleanup
+        run: |
+          node scripts/admin-page-cleanup.mjs
+          rm -f app/admin/layout.tsx
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
+          delete packageJson.scripts['auth:cleanup'];
+          packageJson.scripts.pretest = 'npm run catalog:reconcile && npm run auth:scan';
+          packageJson.scripts.prebuild = 'npm run catalog:reconcile && npm run auth:scan';
+          writeFileSync('package.json', JSON.stringify(packageJson, null, 2) + '\n');
+          NODE
       - name: Install and validate
         run: |
           npm ci
           npm run auth:scan
           npm run build
-      - name: Commit clean Auth state
+      - name: Commit clean Auth source
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/admin-auth-cleanup.yml scripts/admin-page-cleanup.mjs
-          git add app/admin package-lock.json
+          git rm -f scripts/admin-page-cleanup.mjs .github/workflows/admin-auth-cleanup.yml
+          git add app/admin package.json package-lock.json
           git commit -m "Remove legacy admin password and local session gates"
           git push origin HEAD:auth/secure-admin-rollout
