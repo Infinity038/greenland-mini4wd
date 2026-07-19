@@ -26,6 +26,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Reconcile catalog fixtures
+        run: npm run catalog:reconcile
       - name: Verify legacy Auth removal
         run: npm run auth:scan
       - name: Run UI and Auth tests
