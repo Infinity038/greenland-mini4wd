@@ -47,7 +47,7 @@ function publicDescription({ itemNo, name, category, chassis }) {
 
   if (category === 'cars') {
     const chassisText = normalizedChassis
-      ? ` using the ${normalizedChassis} chassis`
+      ? ` using the ${normalizedChassis} Chassis`
       : '';
     return `${productName} is a Tamiya Mini 4WD assembly kit${chassisText}.`;
   }
