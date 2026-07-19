@@ -13,6 +13,7 @@ begin
   end if;
 end $$;
 
+drop function if exists public.bootstrap_owner_admin();
 drop function if exists public.current_staff_roles();
 drop function if exists public.is_admin();
 drop function if exists public.has_staff_role(public.staff_role[]);
