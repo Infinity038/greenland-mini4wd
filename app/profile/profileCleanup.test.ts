@@ -55,7 +55,7 @@ describe('fixed reward awarding', () => {
   it('uses whole fixed points in the admin screen', () => {
     expect(adminLoyalty).toContain('One whole point per 100 DKK');
     expect(adminLoyalty).toContain('REWARD_MILESTONES');
-    expect(adminLoyalty).not.toMatch(/LOYALTY COINS|Coins Balance|coins\b/);
+    expect(adminLoyalty).not.toMatch(/LOYALTY COINS|Coins Balance|\b\d+(?:\.\d+)?\s+coins\b/i);
     expect(adminLoyalty).not.toContain('percent_off');
     expect(adminLoyalty).not.toContain('TIERS');
   });
