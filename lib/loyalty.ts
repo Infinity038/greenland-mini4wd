@@ -97,7 +97,7 @@ export async function awardForPayment(memberEmail: string, spendDkk: number): Pr
     points_balance: currentBalance + points,
     total_earned: currentEarned + points,
     total_redeemed: currentRedeemed,
-    tier: member.loyalty_tier || 'member',
+    tier: 'fixed_rewards',
     points_rate: 1,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'member_id' });
@@ -166,6 +166,7 @@ export async function clawbackForPayment(
     const { error: loyaltyUpdateErr } = await supabase.from('loyalty_points').update({
       points_balance: Math.max(0, (Number(loyalty.points_balance) || 0) - pointsToRemove),
       total_earned: Math.max(0, (Number(loyalty.total_earned) || 0) - pointsToRemove),
+      tier: 'fixed_rewards',
       points_rate: 1,
       updated_at: new Date().toISOString(),
     }).eq('member_id', member.id);
