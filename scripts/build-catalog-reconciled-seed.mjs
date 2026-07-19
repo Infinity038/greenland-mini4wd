@@ -121,7 +121,7 @@ for (const sourceRow of candidates) {
   const errors = [];
 
   if (!itemNo) errors.push('missing/blank item_no');
-  if (itemNo && seenCandidateItemNos.get(itemNo) > 1) errors.push(`duplicate item_no in source catalog (${seenCandidateItemNos.get(itemNo)}x`);
+  if (itemNo && seenCandidateItemNos.get(itemNo) > 1) errors.push(`duplicate item_no in source catalog (${seenCandidateItemNos.get(itemNo)}x)`);
   if (!sourceRow.name || !String(sourceRow.name).trim()) errors.push('missing name');
   if (!VALID_SOURCE_CATEGORIES.has(sourceRow.category)) errors.push(`invalid category: ${sourceRow.category}`);
   if ((sourceRow.stock_qty ?? 0) < 0 || (sourceRow.unbuilt_stock ?? 0) < 0 || (sourceRow.built_stock ?? 0) < 0) errors.push('invalid (negative) stock value');
