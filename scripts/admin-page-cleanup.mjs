@@ -14,11 +14,15 @@ const removedBindings = new Set([
   'checked', 'setChecked',
   'pw', 'setPw',
   'pwErr', 'setPwErr',
+  'pwError', 'setPwError',
+  'password', 'setPassword',
+  'loginError', 'setLoginError',
 ]);
 const ignoredCalls = new Set([
   'checkAuth', 'saveAuth',
   'setAuthed', 'setChecked',
-  'setPw', 'setPwErr',
+  'setPw', 'setPwErr', 'setPwError',
+  'setPassword', 'setLoginError',
 ]);
 
 function bindingNames(name, names = []) {
@@ -45,6 +49,10 @@ function containsIdentifier(node, wanted) {
   return found;
 }
 
+function containsText(node, sourceFile, pattern) {
+  return pattern.test(node.getText(sourceFile));
+}
+
 function containsReturn(node) {
   let found = false;
   function visit(child) {
@@ -65,6 +73,11 @@ function isAuthEffect(statement) {
   return ts.isIdentifier(call.expression)
     && call.expression.text === 'useEffect'
     && containsIdentifier(call, new Set(['checkAuth']));
+}
+
+function isLegacyLoginHandler(node, sourceFile) {
+  if (!node) return false;
+  return containsText(node, sourceFile, /mini4wd2026|saveAuth\s*\(/);
 }
 
 function collectBusinessCalls(statement, sourceFile) {
@@ -93,10 +106,12 @@ function parseStatement(source) {
   return file.statements[0];
 }
 
-function cleanVariableStatement(statement) {
+function cleanVariableStatement(statement, sourceFile) {
   const declarations = statement.declarationList.declarations.filter(declaration => {
     const names = bindingNames(declaration.name);
-    return !names.some(name => removedBindings.has(name) || name === 'ADMIN_PASSWORD');
+    if (names.some(name => removedBindings.has(name) || name === 'ADMIN_PASSWORD')) return false;
+    if (names.some(name => name === 'handleLogin' || name === 'login') && isLegacyLoginHandler(declaration.initializer, sourceFile)) return false;
+    return true;
   });
   if (declarations.length === 0) return undefined;
   if (declarations.length === statement.declarationList.declarations.length) return statement;
@@ -113,8 +128,15 @@ function cleanFunction(node, sourceFile) {
 
   for (const statement of node.body.statements) {
     if (ts.isVariableStatement(statement)) {
-      const cleaned = cleanVariableStatement(statement);
+      const cleaned = cleanVariableStatement(statement, sourceFile);
       if (cleaned) statements.push(cleaned);
+      continue;
+    }
+
+    if (ts.isFunctionDeclaration(statement)
+      && statement.name
+      && (statement.name.text === 'handleLogin' || statement.name.text === 'login')
+      && isLegacyLoginHandler(statement, sourceFile)) {
       continue;
     }
 
@@ -158,7 +180,7 @@ function transformFile(file) {
     }
 
     if (ts.isVariableStatement(statement)) {
-      const cleaned = cleanVariableStatement(statement);
+      const cleaned = cleanVariableStatement(statement, sourceFile);
       if (cleaned) statements.push(cleaned);
       continue;
     }
