@@ -5,13 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "catalog:reconcile": "node scripts/build-catalog-reconciled-seed.mjs",
-    "auth:cleanup": "node scripts/admin-page-cleanup.mjs && rm -f app/admin/layout.tsx",
     "auth:scan": "node scripts/assert-no-legacy-admin-auth.mjs",
     "test:ui": "NODE_ENV=test vitest run",
     "test:catalog": "NODE_ENV=test vitest run --config vitest.catalog.config.ts",
-    "pretest": "npm run catalog:reconcile && npm run auth:cleanup && npm run auth:scan",
+    "pretest": "npm run catalog:reconcile && npm run auth:scan",
     "test": "npm run test:ui && npm run test:catalog",
-    "prebuild": "npm run catalog:reconcile && npm run auth:cleanup && npm run auth:scan",
+    "prebuild": "npm run catalog:reconcile && npm run auth:scan",
     "build": "npm run test:ui && npm run test:catalog && next build",
     "start": "next start",
     "lint": "eslint"
