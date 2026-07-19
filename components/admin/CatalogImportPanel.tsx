@@ -18,6 +18,7 @@ export interface SeedRow {
   name: string;
   category: string | null;
   price_dkk: number | null;
+  price_on_request?: boolean;
   posterMatched: boolean;
   validationErrors: string[];
 }
@@ -106,7 +107,7 @@ export default function CatalogImportPanel({ existingProducts }: { existingProdu
     <div style={{ background: '#071426', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 14, padding: '18px 20px', marginBottom: 20 }}>
       <div style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#3B82F6', marginBottom: 4 }}>🗂 B-MAX CATALOG IMPORT (PREVIEW ONLY)</div>
       <div style={{ ...FB, fontSize: 12, color: '#6B7280', marginBottom: 14, lineHeight: 1.6 }}>
-        Previews the reconciled catalog seed ({SEED.existing.length} existing live rows preserved exactly as-is, {SEED.new.length} validated new rows, {SEED.blocked.length} blocked for missing/invalid production fields).
+        Previews the reconciled catalog seed ({SEED.existing.length} existing live rows preserved exactly as-is, {SEED.new.length} validated new rows — {SEED.new.filter(r => r.price_on_request).length} price-on-request, {SEED.new.filter(r => !r.price_on_request).length} with an approved price — {SEED.blocked.length} blocked for a genuine data-integrity problem, never for a missing price alone).
         Nothing here writes to the database — <strong style={{ color: '#F5F5F5' }}>public.products stays the only runtime source of truth</strong>. Import execution is disabled until a reviewed migration is separately approved and applied.
       </div>
 

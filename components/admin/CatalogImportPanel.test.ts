@@ -4,7 +4,7 @@ import reconciledSeedRaw from '@/catalog/bmax-catalog-reconciled-seed.json';
 
 const reconciledSeed = reconciledSeedRaw as unknown as {
   existing: { item_no: string; name: string; category: string }[];
-  new: { item_no: string; name: string; category: string }[];
+  new: { item_no: string; name: string; category: string; price_on_request?: boolean }[];
   blocked: { item_no: string; name: string; validationErrors: string[] }[];
 };
 
@@ -73,5 +73,22 @@ describe('computeDryRun — dry-run only, reads Supabase-shaped existingProducts
     // ExistingProductRef[] and reads the statically-imported seed — there
     // is no client/fetch parameter it could use to write anywhere.
     expect(computeDryRun.length).toBe(1);
+  });
+});
+
+describe('price-on-request is separate from catalog inclusion', () => {
+  it('includes price-on-request rows as "new", not "blocked"', () => {
+    const onRequestSample = reconciledSeed.new.find(r => r.price_on_request === true);
+    expect(onRequestSample).toBeTruthy();
+    const rows = computeDryRun([]);
+    const row = rows.find(r => r.item.item_no === onRequestSample!.item_no)!;
+    expect(row.status).toBe('new');
+  });
+
+  it('never blocks a seed row for missing price alone — every blocked reason cites a real data-integrity problem', () => {
+    for (const row of reconciledSeed.blocked) {
+      const reasons = row.validationErrors.join('; ').toLowerCase();
+      expect(reasons).not.toMatch(/^missing\/invalid approved_regular_price_dkk/);
+    }
   });
 });

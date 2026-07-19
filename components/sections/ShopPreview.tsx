@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { resilientCatalogFetch } from '@/lib/resilientCatalogFetch';
 import { ProductImage } from '@/components/ProductImage';
+import { isPriceOnRequest, PRICE_ON_REQUEST_LABEL } from '@/lib/pricing';
 
 const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -68,7 +69,7 @@ export default function ShopPreview() {
                 <div style={{ padding: 16 }}>
                   <p style={{ ...FB, fontSize: 10, color: '#6B7280', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 4 }}>{label}</p>
                   <p style={{ ...F, fontWeight: 700, fontSize: 18, color: '#F5F5F5', lineHeight: 1.2, marginBottom: 8 }}>{item.name}</p>
-                  <p style={{ ...F, fontWeight: 900, fontSize: 22, color: '#DC2626' }}>{cheapestPrice(item)} DKK</p>
+                  <p style={{ ...F, fontWeight: 900, fontSize: isPriceOnRequest(item) ? 14 : 22, color: '#DC2626' }}>{isPriceOnRequest(item) ? PRICE_ON_REQUEST_LABEL : `${cheapestPrice(item)} DKK`}</p>
                 </div>
               </a>
             );
