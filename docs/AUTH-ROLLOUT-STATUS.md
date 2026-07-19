@@ -8,4 +8,4 @@ Draft PR: `#6`
 - Staff authorization tests passed.
 - Legacy page gates removed.
 - Owner setup flow added.
-- Final GitHub Actions validation triggered.
+- Separated final CI checks triggered.
