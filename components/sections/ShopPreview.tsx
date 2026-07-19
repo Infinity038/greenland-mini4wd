@@ -1,9 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { resilientCatalogFetch } from '@/lib/resilientCatalogFetch';
+import { ProductImage } from '@/components/ProductImage';
+import { isPriceOnRequest, PRICE_ON_REQUEST_LABEL } from '@/lib/pricing';
 
 const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
+
+const CATALOG_CACHE_KEY = 'shop_preview_products';
 
 const FALLBACK = [
   { id: 1, name: 'Tamiya Avante',     category: 'cars',        subcategory: null,            price_dkk: 299, emoji: '🚗' },
@@ -11,22 +16,6 @@ const FALLBACK = [
   { id: 3, name: 'Motor Upgrade Set', category: 'parts',       subcategory: 'Motors',        price_dkk: 149, emoji: '⚡' },
   { id: 4, name: 'GM4WD Club Jersey', category: 'merchandise', subcategory: 'Jersey',        price_dkk: 199, emoji: '👕' },
 ];
-
-function fixImageUrl(url: string): string {
-  if (!url) return url;
-  const drilldown = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
-  if (drilldown) {
-    try { url = drilldown[1] + atob(drilldown[2]); } catch { /* leave as-is */ }
-  }
-  url = url.replace(
-    /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
-    'res.cloudinary.com/$1/image/upload/'
-  );
-  if (/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/[^./]+$/.test(url)) {
-    url = url + '.png';
-  }
-  return url;
-}
 
 function cheapestPrice(p: any): number {
   if (p.category !== 'cars') return p.price_dkk || 0;
@@ -44,10 +33,14 @@ export default function ShopPreview() {
   const [items, setItems] = useState<any[]>([]);
 
   useEffect(() => {
-    // Pull real, sellable products (cars, parts, merch) — prioritizes whatever's most
-    // recently added, which right now means your Collector's Vault cars.
-    supabase.from('products').select('*').in('status', ['in stock', 'limited', 'preorder only']).order('created_at', { ascending: false }).limit(4)
-      .then(({ data }: { data: any[] | null }) => setItems(data && data.length > 0 ? data : FALLBACK));
+    // Pull real, sellable products (cars, parts, merch) from public.products
+    // — prioritizes whatever's most recently added, which right now means
+    // your Collector's Vault cars. Cache-first via resilientCatalogFetch so
+    // a transient Supabase error keeps showing the last successful preview
+    // instead of instantly falling back to the generic placeholder cards.
+    resilientCatalogFetch(CATALOG_CACHE_KEY, () =>
+      supabase.from('products').select('*').in('status', ['in stock', 'limited', 'preorder only']).order('created_at', { ascending: false }).limit(4)
+    ).then(({ data }) => setItems(data && data.length > 0 ? data : FALLBACK));
   }, []);
 
   const display = items.length > 0 ? items : FALLBACK;
@@ -63,14 +56,12 @@ export default function ShopPreview() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 16, marginBottom: 40 }}>
           {display.map(item => {
-            const imgs = item.image_url ? item.image_url.split(',') : [];
-            const firstImg = imgs[0] ? fixImageUrl(imgs[0].trim()) : '';
             const label = item.subcategory || item.category || item.chassis || '';
             return (
               <a key={item.id} href={shopLink(item)} style={{ textDecoration: 'none', display: 'block', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, overflow: 'hidden', transition: 'border-color 0.2s' }}>
                 <div style={{ height: 160, background: '#0d0d0d', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                  {firstImg ? (
-                    <img src={firstImg} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 12 }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  {item.image_url ? (
+                    <ProductImage imageUrl={item.image_url} name={item.name} category={item.category} itemNo={item.item_no} chassis={item.chassis} />
                   ) : (
                     <span style={{ fontSize: 40 }}>{item.emoji || '🚗'}</span>
                   )}
@@ -78,7 +69,7 @@ export default function ShopPreview() {
                 <div style={{ padding: 16 }}>
                   <p style={{ ...FB, fontSize: 10, color: '#6B7280', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 4 }}>{label}</p>
                   <p style={{ ...F, fontWeight: 700, fontSize: 18, color: '#F5F5F5', lineHeight: 1.2, marginBottom: 8 }}>{item.name}</p>
-                  <p style={{ ...F, fontWeight: 900, fontSize: 22, color: '#DC2626' }}>{cheapestPrice(item)} DKK</p>
+                  <p style={{ ...F, fontWeight: 900, fontSize: isPriceOnRequest(item) ? 14 : 22, color: '#DC2626' }}>{isPriceOnRequest(item) ? PRICE_ON_REQUEST_LABEL : `${cheapestPrice(item)} DKK`}</p>
                 </div>
               </a>
             );

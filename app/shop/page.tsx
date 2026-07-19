@@ -6,6 +6,16 @@ import { getMemberData, isRegistered, generatePaymentRef } from '@/lib/member';
 import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import { resilientCatalogFetch } from '@/lib/resilientCatalogFetch';
+import { parseImages } from '@/lib/images';
+import { ProductImage as SharedProductImage } from '@/components/ProductImage';
+import { isPriceOnRequest, PRICE_ON_REQUEST_LABEL, ASK_FOR_PRICE_LABEL } from '@/lib/pricing';
+
+// public.products is the runtime source of truth for every category (Cars,
+// Parts, Merchandise) — the static catalog import-seed JSON under
+// catalog/ is never read here; it is import-seed/dry-run/test-fixture
+// data only, wired up solely in the admin dry-run panel.
+const CATALOG_CACHE_KEY = 'shop_products';
 
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -20,8 +30,9 @@ interface Product {
   category: string;
   subcategory?: string;
   chassis: string;
-  price_dkk: number;
+  price_dkk: number | null;
   original_price_dkk?: number;
+  price_on_request?: boolean;
   stock_qty: number;
   unbuilt_stock?: number;
   built_stock?: number;
@@ -90,68 +101,23 @@ const FILTER_TABS = [
 const CHASSIS_FILTERS = ['AR', 'EZ', 'FM-A', 'MA', 'ME', 'MS', 'Super II', 'Super XX', 'VS', 'VZ'];
 const PARTS_SUBCATEGORIES = ['Bearings', 'Brakes/Dampers', 'Chassis', 'Shafts/Gears', 'Motors', 'Plates', 'Rollers/Stabilizers', 'Screws/Nuts', 'Wheels/Tires', 'Accessories'];
 
-function fixImageUrl(url: string): string {
-  if (!url) return url;
-  const drilldown = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
-  if (drilldown) {
-    try { url = drilldown[1] + atob(drilldown[2]); } catch { /* leave as-is */ }
-  }
-  url = url.replace(
-    /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
-    'res.cloudinary.com/$1/image/upload/'
-  );
-  if (/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/[^./]+$/.test(url)) {
-    url = url + '.png';
-  }
-  return url;
-}
-
-function parseImages(url: string): string[] {
-  if (!url) return [];
-  return url.split(',').map(u => fixImageUrl(u.trim())).filter(Boolean);
-}
-
+// Thin adapter over the shared, durable-fallback ProductImage component —
+// preserves this file's existing `<ProductImage product={p} onClick={...} />`
+// call shape (used throughout the cars/parts/merch grids and the collectors
+// vault card) while delegating actual rendering/fallback/carousel behavior
+// to components/ProductImage.tsx (also used by the admin catalog tooling),
+// so there is exactly one implementation of "how a product image renders,"
+// not a second copy that can drift.
 function ProductImage({ product, onClick }: { product: Product; onClick?: () => void }) {
-  const images = parseImages(product.image_url);
-  const [idx, setIdx] = useState(0);
-  const [failed, setFailed] = useState<Record<number, boolean>>({});
-
-  const current = images[idx];
-  const isFailed = failed[idx];
-
-  if (!current || isFailed) return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-      <span style={{ ...F, fontWeight: 900, fontSize: 40, color: 'rgba(255,255,255,0.06)', letterSpacing: 2 }}>{product.chassis || product.subcategory || ''}</span>
-      <span style={{ ...FB, fontSize: 10, color: 'rgba(255,255,255,0.15)' }}>Image coming soon</span>
-    </div>
-  );
-
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <img
-        src={current}
-        alt={product.name}
-        onError={() => setFailed(f => ({ ...f, [idx]: true }))}
-        onClick={onClick}
-        style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', cursor: onClick ? 'zoom-in' : 'default' }}
-      />
-      {images.length > 1 && (
-        <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 4 }}>
-          {images.map((_, i) => (
-            <button key={i} onClick={e => { e.stopPropagation(); setIdx(i); }}
-              style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 3, border: 'none', background: i === idx ? '#DC2626' : 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, transition: 'all 0.2s' }} />
-          ))}
-        </div>
-      )}
-      {images.length > 1 && idx > 0 && (
-        <button onClick={e => { e.stopPropagation(); setIdx(i => i - 1); }}
-          style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
-      )}
-      {images.length > 1 && idx < images.length - 1 && (
-        <button onClick={e => { e.stopPropagation(); setIdx(i => i + 1); }}
-          style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
-      )}
-    </div>
+    <SharedProductImage
+      imageUrl={product.image_url}
+      name={product.name}
+      category={product.category}
+      itemNo={product.item_no}
+      chassis={product.chassis}
+      onClick={onClick}
+    />
   );
 }
 
@@ -204,8 +170,9 @@ function Lightbox({ product, onClose }: { product: Product; onClose: () => void 
 }
 
 // Shared card for PARTS & MERCHANDISE — flat price, single stock pool, no variant grid
-function SimpleProductCard({ p, wishlistIds, toggleWishlist, shareProduct, copiedId, openModal, openPreorder, setLightbox, highlightId }: any) {
+function SimpleProductCard({ p, wishlistIds, toggleWishlist, shareProduct, copiedId, openModal, openPreorder, openInquiry, setLightbox, highlightId }: any) {
   const available = isSimpleAvailable(p);
+  const onRequest = isPriceOnRequest(p);
   const { price, original } = simplePricing(p);
   return (
     <div id={`product-${p.id}`} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: highlightId === p.id ? '0 0 0 3px #DC2626, 0 0 24px rgba(220,38,38,0.5)' : 'none' }}>
@@ -224,10 +191,18 @@ function SimpleProductCard({ p, wishlistIds, toggleWishlist, shareProduct, copie
         <h3 style={{ ...F, fontWeight: 900, fontSize: 16, color: '#F5F5F5', margin: '0 0 6px' }}>{p.name}</h3>
         <p style={{ ...FB, fontSize: 12, color: '#B8C1CC', lineHeight: 1.5, margin: '0 0 14px', flex: 1 }}>{p.description}</p>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-          {original && <span style={{ ...FB, fontSize: 13, color: '#6B7280', textDecoration: 'line-through' }}>{original.toLocaleString()}</span>}
-          <div style={{ ...F, fontWeight: 900, fontSize: 20, color: original ? '#22C55E' : '#FACC15' }}>{price.toLocaleString()} kr</div>
+          {onRequest ? (
+            <div style={{ ...F, fontWeight: 900, fontSize: 16, letterSpacing: 1, color: '#93C5FD' }}>{PRICE_ON_REQUEST_LABEL}</div>
+          ) : (
+            <>
+              {original && <span style={{ ...FB, fontSize: 13, color: '#6B7280', textDecoration: 'line-through' }}>{original.toLocaleString()}</span>}
+              <div style={{ ...F, fontWeight: 900, fontSize: 20, color: original ? '#22C55E' : '#FACC15' }}>{price.toLocaleString()} kr</div>
+            </>
+          )}
         </div>
-        {available ? (
+        {onRequest ? (
+          <button onClick={() => openInquiry(p)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '10px 0', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>{ASK_FOR_PRICE_LABEL}</button>
+        ) : available ? (
           <button onClick={() => openModal(p, 'standard')} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 0', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
         ) : (
           <>
@@ -244,6 +219,7 @@ export default function ShopPage() {
   const [member, setMember] = useState<any>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [filter, setFilter] = useState('all');
   const [globalCaseStock, setGlobalCaseStock] = useState(0);
 
@@ -272,6 +248,16 @@ export default function ShopPage() {
   const [preorderTarget, setPreorderTarget] = useState<{ product: Product; variantKey: string } | null>(null);
   const [preorderSending, setPreorderSending] = useState(false);
   const [preorderDone, setPreorderDone] = useState(false);
+
+  // Price-on-request inquiry: a simple non-order lead-capture flow — never
+  // touches orders/preorders/stock/payment. See openInquiry/sendInquiry below.
+  const [inquiryTarget, setInquiryTarget] = useState<Product | null>(null);
+  const [inquiryName, setInquiryName] = useState('');
+  const [inquiryContact, setInquiryContact] = useState('');
+  const [inquiryMessage, setInquiryMessage] = useState('');
+  const [inquirySending, setInquirySending] = useState(false);
+  const [inquiryDone, setInquiryDone] = useState(false);
+  const [inquiryError, setInquiryError] = useState('');
 
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
 
@@ -377,9 +363,17 @@ export default function ShopPage() {
   };
 
   async function fetchProducts() {
+    // Cache-first: a failed refresh keeps showing the last successfully
+    // loaded catalog (with a dismissible retry banner) instead of a blank
+    // shop — see lib/resilientCatalogFetch.ts. Supabase public.products
+    // remains the only data source for every category; this only changes
+    // how fetch failures are handled, not what data is used.
     setLoading(true);
-    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: true });
-    setProducts(data || []);
+    const { data, error } = await resilientCatalogFetch<Product>(CATALOG_CACHE_KEY, () =>
+      supabase.from('products').select('*').order('created_at', { ascending: true })
+    );
+    setProducts(data);
+    setCatalogError(error);
     setLoading(false);
   }
 
@@ -417,7 +411,15 @@ export default function ShopPage() {
     return matchesSub && matchesSearch;
   });
 
+  // A price-on-request product can never reach the reservation/payment flow
+  // or the preorder flow — this guard is checked here (the entry points),
+  // again inside placeOrder/sendPreorder (the actual order/preorder writes,
+  // in case some other path ever calls them directly), and once more as the
+  // UI-level fact that these buttons are never rendered for such products in
+  // the first place (see the price_on_request branches above). Hiding the
+  // button alone is not treated as sufficient.
   const openModal = (p: Product, variantKey: string) => {
+    if (isPriceOnRequest(p)) { openInquiry(p); return; }
     if (!isRegistered()) { window.location.href = '/register'; return; }
     if (isCarProduct(p)) {
       if (!isVariantAvailable(p, variantKey, globalCaseStock)) return;
@@ -431,6 +433,7 @@ export default function ShopPage() {
   };
 
   const openPreorder = (p: Product, variantKey: string) => {
+    if (isPriceOnRequest(p)) { openInquiry(p); return; }
     if (!isRegistered()) { window.location.href = '/register'; return; }
     setPreorderTarget({ product: p, variantKey });
     setPreorderDone(false);
@@ -438,6 +441,7 @@ export default function ShopPage() {
 
   const sendPreorder = async () => {
     if (!preorderTarget || !member) return;
+    if (isPriceOnRequest(preorderTarget.product)) return;
     setPreorderSending(true);
     try {
       await supabase.from('preorders').insert({
@@ -453,8 +457,41 @@ export default function ShopPage() {
     setPreorderSending(false);
   };
 
+  const openInquiry = (p: Product) => {
+    setInquiryTarget(p);
+    setInquiryDone(false);
+    setInquiryError('');
+    setInquiryName(member?.name || '');
+    setInquiryContact(member?.email || '');
+    setInquiryMessage('');
+  };
+
+  const sendInquiry = async () => {
+    if (!inquiryTarget) return;
+    if (!inquiryName.trim() || !inquiryContact.trim()) { setInquiryError('Please enter your name and email or contact info.'); return; }
+    setInquirySending(true); setInquiryError('');
+    try {
+      const { error: err } = await supabase.from('product_inquiries').insert({
+        product_id: inquiryTarget.id,
+        item_no: inquiryTarget.item_no || null,
+        product_name: inquiryTarget.name,
+        customer_name: inquiryName.trim(),
+        customer_contact: inquiryContact.trim(),
+        message: inquiryMessage.trim() || null,
+        status: 'new',
+      });
+      if (err) throw err;
+      setInquiryDone(true);
+    } catch { setInquiryError('Something went wrong. Please try again.'); }
+    setInquirySending(false);
+  };
+
   const placeOrder = async () => {
     if (!selected || !member) return;
+    // Hard guard on the actual order-creation write path, not just the UI
+    // entry point above — a price-on-request product must never be able to
+    // create an order, generate a payment reference, or deduct stock.
+    if (isPriceOnRequest(selected)) return;
     setUploading(true); setError('');
     const isCar = isCarProduct(selected);
     const v = isCar ? VARIANTS.find(x => x.key === selectedVariant)! : null;
@@ -560,6 +597,18 @@ export default function ShopPage() {
           </div>
         </section>
 
+        {catalogError && (
+          <div style={{ maxWidth: 1100, margin: '16px auto 0', padding: '0 24px' }}>
+            <div style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ ...FB, fontSize: 13, color: '#FCA5A5' }}>{catalogError}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => fetchProducts()} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', ...F, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>RETRY</button>
+                <button onClick={() => setCatalogError(null)} style={{ background: 'transparent', color: '#B8C1CC', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '6px 14px', ...F, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>DISMISS</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 0' }}>
           <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             {(['cars', 'parts', 'merchandise'] as ShopTab[]).map(t => (
@@ -600,17 +649,26 @@ export default function ShopPage() {
                       <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 4, lineHeight: 1.1 }}>{p.name}</div>
                       <div style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC', marginBottom: 12 }}>{p.chassis} CHASSIS{p.item_no ? ` · #${p.item_no}` : ''}</div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#FACC15' }}>FROM</div>
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                            {unbuiltOriginal && <span style={{ ...FB, fontSize: 13, color: '#6B7280', textDecoration: 'line-through' }}>{unbuiltOriginal.toLocaleString()}</span>}
-                            <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{unbuiltPrice.toLocaleString()} kr</div>
-                          </div>
-                        </div>
-                        {unbuiltAvailable ? (
-                          <button onClick={() => openModal(p, 'unbuilt')} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                        {isPriceOnRequest(p) ? (
+                          <>
+                            <div style={{ ...F, fontWeight: 900, fontSize: 15, letterSpacing: 1, color: '#93C5FD' }}>{PRICE_ON_REQUEST_LABEL}</div>
+                            <button onClick={() => openInquiry(p)} style={{ background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>{ASK_FOR_PRICE_LABEL}</button>
+                          </>
                         ) : (
-                          <button onClick={() => openPreorder(p, 'unbuilt')} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                          <>
+                            <div>
+                              <div style={{ ...F, fontSize: 9, letterSpacing: 3, color: '#FACC15' }}>FROM</div>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                {unbuiltOriginal && <span style={{ ...FB, fontSize: 13, color: '#6B7280', textDecoration: 'line-through' }}>{unbuiltOriginal.toLocaleString()}</span>}
+                                <div style={{ ...F, fontWeight: 900, fontSize: 24, color: '#FACC15' }}>{unbuiltPrice.toLocaleString()} kr</div>
+                              </div>
+                            </div>
+                            {unbuiltAvailable ? (
+                              <button onClick={() => openModal(p, 'unbuilt')} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                            ) : (
+                              <button onClick={() => openPreorder(p, 'unbuilt')} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -679,29 +737,36 @@ export default function ShopPage() {
                         <h3 style={{ ...F, fontWeight: 900, fontSize: 19, color: '#F5F5F5', margin: '0 0 6px', lineHeight: 1.1 }}>{p.name}</h3>
                         <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', lineHeight: 1.6, margin: '0 0 14px' }}>{p.description}</p>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          {VARIANTS.map(v => {
-                            const available = isVariantAvailable(p, v.key, globalCaseStock);
-                            const { price, original } = variantPricing(p, v.key);
-                            return (
-                              <div key={v.key} style={{ background: '#050505', border: `1px solid ${available ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.25)'}`, borderRadius: 8, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#B8C1CC' }}>{v.icon} {v.label.toUpperCase()}</div>
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
-                                  {original && <span style={{ ...FB, fontSize: 11, color: '#6B7280', textDecoration: 'line-through' }}>{original.toLocaleString()}</span>}
-                                  <div style={{ ...F, fontWeight: 900, fontSize: 15, color: available ? (original ? '#22C55E' : (isCollector ? '#FACC15' : '#F5F5F5')) : '#6B7280' }}>{price.toLocaleString()} kr</div>
+                        {isPriceOnRequest(p) ? (
+                          <div style={{ background: '#050505', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                            <div style={{ ...F, fontWeight: 900, fontSize: 14, letterSpacing: 1, color: '#93C5FD' }}>{PRICE_ON_REQUEST_LABEL}</div>
+                            <button onClick={() => openInquiry(p)} style={{ background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 22px', ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, cursor: 'pointer' }}>{ASK_FOR_PRICE_LABEL}</button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            {VARIANTS.map(v => {
+                              const available = isVariantAvailable(p, v.key, globalCaseStock);
+                              const { price, original } = variantPricing(p, v.key);
+                              return (
+                                <div key={v.key} style={{ background: '#050505', border: `1px solid ${available ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.25)'}`, borderRadius: 8, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                  <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#B8C1CC' }}>{v.icon} {v.label.toUpperCase()}</div>
+                                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                                    {original && <span style={{ ...FB, fontSize: 11, color: '#6B7280', textDecoration: 'line-through' }}>{original.toLocaleString()}</span>}
+                                    <div style={{ ...F, fontWeight: 900, fontSize: 15, color: available ? (original ? '#22C55E' : (isCollector ? '#FACC15' : '#F5F5F5')) : '#6B7280' }}>{price.toLocaleString()} kr</div>
+                                  </div>
+                                  {available ? (
+                                    <button onClick={() => openModal(p, v.key)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                                  ) : (
+                                    <>
+                                      <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>SOLD OUT</div>
+                                      <button onClick={() => openPreorder(p, v.key)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                                    </>
+                                  )}
                                 </div>
-                                {available ? (
-                                  <button onClick={() => openModal(p, v.key)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
-                                ) : (
-                                  <>
-                                    <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>SOLD OUT</div>
-                                    <button onClick={() => openPreorder(p, v.key)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
-                                  </>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -741,7 +806,7 @@ export default function ShopPage() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20 }}>
                 {partsFiltered.map(p => (
-                  <SimpleProductCard key={p.id} p={p} wishlistIds={wishlistIds} toggleWishlist={toggleWishlist} shareProduct={shareProduct} copiedId={copiedId} openModal={openModal} openPreorder={openPreorder} setLightbox={setLightbox} highlightId={highlightId} />
+                  <SimpleProductCard key={p.id} p={p} wishlistIds={wishlistIds} toggleWishlist={toggleWishlist} shareProduct={shareProduct} copiedId={copiedId} openModal={openModal} openPreorder={openPreorder} openInquiry={openInquiry} setLightbox={setLightbox} highlightId={highlightId} />
                 ))}
               </div>
             )}
@@ -775,7 +840,7 @@ export default function ShopPage() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20 }}>
                 {merchFiltered.map(p => (
-                  <SimpleProductCard key={p.id} p={p} wishlistIds={wishlistIds} toggleWishlist={toggleWishlist} shareProduct={shareProduct} copiedId={copiedId} openModal={openModal} openPreorder={openPreorder} setLightbox={setLightbox} highlightId={highlightId} />
+                  <SimpleProductCard key={p.id} p={p} wishlistIds={wishlistIds} toggleWishlist={toggleWishlist} shareProduct={shareProduct} copiedId={copiedId} openModal={openModal} openPreorder={openPreorder} openInquiry={openInquiry} setLightbox={setLightbox} highlightId={highlightId} />
                 ))}
               </div>
             )}
@@ -952,6 +1017,49 @@ export default function ShopPage() {
                 <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5', marginBottom: 8 }}>REQUEST SENT!</div>
                 <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 20 }}>We'll reach out by email when it's available.</div>
                 <button onClick={() => setPreorderTarget(null)} style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: 14, ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', cursor: 'pointer' }}>CLOSE</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {inquiryTarget && (
+        <div onClick={() => setInquiryTarget(null)} style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#071426', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 440, padding: '28px 24px 36px' }}>
+            {!inquiryDone ? (
+              <>
+                <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#3B82F6', marginBottom: 6 }}>{ASK_FOR_PRICE_LABEL}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                  <div style={{ width: 56, height: 56, background: '#050505', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                    <ProductImage product={inquiryTarget} />
+                  </div>
+                  <div>
+                    <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5' }}>{inquiryTarget.name}</div>
+                    {inquiryTarget.item_no && <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>#{inquiryTarget.item_no}</div>}
+                  </div>
+                </div>
+                <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, padding: 12, ...FB, fontSize: 13, color: '#93C5FD', marginBottom: 16 }}>
+                  The final price for this product is not approved yet. Send your details and we will get back to you with pricing — this does not create an order, reserve stock, or charge anything.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                  <input value={inquiryName} onChange={e => setInquiryName(e.target.value)} placeholder="Your name"
+                    style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#F5F5F5', ...FB, fontSize: 13, outline: 'none' }} />
+                  <input value={inquiryContact} onChange={e => setInquiryContact(e.target.value)} placeholder="Email or contact info"
+                    style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#F5F5F5', ...FB, fontSize: 13, outline: 'none' }} />
+                  <textarea value={inquiryMessage} onChange={e => setInquiryMessage(e.target.value)} placeholder="Optional message" rows={3}
+                    style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#F5F5F5', ...FB, fontSize: 13, outline: 'none', resize: 'vertical' }} />
+                </div>
+                {inquiryError && <div style={{ ...FB, fontSize: 12, color: '#DC2626', marginBottom: 12 }}>{inquiryError}</div>}
+                <button onClick={sendInquiry} disabled={inquirySending} style={{ width: '100%', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 12, padding: 15, ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, cursor: 'pointer', opacity: inquirySending ? 0.5 : 1 }}>
+                  {inquirySending ? 'SENDING...' : 'SEND INQUIRY →'}
+                </button>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 44, marginBottom: 10 }}>✅</div>
+                <div style={{ ...F, fontWeight: 900, fontSize: 20, color: '#F5F5F5', marginBottom: 8 }}>INQUIRY SENT!</div>
+                <div style={{ ...FB, fontSize: 13, color: '#B8C1CC', marginBottom: 20 }}>We will reach out with pricing information soon.</div>
+                <button onClick={() => setInquiryTarget(null)} style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: 14, ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5', cursor: 'pointer' }}>CLOSE</button>
               </div>
             )}
           </div>

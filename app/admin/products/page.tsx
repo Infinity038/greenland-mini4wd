@@ -2,6 +2,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { parseImages } from '@/lib/images';
+import CatalogImportPanel from '@/components/admin/CatalogImportPanel';
 
 const ADMIN_PASSWORD = 'mini4wd2026';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
@@ -26,23 +28,12 @@ function cheapestPrice(p: any): number {
   return vals.length ? Math.min(...vals) : (p.price_dkk || 0);
 }
 
+// Shared with app/shop/page.tsx and components/sections/ShopPreview.tsx —
+// see lib/images.ts. Preserves this file's existing comma-joined-string
+// call shape (`fixImageUrl(url)` in, comma-joined string out) so every
+// existing call site below is unchanged.
 function fixImageUrl(url: string): string {
-  if (!url) return url;
-  return url.split(',').map(u => {
-    let trimmed = u.trim();
-    const drilldown = trimmed.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/)([A-Za-z0-9+/=]+)\/drilldown\/?$/);
-    if (drilldown) {
-      try { trimmed = drilldown[1] + atob(drilldown[2]); } catch { /* leave as-is */ }
-    }
-    trimmed = trimmed.replace(
-      /res-console\.cloudinary\.com\/([^/]+)\/thumbnails\/v1\/image\/upload\//,
-      'res.cloudinary.com/$1/image/upload/'
-    );
-    if (/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/[^./]+$/.test(trimmed)) {
-      trimmed = trimmed + '.png';
-    }
-    return trimmed;
-  }).join(',');
+  return parseImages(url).join(',');
 }
 
 function checkAuth() {
@@ -217,6 +208,8 @@ export default function AdminProductsPage() {
 
         {tab === 'products' && (
           <>
+            <CatalogImportPanel existingProducts={products} />
+
             <div style={{ background:'#071426', border:'1px solid rgba(250,204,21,0.2)', borderRadius:14, padding:'18px 20px', marginBottom:20 }}>
               <div style={{ ...F, fontSize:11, letterSpacing:3, color:'#FACC15', marginBottom:4 }}>📦 GLOBAL CASE INVENTORY</div>
               <div style={{ ...FB, fontSize:12, color:'#6B7280', marginBottom:14 }}>Shared display-case STOCK used by EVERY model's "+ Case" listings. Case pricing is now set per-product below, not here.</div>
