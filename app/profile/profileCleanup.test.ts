@@ -47,12 +47,28 @@ describe('fixed reward awarding', () => {
     expect(loyalty).not.toContain('getRankFromPoints');
   });
 
+  it('always writes to the fixed reward account rather than a race tier', () => {
+    expect(loyalty).toContain("tier: 'fixed_rewards'");
+    expect(loyalty).not.toContain("tier: member.loyalty_tier");
+  });
+
   it('uses whole fixed points in the admin screen', () => {
     expect(adminLoyalty).toContain('One whole point per 100 DKK');
     expect(adminLoyalty).toContain('REWARD_MILESTONES');
     expect(adminLoyalty).not.toMatch(/LOYALTY COINS|Coins Balance|coins\b/);
     expect(adminLoyalty).not.toContain('percent_off');
     expect(adminLoyalty).not.toContain('TIERS');
+  });
+
+  it('shows only fixed-system transactions in the new admin history', () => {
+    expect(adminLoyalty).toContain(".eq('rate_applied', 1)");
+    expect(adminLoyalty).toContain('No fixed-reward activity recorded.');
+  });
+
+  it('restricts redemption to the approved milestone point amounts', () => {
+    expect(adminLoyalty).toContain('REWARD_MILESTONES.find(milestone => milestone.points === amount)');
+    expect(adminLoyalty).toContain('Redemptions must use an approved milestone: 25, 50, 100 or 150 points.');
+    expect(adminLoyalty).toContain('availableRedemptions.map');
   });
 });
 
