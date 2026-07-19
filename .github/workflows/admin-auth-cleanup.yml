@@ -28,5 +28,14 @@ jobs:
         run: npm ci
       - name: Verify legacy Auth removal
         run: npm run auth:scan
-      - name: Run full test and production build
-        run: npm run build
+      - name: Run UI and Auth tests
+        run: npm run test:ui
+      - name: Run catalog and SQL tests
+        run: npm run test:catalog
+      - name: Type-check
+        run: npx tsc --noEmit
+      - name: Compile Next.js application
+        run: npx next build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-public-anon-key
