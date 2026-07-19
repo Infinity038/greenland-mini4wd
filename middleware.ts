@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareSupabaseClient, copyResponseCookies } from '@/lib/supabaseAuth/middlewareClient';
 
 const MEMBER_ONLY = ['/profile', '/tickets/checkout'];
+const PUBLIC_ADMIN_PATHS = new Set(['/admin/login', '/admin/setup']);
 
 function adminLoginRedirect(request: NextRequest, refreshedResponse: NextResponse, reason?: string) {
   const loginUrl = new URL('/admin/login', request.url);
@@ -22,6 +23,13 @@ export async function middleware(request: NextRequest) {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     const refreshedResponse = getResponse();
 
+    if (pathname === '/admin/setup') {
+      // Public only for the one-time owner signup/confirmation flow. The
+      // database bootstrap function independently enforces the confirmed
+      // owner email and refuses every other account.
+      return refreshedResponse;
+    }
+
     if (pathname === '/admin/login') {
       if (!userError && userData.user) {
         const { data: roles, error: roleError } = await supabase.rpc('current_staff_roles');
@@ -32,7 +40,7 @@ export async function middleware(request: NextRequest) {
       return refreshedResponse;
     }
 
-    if (userError || !userData.user) {
+    if (!PUBLIC_ADMIN_PATHS.has(pathname) && (userError || !userData.user)) {
       return adminLoginRedirect(request, refreshedResponse);
     }
 
