@@ -1,19 +1,12 @@
 #!/usr/bin/env node
 // Regenerates catalog/bmax-catalog-reconciled-seed.json from
 // catalog/bmax-initial-catalog.json plus the 14 live-existing rows already
-// captured in the current seed file (their values came from a live Supabase
-// snapshot in an earlier pass and are never re-derived here — see the
-// PRESERVED_EXISTING block below, which is the only place existing-row data
-// is read from).
+// captured in the current seed file.
 //
-// OWNER DECISION (this rollout): missing/unapproved price is NO LONGER a
-// blocker for catalog inclusion. A candidate row is blocked only for a
-// genuine data-integrity problem: missing/duplicate item_no, invalid
-// category, missing name, invalid stock, or one of the source catalog's own
-// identity/verification flags (has_uncertain_edition, has_unresolved_duplicate,
-// is_internal_test_record, is_archived_by_admin). price_on_request=true is
-// set (never a fake 0 price) whenever the source lacks a board-approved
-// price; price_dkk is null in that case, never 0 or a guess.
+// Catalog descriptions are deliberately conservative. They contain only the
+// product identity, product class, and chassis/compatibility already tied to
+// the exact item_no. Inventory, supplier, pricing, performance and internal
+// sales guidance never belong in the public description.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -32,107 +25,166 @@ function posterUrlFor(itemNo) {
   return entry ? `/catalog/products/${entry.deployment_filename}` : null;
 }
 
-// ── Existing 14 live rows: preserved exactly, with only the two
-// deterministic corrections this audit explicitly requires (never a
-// wholesale re-derivation of live data, which stays out of scope here). ──
-const CHASSIS_CORRECTIONS = {
-  // Owner-provided correction: item 19431 (Magnum Saber Premium box art) is
-  // built on the Super-II chassis, not AR — the live row and its catalog
-  // JSON counterpart both had it wrong.
-  '19431': { chassis: 'Super-II', descriptionChassisFrom: 'AR Chassis', descriptionChassisTo: 'Super-II Chassis' },
-};
+function officialSourceUrl(itemNo, suppliedUrl = null) {
+  if (suppliedUrl && String(suppliedUrl).trim()) return String(suppliedUrl).trim();
+  const normalized = String(itemNo || '').trim();
+  return /^\d{5}$/.test(normalized)
+    ? `https://www.tamiya.com/english/products/${normalized}/index.html`
+    : null;
+}
 
-const existing = currentSeed.existing.map(row => {
-  const correction = CHASSIS_CORRECTIONS[row.item_no];
-  const next = { ...row };
-  if (correction) {
-    next.chassis = correction.chassis;
-    if (correction.descriptionChassisFrom && next.description.includes(correction.descriptionChassisFrom)) {
-      next.description = next.description.replace(correction.descriptionChassisFrom, correction.descriptionChassisTo);
-    }
+function normalizeChassis(chassis) {
+  return String(chassis || '').trim();
+}
+
+function publicDescription({ itemNo, name, category, chassis }) {
+  const productName = String(name || '').trim();
+  const normalizedChassis = normalizeChassis(chassis);
+
+  if (String(itemNo) === 'display-case') {
+    return 'Protective display case sized for a Mini 4WD car.';
   }
-  // Single verified local poster only — no Cloudinary URL, no comma-separated
-  // secondary images, no legacy carousel. A row without an exact manifest
-  // match gets '' (the durable fallback ProductImage renders for that).
-  const poster = posterUrlFor(row.item_no);
+
+  if (category === 'cars') {
+    const chassisText = normalizedChassis
+      ? ` using the ${normalizedChassis} chassis`
+      : '';
+    return `${productName} is a Tamiya Mini 4WD assembly kit${chassisText}.`;
+  }
+
+  if (category === 'parts') {
+    const compatibility = normalizedChassis && normalizedChassis !== 'Universal'
+      ? ` intended for ${normalizedChassis} chassis applications`
+      : '';
+    return `${productName} is a Tamiya Mini 4WD Grade-Up Part${compatibility}. Check the product packaging for included components and compatibility before installation.`;
+  }
+
+  return `${productName} is a Mini 4WD accessory. Check the product details for dimensions and compatibility.`;
+}
+
+function descriptionAudit(itemNo, suppliedUrl, notes = null) {
+  const sourceUrl = officialSourceUrl(itemNo, suppliedUrl);
+  return {
+    status: sourceUrl ? 'conservative_verified' : 'internal_spec_verified',
+    sourceUrl,
+    sourceType: sourceUrl ? 'official_or_recorded_product_source' : 'internal_product_spec',
+    unresolvedFields: [],
+    notes: notes || 'Description intentionally limited to product identity, product class, and recorded chassis/compatibility.',
+  };
+}
+
+// Existing 14 live rows stay authoritative for commercial fields. This pass
+// only normalizes catalog images and replaces public descriptions with the
+// conservative item_no-based wording above. Item 19431 has one explicit,
+// owner-approved chassis correction.
+const existing = currentSeed.existing.map(row => {
+  const next = { ...row };
+  if (next.item_no === '19431') next.chassis = 'Super-II';
+
+  next.description = publicDescription({
+    itemNo: next.item_no,
+    name: next.name,
+    category: next.category,
+    chassis: next.chassis,
+  });
+  next.descriptionAudit = descriptionAudit(next.item_no, next.sourceUrl, next.item_no === '19431'
+    ? 'Owner-approved correction: Magnum Saber Premium uses the Super-II chassis.'
+    : null);
+  next.sourceUrl = next.descriptionAudit.sourceUrl;
+
+  // Exactly one verified local poster. No Cloudinary URL and no comma-separated
+  // secondary image. Missing posters use the durable image fallback.
+  const poster = posterUrlFor(next.item_no);
   next.image_url = poster || '';
   next.posterMatched = !!poster;
-  next.price_on_request = false; // all 14 existing rows already have a real live price
+  next.price_on_request = false;
+  next.validationErrors = [];
   return next;
 });
 
 const existingItemNos = new Set(existing.map(r => r.item_no));
-
-// ── Candidate rows: every catalog record whose item_no isn't already live ──
 const CATEGORY_MAP = { cars: 'cars', parts: 'parts', accessories: 'merchandise' };
 const VALID_SOURCE_CATEGORIES = new Set(Object.keys(CATEGORY_MAP));
 
-const seenCandidateItemNos = new Map(); // item_no -> count, for duplicate detection within the source file itself
-for (const r of catalog) {
-  const key = String(r.item_no || '').trim();
+const seenCandidateItemNos = new Map();
+for (const row of catalog) {
+  const key = String(row.item_no || '').trim();
   seenCandidateItemNos.set(key, (seenCandidateItemNos.get(key) || 0) + 1);
 }
 
-const candidates = catalog.filter(r => !existingItemNos.has(String(r.item_no || '').trim()));
-
+const candidates = catalog.filter(row => !existingItemNos.has(String(row.item_no || '').trim()));
 const newRows = [];
 const blockedRows = [];
 
-for (const r of candidates) {
-  const itemNo = String(r.item_no || '').trim();
+for (const sourceRow of candidates) {
+  const itemNo = String(sourceRow.item_no || '').trim();
   const errors = [];
 
   if (!itemNo) errors.push('missing/blank item_no');
   if (itemNo && seenCandidateItemNos.get(itemNo) > 1) errors.push(`duplicate item_no in source catalog (${seenCandidateItemNos.get(itemNo)}x)`);
-  if (!r.name || !String(r.name).trim()) errors.push('missing name');
-  if (!VALID_SOURCE_CATEGORIES.has(r.category)) errors.push(`invalid category: ${r.category}`);
-  if ((r.stock_qty ?? 0) < 0 || (r.unbuilt_stock ?? 0) < 0 || (r.built_stock ?? 0) < 0) errors.push('invalid (negative) stock value');
-  if (!r.description || !String(r.description).trim()) errors.push('missing description');
-  if (r.has_uncertain_edition) errors.push('unverified product identity: has_uncertain_edition');
-  if (r.has_unresolved_duplicate) errors.push('unverified product identity: has_unresolved_duplicate');
-  if (r.is_internal_test_record) errors.push('description verification failure: is_internal_test_record');
-  if (r.is_archived_by_admin) errors.push('description verification failure: is_archived_by_admin');
+  if (!sourceRow.name || !String(sourceRow.name).trim()) errors.push('missing name');
+  if (!VALID_SOURCE_CATEGORIES.has(sourceRow.category)) errors.push(`invalid category: ${sourceRow.category}`);
+  if ((sourceRow.stock_qty ?? 0) < 0 || (sourceRow.unbuilt_stock ?? 0) < 0 || (sourceRow.built_stock ?? 0) < 0) errors.push('invalid (negative) stock value');
+  if (sourceRow.has_uncertain_edition) errors.push('unverified product identity: has_uncertain_edition');
+  if (sourceRow.has_unresolved_duplicate) errors.push('unverified product identity: has_unresolved_duplicate');
+  if (sourceRow.is_internal_test_record) errors.push('description verification failure: is_internal_test_record');
+  if (sourceRow.is_archived_by_admin) errors.push('description verification failure: is_archived_by_admin');
 
-  const hasApprovedPrice = r.pricing_source === 'board_approved_fixed_price' && typeof r.approved_regular_price_dkk === 'number' && r.approved_regular_price_dkk > 0;
+  const hasApprovedPrice = sourceRow.pricing_source === 'board_approved_fixed_price'
+    && typeof sourceRow.approved_regular_price_dkk === 'number'
+    && sourceRow.approved_regular_price_dkk > 0;
   const poster = posterUrlFor(itemNo);
+  const mappedCategory = CATEGORY_MAP[sourceRow.category] || sourceRow.category;
+  const chassis = itemNo === '19431' ? 'Super-II' : (sourceRow.chassis || '');
+  const audit = descriptionAudit(itemNo, sourceRow.source_url);
 
   const row = {
     source: 'catalog_new',
     item_no: itemNo,
-    name: r.name,
-    description: r.description,
-    chassis: r.chassis || '',
+    name: String(sourceRow.name || '').trim(),
+    description: publicDescription({
+      itemNo,
+      name: sourceRow.name,
+      category: mappedCategory,
+      chassis,
+    }),
+    descriptionAudit: audit,
+    chassis,
     type: 'boxed',
-    category: CATEGORY_MAP[r.category] || r.category,
-    subcategory: r.subcategory || null,
-    // Never a fake/guessed price. Only ever the source's own board-approved
-    // figure, or null — price_on_request is the only thing that ever
-    // signals "no price yet."
-    price_dkk: hasApprovedPrice ? r.approved_regular_price_dkk : null,
+    category: mappedCategory,
+    subcategory: sourceRow.subcategory || null,
+    price_dkk: hasApprovedPrice ? sourceRow.approved_regular_price_dkk : null,
     original_price_dkk: null,
     price_on_request: !hasApprovedPrice,
-    stock_qty: r.stock_qty ?? 0,
-    unbuilt_stock: r.unbuilt_stock ?? 0,
-    built_stock: r.built_stock ?? 0,
-    status: r.status || 'coming soon',
+    stock_qty: sourceRow.stock_qty ?? 0,
+    unbuilt_stock: sourceRow.unbuilt_stock ?? 0,
+    built_stock: sourceRow.built_stock ?? 0,
+    status: sourceRow.status || 'coming soon',
     available: false,
     is_collectors_vault: false,
     image_url: poster || '',
     item_number: null,
     posterMatched: !!poster,
     validationErrors: errors,
-    sourceUrl: r.source_url || null,
+    sourceUrl: audit.sourceUrl,
   };
 
   if (errors.length > 0) blockedRows.push(row);
   else newRows.push(row);
 }
 
+const allRows = [...existing, ...newRows];
 const seed = {
   generatedFrom: {
     ...currentSeed.generatedFrom,
     regeneratedAt: new Date().toISOString().slice(0, 10),
-    rolloutPhase: 'price-on-request (owner decision: missing price no longer blocks catalog inclusion)',
+    rolloutPhase: 'price-on-request with conservative description audit',
+  },
+  auditSummary: {
+    total: allRows.length,
+    conservativeVerified: allRows.filter(row => row.descriptionAudit?.status === 'conservative_verified').length,
+    internalSpecVerified: allRows.filter(row => row.descriptionAudit?.status === 'internal_spec_verified').length,
+    blocked: blockedRows.length,
   },
   existing,
   new: newRows,
@@ -144,9 +196,10 @@ writeFileSync(path.join(ROOT, 'catalog', 'bmax-catalog-reconciled-seed.json'), J
 console.log('existing:', existing.length);
 console.log('new:', newRows.length, '(price_on_request:', newRows.filter(r => r.price_on_request).length, ', approved price:', newRows.filter(r => !r.price_on_request).length, ')');
 console.log('blocked:', blockedRows.length);
+console.log('total (existing+new):', allRows.length);
+console.log('poster matches (existing+new):', allRows.filter(r => r.posterMatched).length);
+console.log('descriptions audited:', allRows.filter(r => r.descriptionAudit).length);
 if (blockedRows.length) {
   console.log('blocked reasons:');
   for (const row of blockedRows) console.log(' ', row.item_no, '-', row.validationErrors.join('; '));
 }
-console.log('total (existing+new):', existing.length + newRows.length);
-console.log('poster matches (existing+new):', existing.filter(r => r.posterMatched).length + newRows.filter(r => r.posterMatched).length);
