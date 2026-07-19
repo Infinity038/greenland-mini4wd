@@ -23,10 +23,12 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
-      - name: Update dependency lock
-        run: npm install --package-lock-only --ignore-scripts
+      - name: Update dependency lock and install
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          npm ci
       - name: Persist validated legacy-auth cleanup
         run: |
           node scripts/admin-page-cleanup.mjs
@@ -39,9 +41,8 @@ jobs:
           packageJson.scripts.prebuild = 'npm run catalog:reconcile && npm run auth:scan';
           writeFileSync('package.json', JSON.stringify(packageJson, null, 2) + '\n');
           NODE
-      - name: Install and validate
+      - name: Validate clean Auth source
         run: |
-          npm ci
           npm run auth:scan
           npm run build
       - name: Commit clean Auth source
