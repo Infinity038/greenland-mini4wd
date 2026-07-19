@@ -1,118 +1,71 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MemberProfileModal } from '@/components/admin/MemberProfileModal';
-
-const ADMIN_PASSWORD = 'mini4wd2026';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
-
 const STATUS_LABELS: Record<string, string> = {
-  awaiting_payment: 'Awaiting Payment', proof_uploaded: 'Proof Uploaded',
-  payment_confirmed: 'Payment Confirmed', rejected: 'Proof Rejected',
-  pending: 'Pending', reserved: 'Reserved', awaiting_stock: 'Awaiting Stock',
-  in_transit: 'In Transit', ready_for_pickup: 'Ready for Pickup',
-  completed: 'Completed', cancelled: 'Cancelled',
+    awaiting_payment: 'Awaiting Payment', proof_uploaded: 'Proof Uploaded',
+    payment_confirmed: 'Payment Confirmed', rejected: 'Proof Rejected',
+    pending: 'Pending', reserved: 'Reserved', awaiting_stock: 'Awaiting Stock',
+    in_transit: 'In Transit', ready_for_pickup: 'Ready for Pickup',
+    completed: 'Completed', cancelled: 'Cancelled',
 };
 const STATUS_COLORS: Record<string, string> = {
-  awaiting_payment: '#FACC15', proof_uploaded: '#3B82F6', payment_confirmed: '#22C55E',
-  rejected: '#DC2626', pending: '#FACC15', reserved: '#22C55E', awaiting_stock: '#F97316',
-  in_transit: '#3B82F6', ready_for_pickup: '#10B981', completed: '#6B7280', cancelled: '#DC2626',
+    awaiting_payment: '#FACC15', proof_uploaded: '#3B82F6', payment_confirmed: '#22C55E',
+    rejected: '#DC2626', pending: '#FACC15', reserved: '#22C55E', awaiting_stock: '#F97316',
+    in_transit: '#3B82F6', ready_for_pickup: '#10B981', completed: '#6B7280', cancelled: '#DC2626',
 };
-const ALL_STATUSES = ['awaiting_payment','proof_uploaded','payment_confirmed','rejected','reserved','awaiting_stock','in_transit','ready_for_pickup','completed','cancelled'];
-
-function checkAuth() {
-  if (typeof window === 'undefined') return false;
-  const s = localStorage.getItem('adminSession');
-  if (!s) return false;
-  try { const { expires } = JSON.parse(s); return Date.now() < expires; } catch { return false; }
-}
-function saveAuth() {
-  localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + 8 * 60 * 60 * 1000 }));
-}
-
-function LoginScreen({ onLogin }: { onLogin: () => void }) {
-  const [pw, setPw] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState(false);
-  const login = () => { if (pw === ADMIN_PASSWORD) { saveAuth(); onLogin(); } else setError(true); };
-  return (
-    <div style={{ minHeight: '100vh', background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ width: '100%', maxWidth: 380 }}>
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <a href="/admin" style={{ textDecoration: 'none' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, background: '#DC2626', borderRadius: 12, ...F, fontWeight: 900, fontSize: 20, color: '#fff', marginBottom: 12 }}>4W</div>
-          </a>
-          <div style={{ ...F, fontWeight: 900, fontSize: 22, color: '#F5F5F5', letterSpacing: 2 }}>ADMIN ACCESS</div>
-          <div style={{ ...FB, fontSize: 12, color: '#6B7280', marginTop: 4 }}>Orders & Payments</div>
-        </div>
-        <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, padding: '28px 24px' }}>
-          <div style={{ position: 'relative', marginBottom: error ? 8 : 16 }}>
-            <input type={showPw ? 'text' : 'password'} value={pw} onChange={e => { setPw(e.target.value); setError(false); }} onKeyDown={e => e.key === 'Enter' && login()} placeholder="Admin password" autoFocus
-              style={{ width: '100%', background: '#050505', border: `1px solid ${error ? '#DC2626' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '13px 46px 13px 16px', color: '#F5F5F5', ...FB, fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
-            <button onClick={() => setShowPw(!showPw)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#6B7280', cursor: 'pointer', fontSize: 16 }}>{showPw ? '🙈' : '👁️'}</button>
-          </div>
-          {error && <div style={{ ...FB, fontSize: 13, color: '#DC2626', marginBottom: 12 }}>⚠ Incorrect password.</div>}
-          <button onClick={login} style={{ width: '100%', background: '#DC2626', color: '#fff', border: 'none', borderRadius: 10, padding: '13px', ...F, fontWeight: 900, fontSize: 17, letterSpacing: 2, cursor: 'pointer' }}>LOGIN →</button>
-          <div style={{ textAlign: 'center', marginTop: 12 }}><a href="/admin" style={{ ...FB, fontSize: 12, color: '#6B7280', textDecoration: 'none' }}>← Dashboard</a></div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+const ALL_STATUSES = ['awaiting_payment', 'proof_uploaded', 'payment_confirmed', 'rejected', 'reserved', 'awaiting_stock', 'in_transit', 'ready_for_pickup', 'completed', 'cancelled'];
 export default function AdminOrdersPage() {
-  const [authed, setAuthed] = useState(false);
-  const [checked, setChecked] = useState(false);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [proofs, setProofs] = useState<Record<string, any>>({});
-  const [members, setMembers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState<string | null>(null);
-  const [activeProof, setActiveProof] = useState<string | null>(null);
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const [filter, setFilter] = useState('all');
-  const [tab, setTab] = useState<'orders' | 'members'>('orders');
-  const [selectedMember, setSelectedMember] = useState<any>(null);
-
-  useEffect(() => { const ok = checkAuth(); setAuthed(ok); setChecked(true); if (ok) fetchData(); }, []);
-
-  const fetchData = async () => {
-    setLoading(true);
-    const [{ data: o }, { data: pr }, { data: m }] = await Promise.all([
-      supabase.from('orders').select('*').order('created_at', { ascending: false }),
-      supabase.from('payment_proofs').select('*'),
-      supabase.from('members').select('*').order('created_at', { ascending: false }),
-    ]);
-    setOrders(o || []); setMembers(m || []);
-    const pm: Record<string, any> = {}; (pr || []).forEach((p: any) => { pm[p.order_id] = p; }); setProofs(pm);
-    const nm: Record<string, string> = {}; (o || []).forEach((x: any) => { nm[x.id] = x.notes || ''; }); setNotes(nm);
-    setLoading(false);
-  };
-
-  const updateOrder = async (id: string, updates: any) => { setSaving(id); await supabase.from('orders').update(updates).eq('id', id); await fetchData(); setSaving(null); };
-  const confirmPayment = async (order: any) => {
-    setSaving(order.id);
-    await supabase.from('orders').update({ payment_status: 'payment_confirmed', status: 'reserved' }).eq('id', order.id);
-    if (proofs[order.id]) await supabase.from('payment_proofs').update({ status: 'confirmed', reviewed_at: new Date().toISOString() }).eq('order_id', order.id);
-    await fetchData(); setSaving(null);
-  };
-  const rejectProof = async (id: string) => {
-    setSaving(id);
-    await supabase.from('orders').update({ payment_status: 'rejected' }).eq('id', id);
-    if (proofs[id]) await supabase.from('payment_proofs').update({ status: 'rejected' }).eq('order_id', id);
-    await fetchData(); setSaving(null);
-  };
-  const unlockMembership = async (email: string) => { await supabase.from('members').update({ member_status: 'official' }).eq('email', email); await fetchData(); };
-
-  const filtered = filter === 'all' ? orders : orders.filter(o => (o.payment_status || o.status) === filter);
-
-  if (!checked) return null;
-  if (!authed) return <LoginScreen onLogin={() => { setAuthed(true); fetchData(); }} />;
-
-  return (
-    <div style={{ minHeight: '100vh', background: '#050505', color: '#F5F5F5' }}>
+    const [orders, setOrders] = useState<any[]>([]);
+    const [proofs, setProofs] = useState<Record<string, any>>({});
+    const [members, setMembers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState<string | null>(null);
+    const [activeProof, setActiveProof] = useState<string | null>(null);
+    const [notes, setNotes] = useState<Record<string, string>>({});
+    const [filter, setFilter] = useState('all');
+    const [tab, setTab] = useState<'orders' | 'members'>('orders');
+    const [selectedMember, setSelectedMember] = useState<any>(null);
+    useEffect(() => { fetchData(); }, []);
+    const fetchData = async () => {
+        setLoading(true);
+        const [{ data: o }, { data: pr }, { data: m }] = await Promise.all([
+            supabase.from('orders').select('*').order('created_at', { ascending: false }),
+            supabase.from('payment_proofs').select('*'),
+            supabase.from('members').select('*').order('created_at', { ascending: false }),
+        ]);
+        setOrders(o || []);
+        setMembers(m || []);
+        const pm: Record<string, any> = {};
+        (pr || []).forEach((p: any) => { pm[p.order_id] = p; });
+        setProofs(pm);
+        const nm: Record<string, string> = {};
+        (o || []).forEach((x: any) => { nm[x.id] = x.notes || ''; });
+        setNotes(nm);
+        setLoading(false);
+    };
+    const updateOrder = async (id: string, updates: any) => { setSaving(id); await supabase.from('orders').update(updates).eq('id', id); await fetchData(); setSaving(null); };
+    const confirmPayment = async (order: any) => {
+        setSaving(order.id);
+        await supabase.from('orders').update({ payment_status: 'payment_confirmed', status: 'reserved' }).eq('id', order.id);
+        if (proofs[order.id])
+            await supabase.from('payment_proofs').update({ status: 'confirmed', reviewed_at: new Date().toISOString() }).eq('order_id', order.id);
+        await fetchData();
+        setSaving(null);
+    };
+    const rejectProof = async (id: string) => {
+        setSaving(id);
+        await supabase.from('orders').update({ payment_status: 'rejected' }).eq('id', id);
+        if (proofs[id])
+            await supabase.from('payment_proofs').update({ status: 'rejected' }).eq('order_id', id);
+        await fetchData();
+        setSaving(null);
+    };
+    const unlockMembership = async (email: string) => { await supabase.from('members').update({ member_status: 'official' }).eq('email', email); await fetchData(); };
+    const filtered = filter === 'all' ? orders : orders.filter(o => (o.payment_status || o.status) === filter);
+    return (<div style={{ minHeight: '100vh', background: '#050505', color: '#F5F5F5' }}>
       <div style={{ background: '#071426', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <a href="/admin" style={{ textDecoration: 'none' }}><div style={{ width: 28, height: 28, background: '#DC2626', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', ...F, fontWeight: 900, fontSize: 12, color: '#fff' }}>4W</div></a>
@@ -132,41 +85,33 @@ export default function AdminOrdersPage() {
             { label: 'Awaiting Payment', value: orders.filter(o => o.payment_status === 'awaiting_payment').length, color: '#FACC15' },
             { label: 'Confirmed', value: orders.filter(o => o.payment_status === 'payment_confirmed').length, color: '#22C55E' },
             { label: 'Total Members', value: members.length, color: '#A855F7' },
-          ].map(s => (
-            <div key={s.label} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '14px 16px' }}>
+        ].map(s => (<div key={s.label} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ ...F, fontWeight: 900, fontSize: 30, color: s.color }}>{s.value}</div>
               <div style={{ ...F, fontSize: 11, letterSpacing: 1, color: '#B8C1CC' }}>{s.label}</div>
-            </div>
-          ))}
+            </div>))}
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-          {(['orders', 'members'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{ ...F, fontWeight: 700, fontSize: 14, letterSpacing: 1, padding: '9px 20px', borderRadius: 8, cursor: 'pointer', background: tab === t ? '#DC2626' : '#071426', color: tab === t ? '#fff' : '#B8C1CC', border: tab === t ? 'none' : '1px solid rgba(255,255,255,0.08)' }}>
+          {(['orders', 'members'] as const).map(t => (<button key={t} onClick={() => setTab(t)} style={{ ...F, fontWeight: 700, fontSize: 14, letterSpacing: 1, padding: '9px 20px', borderRadius: 8, cursor: 'pointer', background: tab === t ? '#DC2626' : '#071426', color: tab === t ? '#fff' : '#B8C1CC', border: tab === t ? 'none' : '1px solid rgba(255,255,255,0.08)' }}>
               {t === 'orders' ? `ORDERS (${orders.length})` : `MEMBERS (${members.length})`}
-            </button>
-          ))}
+            </button>))}
         </div>
 
-        {tab === 'orders' && (
-          <>
+        {tab === 'orders' && (<>
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 20, paddingBottom: 4 }}>
-              {['all', 'proof_uploaded', 'awaiting_payment', 'payment_confirmed', 'rejected'].map(f => (
-                <button key={f} onClick={() => setFilter(f)} style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, padding: '7px 14px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, background: filter === f ? '#DC2626' : '#071426', color: filter === f ? '#fff' : '#B8C1CC', border: filter === f ? 'none' : '1px solid rgba(255,255,255,0.08)' }}>
+              {['all', 'proof_uploaded', 'awaiting_payment', 'payment_confirmed', 'rejected'].map(f => (<button key={f} onClick={() => setFilter(f)} style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, padding: '7px 14px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, background: filter === f ? '#DC2626' : '#071426', color: filter === f ? '#fff' : '#B8C1CC', border: filter === f ? 'none' : '1px solid rgba(255,255,255,0.08)' }}>
                   {f === 'all' ? 'ALL' : (STATUS_LABELS[f] || f).toUpperCase()}
                   {f === 'proof_uploaded' ? ` (${orders.filter(o => o.payment_status === 'proof_uploaded').length})` : ''}
-                </button>
-              ))}
+                </button>))}
             </div>
             {loading ? <div style={{ textAlign: 'center', padding: 60, ...FB, color: '#B8C1CC' }}>Loading...</div>
-            : filtered.length === 0 ? <div style={{ textAlign: 'center', padding: 60, ...FB, color: '#B8C1CC' }}>No orders found.</div>
-            : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                : filtered.length === 0 ? <div style={{ textAlign: 'center', padding: 60, ...FB, color: '#B8C1CC' }}>No orders found.</div>
+                    : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {filtered.map(order => {
-                  const ps = order.payment_status || order.status;
-                  const sc = STATUS_COLORS[ps] || '#6B7280';
-                  const proof = proofs[order.id];
-                  return (
-                    <div key={order.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
+                            const ps = order.payment_status || order.status;
+                            const sc = STATUS_COLORS[ps] || '#6B7280';
+                            const proof = proofs[order.id];
+                            return (<div key={order.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
                       <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                         <div>
                           <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', marginBottom: 2 }}>{order.product_name}</div>
@@ -176,68 +121,50 @@ export default function AdminOrdersPage() {
                         </div>
                         <span style={{ ...F, fontSize: 11, letterSpacing: 2, padding: '4px 12px', borderRadius: 20, background: sc + '22', color: sc, flexShrink: 0 }}>{STATUS_LABELS[ps] || ps}</span>
                       </div>
-                      {proof && (
-                        <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(59,130,246,0.05)' }}>
+                      {proof && (<div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(59,130,246,0.05)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ ...F, fontWeight: 700, fontSize: 13, color: '#3B82F6' }}>📸 Payment Proof Uploaded</span>
                             <button onClick={() => setActiveProof(activeProof === order.id ? null : order.id)} style={{ ...FB, fontSize: 12, color: '#B8C1CC', background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>
                               {activeProof === order.id ? 'Hide' : 'View Proof'}
                             </button>
                           </div>
-                          {activeProof === order.id && proof.proof_url && (
-                            <img src={proof.proof_url} alt="proof" style={{ maxHeight: 240, borderRadius: 8, marginTop: 10, border: '1px solid rgba(255,255,255,0.1)', display: 'block', margin: '10px auto 0' }} />
-                          )}
-                        </div>
-                      )}
+                          {activeProof === order.id && proof.proof_url && (<img src={proof.proof_url} alt="proof" style={{ maxHeight: 240, borderRadius: 8, marginTop: 10, border: '1px solid rgba(255,255,255,0.1)', display: 'block', margin: '10px auto 0' }}/>)}
+                        </div>)}
                       <div style={{ padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {ps === 'proof_uploaded' && (
-                          <div style={{ display: 'flex', gap: 8 }}>
+                        {ps === 'proof_uploaded' && (<div style={{ display: 'flex', gap: 8 }}>
                             <button onClick={() => confirmPayment(order)} disabled={saving === order.id} style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer', opacity: saving === order.id ? 0.5 : 1 }}>✓ CONFIRM PAYMENT</button>
                             <button onClick={() => rejectProof(order.id)} disabled={saving === order.id} style={{ background: 'transparent', color: '#DC2626', border: '1px solid rgba(220,38,38,0.4)', borderRadius: 8, padding: '9px 16px', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>✕ REJECT</button>
-                          </div>
-                        )}
-                        {ps === 'payment_confirmed' && (
-                          <button onClick={() => unlockMembership(order.member_email)} style={{ alignSelf: 'flex-start', background: 'rgba(250,204,21,0.12)', color: '#FACC15', border: '1px solid rgba(250,204,21,0.3)', borderRadius: 8, padding: '9px 16px', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>🏅 UNLOCK OFFICIAL MEMBERSHIP</button>
-                        )}
+                          </div>)}
+                        {ps === 'payment_confirmed' && (<button onClick={() => unlockMembership(order.member_email)} style={{ alignSelf: 'flex-start', background: 'rgba(250,204,21,0.12)', color: '#FACC15', border: '1px solid rgba(250,204,21,0.3)', borderRadius: 8, padding: '9px 16px', ...F, fontWeight: 700, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>🏅 UNLOCK OFFICIAL MEMBERSHIP</button>)}
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           <select value={order.status || ''} onChange={e => updateOrder(order.id, { status: e.target.value })} style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#F5F5F5', ...FB, fontSize: 13, outline: 'none', cursor: 'pointer' }}>
                             {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}
                           </select>
-                          <input value={notes[order.id] || ''} onChange={e => setNotes(p => ({ ...p, [order.id]: e.target.value }))} placeholder="Admin notes..." style={{ flex: 1, minWidth: 140, background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#F5F5F5', ...FB, fontSize: 13, outline: 'none' }} />
+                          <input value={notes[order.id] || ''} onChange={e => setNotes(p => ({ ...p, [order.id]: e.target.value }))} placeholder="Admin notes..." style={{ flex: 1, minWidth: 140, background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#F5F5F5', ...FB, fontSize: 13, outline: 'none' }}/>
                           <button onClick={() => updateOrder(order.id, { notes: notes[order.id] })} disabled={saving === order.id} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', ...F, fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving === order.id ? 0.5 : 1 }}>
                             {saving === order.id ? '...' : 'SAVE'}
                           </button>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            }
-          </>
-        )}
+                    </div>);
+                        })}
+              </div>}
+          </>)}
 
-        {tab === 'members' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {members.map(m => (
-              <div key={m.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        {tab === 'members' && (<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {members.map(m => (<div key={m.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <button onClick={() => setSelectedMember(m)} style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', flex: 1, minWidth: 0 }}>
                   <div style={{ ...F, fontWeight: 700, fontSize: 17, color: '#F5F5F5' }}>{m.name}</div>
                   <div style={{ ...FB, fontSize: 12, color: '#B8C1CC' }}>{m.email} · {m.nationality}</div>
                 </button>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span style={{ ...F, fontSize: 10, letterSpacing: 2, padding: '3px 10px', borderRadius: 4, background: m.member_status === 'official' ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)', color: m.member_status === 'official' ? '#FACC15' : '#B8C1CC' }}>{(m.member_status || 'registered').toUpperCase()}</span>
-                  {m.member_status !== 'official' && (
-                    <button onClick={() => unlockMembership(m.email)} style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, padding: '6px 12px', borderRadius: 6, background: 'transparent', border: '1px solid rgba(250,204,21,0.3)', color: '#FACC15', cursor: 'pointer' }}>MAKE OFFICIAL</button>
-                  )}
+                  {m.member_status !== 'official' && (<button onClick={() => unlockMembership(m.email)} style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, padding: '6px 12px', borderRadius: 6, background: 'transparent', border: '1px solid rgba(250,204,21,0.3)', color: '#FACC15', cursor: 'pointer' }}>MAKE OFFICIAL</button>)}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              </div>))}
+          </div>)}
       </div>
 
-      <MemberProfileModal member={selectedMember} onClose={() => setSelectedMember(null)} />
-    </div>
-  );
+      <MemberProfileModal member={selectedMember} onClose={() => setSelectedMember(null)}/>
+    </div>);
 }
