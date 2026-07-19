@@ -45,6 +45,7 @@ export default function AdminLoyaltyPage() {
       supabase
         .from('points_transactions')
         .select('*')
+        .eq('rate_applied', 1)
         .order('created_at', { ascending: false })
         .limit(40),
     ]);
@@ -70,6 +71,7 @@ export default function AdminLoyaltyPage() {
   const balance = normalizeRewardPoints(selectedAccount?.points_balance);
   const unlocked = highestUnlockedReward(balance);
   const next = nextRewardMilestone(balance);
+  const availableRedemptions = REWARD_MILESTONES.filter(milestone => milestone.points <= balance);
 
   async function saveAdjustment() {
     if (!selectedMember) return;
@@ -79,7 +81,15 @@ export default function AdminLoyaltyPage() {
       return;
     }
 
-    if (form.type === 'redeem' && amount > balance) {
+    const isRedeem = form.type === 'redeem';
+    const selectedMilestone = REWARD_MILESTONES.find(milestone => milestone.points === amount);
+
+    if (isRedeem && !selectedMilestone) {
+      setMessage('Redemptions must use an approved milestone: 25, 50, 100 or 150 points.');
+      return;
+    }
+
+    if (isRedeem && amount > balance) {
       setMessage(`Cannot redeem ${amount} points. Current balance is ${balance}.`);
       return;
     }
@@ -89,7 +99,6 @@ export default function AdminLoyaltyPage() {
 
     const currentEarned = normalizeRewardPoints(selectedAccount?.total_earned);
     const currentRedeemed = normalizeRewardPoints(selectedAccount?.total_redeemed);
-    const isRedeem = form.type === 'redeem';
     const nextBalance = isRedeem ? balance - amount : balance + amount;
     const nextEarned = isRedeem ? currentEarned : currentEarned + amount;
     const nextRedeemed = isRedeem ? currentRedeemed + amount : currentRedeemed;
@@ -113,7 +122,9 @@ export default function AdminLoyaltyPage() {
     }
 
     const description = form.description.trim()
-      || (isRedeem ? `Fixed reward redemption: ${amount} points` : `Manual fixed reward adjustment: +${amount} points`);
+      || (isRedeem
+        ? `Fixed reward redemption: ${amount} points for ${selectedMilestone?.discountDkk} DKK`
+        : `Manual fixed reward adjustment: +${amount} points`);
 
     const { error: transactionError } = await supabase.from('points_transactions').insert({
       member_id: selectedMember.id,
@@ -128,7 +139,9 @@ export default function AdminLoyaltyPage() {
     if (transactionError) {
       setMessage(`Balance updated, but activity log failed: ${transactionError.message}`);
     } else {
-      setMessage(isRedeem ? `✅ Redeemed ${amount} points.` : `✅ Added ${amount} points.`);
+      setMessage(isRedeem
+        ? `✅ Redeemed ${amount} points for ${selectedMilestone?.discountDkk} DKK.`
+        : `✅ Added ${amount} points.`);
     }
 
     setForm({ type: 'bonus', amount: '', description: '' });
@@ -231,22 +244,53 @@ export default function AdminLoyaltyPage() {
                 <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, marginBottom: 14 }}>
                   <div style={{ ...F, fontSize: 16, fontWeight: 900, marginBottom: 13 }}>ADJUST POINTS</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr)', gap: 10 }}>
-                    <select value={form.type} onChange={event => setForm(previous => ({ ...previous, type: event.target.value }))} style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '9px 10px', color: '#F5F5F5' }}>
+                    <select
+                      value={form.type}
+                      onChange={event => setForm(previous => ({ ...previous, type: event.target.value, amount: '' }))}
+                      style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '9px 10px', color: '#F5F5F5' }}
+                    >
                       <option value="bonus">Add bonus points</option>
                       <option value="adjust">Add manual points</option>
-                      <option value="redeem">Redeem points</option>
+                      <option value="redeem">Redeem fixed reward</option>
                     </select>
-                    <input type="number" min="1" step="1" value={form.amount} onChange={event => setForm(previous => ({ ...previous, amount: event.target.value }))} placeholder="Whole points" style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '9px 10px', color: '#F5F5F5' }} />
+
+                    {form.type === 'redeem' ? (
+                      <select
+                        value={form.amount}
+                        onChange={event => setForm(previous => ({ ...previous, amount: event.target.value }))}
+                        style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '9px 10px', color: '#F5F5F5' }}
+                      >
+                        <option value="">Select available reward…</option>
+                        {availableRedemptions.map(milestone => (
+                          <option key={milestone.points} value={milestone.points}>
+                            {milestone.points} points → {milestone.discountDkk} DKK
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.amount}
+                        onChange={event => setForm(previous => ({ ...previous, amount: event.target.value }))}
+                        placeholder="Whole points"
+                        style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '9px 10px', color: '#F5F5F5' }}
+                      />
+                    )}
                   </div>
+                  {form.type === 'redeem' && availableRedemptions.length === 0 && (
+                    <div style={{ color: '#6B7280', fontSize: 11, marginTop: 8 }}>This racer has not reached the first 25-point reward.</div>
+                  )}
                   <input value={form.description} onChange={event => setForm(previous => ({ ...previous, description: event.target.value }))} placeholder="Reason or reward used" style={{ width: '100%', boxSizing: 'border-box', marginTop: 10, background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '9px 10px', color: '#F5F5F5' }} />
-                  <button onClick={saveAdjustment} disabled={saving} style={{ marginTop: 10, background: '#DC2626', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 16px', cursor: 'pointer', opacity: saving ? 0.55 : 1, fontWeight: 800 }}>{saving ? 'SAVING…' : form.type === 'redeem' ? 'REDEEM POINTS' : 'ADD POINTS'}</button>
+                  <button onClick={saveAdjustment} disabled={saving || (form.type === 'redeem' && availableRedemptions.length === 0)} style={{ marginTop: 10, background: '#DC2626', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 16px', cursor: 'pointer', opacity: saving || (form.type === 'redeem' && availableRedemptions.length === 0) ? 0.55 : 1, fontWeight: 800 }}>{saving ? 'SAVING…' : form.type === 'redeem' ? 'REDEEM REWARD' : 'ADD POINTS'}</button>
                   {message && <div style={{ color: message.startsWith('✅') ? '#22C55E' : '#FACC15', fontSize: 12, marginTop: 9 }}>{message}</div>}
                 </div>
 
                 <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20 }}>
                   <div style={{ ...F, fontSize: 16, fontWeight: 900, marginBottom: 13 }}>RECENT POINT ACTIVITY</div>
                   {transactions.filter(transaction => transaction.member_id === selectedMember.id).length === 0 ? (
-                    <div style={{ color: '#6B7280', fontSize: 12 }}>No point activity recorded.</div>
+                    <div style={{ color: '#6B7280', fontSize: 12 }}>No fixed-reward activity recorded.</div>
                   ) : transactions.filter(transaction => transaction.member_id === selectedMember.id).slice(0, 12).map(transaction => {
                     const redeem = transaction.type === 'redeem';
                     return (
