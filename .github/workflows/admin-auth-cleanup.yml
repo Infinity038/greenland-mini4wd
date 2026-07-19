@@ -1,0 +1,36 @@
+name: Admin Auth cleanup
+
+on:
+  push:
+    branches:
+      - auth/secure-admin-rollout
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: auth/secure-admin-rollout
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --package-lock-only --ignore-scripts
+      - run: node scripts/admin-page-cleanup.mjs
+      - run: rm app/admin/layout.tsx
+      - run: npm ci
+      - run: npm run auth:scan
+      - run: npm run build
+      - name: Commit cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm scripts/admin-page-cleanup.mjs
+          git add app/admin package-lock.json
+          git commit -m "Remove legacy admin password and local session gates"
+          git push origin HEAD:auth/secure-admin-rollout
