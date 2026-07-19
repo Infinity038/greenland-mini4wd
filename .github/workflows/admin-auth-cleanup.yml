@@ -41,12 +41,15 @@ jobs:
           packageJson.scripts.prebuild = 'npm run catalog:reconcile && npm run auth:scan';
           writeFileSync('package.json', JSON.stringify(packageJson, null, 2) + '\n');
           NODE
+          touch .auth-cleanup-ready
       - name: Validate clean Auth source
         run: |
           npm run auth:scan
           npm run build
       - name: Commit clean Auth source
+        if: always()
         run: |
+          test -f .auth-cleanup-ready
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm -f scripts/admin-page-cleanup.mjs .github/workflows/admin-auth-cleanup.yml
