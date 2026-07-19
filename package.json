@@ -5,12 +5,14 @@
   "scripts": {
     "dev": "next dev",
     "catalog:reconcile": "node scripts/build-catalog-reconciled-seed.mjs",
-    "prebuild": "npm run catalog:reconcile",
-    "build": "vitest run && next build",
-    "start": "next start",
-    "lint": "eslint",
+    "test:ui": "NODE_ENV=test vitest run",
+    "test:catalog": "NODE_ENV=test vitest run --config vitest.catalog.config.ts",
     "pretest": "npm run catalog:reconcile",
-    "test": "vitest run"
+    "test": "npm run test:ui && npm run test:catalog",
+    "prebuild": "npm run catalog:reconcile",
+    "build": "npm run test:ui && npm run test:catalog && next build",
+    "start": "next start",
+    "lint": "eslint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
