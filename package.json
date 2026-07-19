@@ -6,7 +6,7 @@
     "dev": "next dev",
     "catalog:reconcile": "node scripts/build-catalog-reconciled-seed.mjs",
     "prebuild": "npm run catalog:reconcile",
-    "build": "next build",
+    "build": "vitest run && next build",
     "start": "next start",
     "lint": "eslint",
     "pretest": "npm run catalog:reconcile",
