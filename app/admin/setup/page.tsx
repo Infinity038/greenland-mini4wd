@@ -10,6 +10,10 @@ const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
 type Phase = 'checking' | 'form' | 'submitting' | 'email_sent' | 'bootstrapping' | 'done';
 
+function confirmationUrl() {
+  return `${window.location.origin}/auth/callback?next=/admin/setup`;
+}
+
 export default function AdminOwnerSetupPage() {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('checking');
@@ -67,12 +71,11 @@ export default function AdminOwnerSetupPage() {
 
     setPhase('submitting');
     const client = createSupabaseBrowserClient();
-    const confirmationUrl = `${window.location.origin}/auth/confirm?next=/admin/setup`;
     const { data, error: signupError } = await client.auth.signUp({
       email: OWNER_EMAIL,
       password,
       options: {
-        emailRedirectTo: confirmationUrl,
+        emailRedirectTo: confirmationUrl(),
         data: { bootstrap_owner: true },
       },
     });
@@ -85,6 +88,25 @@ export default function AdminOwnerSetupPage() {
 
     if (data.session) {
       await bootstrapCurrentUser();
+      return;
+    }
+
+    setPhase('email_sent');
+  }
+
+  async function resendConfirmation() {
+    setError('');
+    setPhase('submitting');
+    const client = createSupabaseBrowserClient();
+    const { error: resendError } = await client.auth.resend({
+      type: 'signup',
+      email: OWNER_EMAIL,
+      options: { emailRedirectTo: confirmationUrl() },
+    });
+
+    if (resendError) {
+      setError(resendError.message || 'Confirmation email could not be resent.');
+      setPhase('form');
       return;
     }
 
@@ -106,7 +128,8 @@ export default function AdminOwnerSetupPage() {
           <div role="status" style={{ ...FB, fontSize: 14, lineHeight: 1.7, textAlign: 'center', color: '#B8C1CC' }}>
             <div style={{ fontSize: 34, marginBottom: 12 }}>✉️</div>
             A confirmation link was sent to <strong style={{ color: '#F5F5F5' }}>{OWNER_EMAIL}</strong>.
-            Open it on this device to finish setup and receive the administrator role.
+            Open the newest email on this device to finish setup and receive the administrator role.
+            <button onClick={resendConfirmation} style={{ width: '100%', marginTop: 18, background: 'transparent', color: '#F5F5F5', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '11px 18px', ...F, fontWeight: 800, letterSpacing: 1.5, fontSize: 14, cursor: 'pointer' }}>RESEND CONFIRMATION</button>
           </div>
         ) : busy ? (
           <div role="status" style={{ ...FB, textAlign: 'center', color: '#B8C1CC', fontSize: 14 }}>
@@ -128,6 +151,7 @@ export default function AdminOwnerSetupPage() {
 
             {error && <div role="alert" style={{ ...FB, color: '#DC2626', fontSize: 12, lineHeight: 1.5, marginBottom: 15 }}>⚠ {error}</div>}
             <button onClick={createOwnerAccount} style={{ width: '100%', background: '#DC2626', color: '#fff', border: 'none', borderRadius: 10, padding: '13px 20px', ...F, fontWeight: 900, letterSpacing: 2, fontSize: 16, cursor: 'pointer' }}>CREATE OWNER ACCOUNT →</button>
+            <button onClick={resendConfirmation} style={{ width: '100%', marginTop: 10, background: 'transparent', color: '#B8C1CC', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 18px', ...F, fontWeight: 800, letterSpacing: 1.2, fontSize: 13, cursor: 'pointer' }}>ALREADY CREATED? RESEND EMAIL</button>
           </>
         )}
       </div>
