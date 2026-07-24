@@ -18,6 +18,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const misplacedAuthCode = pathname === '/' ? request.nextUrl.searchParams.get('code') : null;
+  if (misplacedAuthCode) {
+    const callbackUrl = new URL('/auth/callback', request.url);
+    callbackUrl.searchParams.set('code', misplacedAuthCode);
+    callbackUrl.searchParams.set('next', '/admin/setup');
+    return NextResponse.redirect(callbackUrl);
+  }
+
   if (pathname.startsWith('/admin')) {
     const { supabase, getResponse } = createMiddlewareSupabaseClient(request);
     const { data: userData, error: userError } = await supabase.auth.getUser();
