@@ -1,9 +1,9 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { getMemberData, isRegistered, logout } from "@/lib/member";
 
-const NAV_LINKS = [
+type NavLink = { label: string; href: string; featured?: "rules" | "tickets" };
+const NAV_LINKS: NavLink[] = [
   { label: "Leaderboard", href: "/leaderboard" },
   { label: "Cars", href: "/cars" },
   { label: "Tournament", href: "/tournament" },
@@ -15,7 +15,7 @@ const NAV_LINKS = [
   { label: "Blog", href: "/blog" },
   { label: "How to Join", href: "/how-to-join" },
   { label: "About", href: "/about" },
-] as const;
+];
 
 const MEMBER_LINKS = [
   { label: "👤 Profile", href: "/profile" },
@@ -23,6 +23,8 @@ const MEMBER_LINKS = [
   { label: "🎟️ Race Tickets", href: "/profile?tab=tickets" },
   { label: "🏎️ My Garage", href: "/profile?tab=garage" },
 ];
+
+const font = "'Barlow Condensed', sans-serif";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -37,380 +39,89 @@ export default function Navbar() {
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    return () => { document.body.style.overflow = ""; };
   }, [open]);
 
   const firstName = member?.name?.split(" ")[0] || member?.first_name || "Member";
 
-  return (
-    <nav
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 50,
-        background: "rgba(5,5,5,0.97)",
-        borderBottom: "1px solid rgba(220,38,38,0.3)",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 1152,
-          margin: "0 auto",
-          padding: "0 16px",
-          height: 60,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+  const renderLink = (link: NavLink, mobile = false) => {
+    const isTickets = link.featured === "tickets";
+    const isKnowledge = link.featured === "rules";
+    return (
+      <a
+        key={link.label}
+        href={link.href}
+        onClick={mobile ? () => setOpen(false) : undefined}
+        style={mobile ? {
+          display: "block", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.05)",
+          fontFamily: font, fontWeight: 700, fontSize: 22,
+          color: isKnowledge ? "#22C55E" : "#F5F5F5", letterSpacing: 3, textDecoration: "none",
+        } : {
+          fontFamily: font, fontWeight: isTickets ? 900 : 600, fontSize: 12.5,
+          color: isTickets ? "#FACC15" : isKnowledge ? "#22C55E" : "#B8C1CC",
+          letterSpacing: 2.5, textDecoration: "none",
+          ...(isTickets ? { border: "1px solid rgba(250,204,21,0.3)", padding: "4px 9px", borderRadius: 6 } : {}),
+          ...(isKnowledge ? { border: "1px solid rgba(34,197,94,0.3)", padding: "4px 9px", borderRadius: 6 } : {}),
         }}
       >
+        {isTickets ? `🎟️ ${link.label}` : isKnowledge ? `📚 ${link.label}` : link.label}
+      </a>
+    );
+  };
+
+  return (
+    <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, background: "rgba(5,5,5,0.97)", borderBottom: "1px solid rgba(220,38,38,0.3)" }}>
+      <div style={{ maxWidth: 1152, margin: "0 auto", padding: "0 16px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              background: "#DC2626",
-              borderRadius: 6,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "'Barlow Condensed', sans-serif",
-              fontWeight: 900,
-              color: "#fff",
-              fontSize: 14,
-            }}
-          >
-            4W
-          </div>
+          <div style={{ width: 34, height: 34, background: "#DC2626", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, fontWeight: 900, color: "#fff", fontSize: 14 }}>4W</div>
           <div>
-            <div
-              style={{
-                fontFamily: "'Barlow Condensed', sans-serif",
-                fontWeight: 900,
-                color: "#F5F5F5",
-                fontSize: 15,
-                lineHeight: 1,
-                letterSpacing: 2,
-              }}
-            >
-              GREENLAND
-            </div>
-            <div
-              style={{
-                fontFamily: "'Barlow Condensed', sans-serif",
-                fontWeight: 600,
-                color: "#FACC15",
-                fontSize: 9,
-                letterSpacing: 4,
-                lineHeight: 1,
-                marginTop: 2,
-              }}
-            >
-              MINI 4WD CLUB
-            </div>
+            <div style={{ fontFamily: font, fontWeight: 900, color: "#F5F5F5", fontSize: 15, lineHeight: 1, letterSpacing: 2 }}>GREENLAND</div>
+            <div style={{ fontFamily: font, fontWeight: 600, color: "#FACC15", fontSize: 9, letterSpacing: 4, lineHeight: 1, marginTop: 2 }}>MINI 4WD CLUB</div>
           </div>
         </a>
 
         <div className="hidden md:flex" style={{ alignItems: "center", gap: 18 }}>
-          {NAV_LINKS.map((link) => {
-            const isTickets = link.featured === "tickets";
-            const isKnowledge = link.featured === "rules";
-            return (
-              <a
-                key={link.label}
-                href={link.href}
-                style={{
-                  fontFamily: "'Barlow Condensed', sans-serif",
-                  fontWeight: isTickets ? 900 : 600,
-                  fontSize: 12.5,
-                  color: isTickets ? "#FACC15" : isKnowledge ? "#22C55E" : "#B8C1CC",
-                  letterSpacing: 2.5,
-                  textDecoration: "none",
-                  ...(isTickets
-                    ? { border: "1px solid rgba(250,204,21,0.3)", padding: "4px 9px", borderRadius: 6 }
-                    : {}),
-                  ...(isKnowledge
-                    ? { border: "1px solid rgba(34,197,94,0.3)", padding: "4px 9px", borderRadius: 6 }
-                    : {}),
-                }}
-              >
-                {isTickets ? `🎟️ ${link.label}` : isKnowledge ? `📚 ${link.label}` : link.label}
-              </a>
-            );
-          })}
-
+          {NAV_LINKS.map((link) => renderLink(link))}
           {registered ? (
             <div style={{ position: "relative" }}>
-              <button
-                onClick={() => setMenuOpen(!menuOpen)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  background: "#071426",
-                  border: "1px solid rgba(220,38,38,0.3)",
-                  borderRadius: 6,
-                  padding: "7px 14px",
-                  cursor: "pointer",
-                  color: "#F5F5F5",
-                }}
-              >
-                <div
-                  style={{
-                    width: 24,
-                    height: 24,
-                    background: "#DC2626",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontFamily: "'Barlow Condensed', sans-serif",
-                    fontWeight: 900,
-                    fontSize: 11,
-                    color: "#fff",
-                  }}
-                >
-                  {firstName[0].toUpperCase()}
-                </div>
-                <span
-                  style={{
-                    fontFamily: "'Barlow Condensed', sans-serif",
-                    fontWeight: 600,
-                    fontSize: 13,
-                    letterSpacing: 2,
-                  }}
-                >
-                  {firstName.toUpperCase()}
-                </span>
+              <button onClick={() => setMenuOpen(!menuOpen)} style={{ display: "flex", alignItems: "center", gap: 8, background: "#071426", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 6, padding: "7px 14px", cursor: "pointer", color: "#F5F5F5" }}>
+                <div style={{ width: 24, height: 24, background: "#DC2626", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, fontWeight: 900, fontSize: 11, color: "#fff" }}>{firstName[0].toUpperCase()}</div>
+                <span style={{ fontFamily: font, fontWeight: 600, fontSize: 13, letterSpacing: 2 }}>{firstName.toUpperCase()}</span>
                 <span style={{ fontSize: 10, color: "#B8C1CC" }}>▼</span>
               </button>
-
               {menuOpen && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    right: 0,
-                    background: "#071426",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 8,
-                    minWidth: 200,
-                    overflow: "hidden",
-                    zIndex: 100,
-                  }}
-                >
+                <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#071426", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, minWidth: 200, overflow: "hidden", zIndex: 100 }}>
                   {MEMBER_LINKS.map((item) => (
-                    <a
-                      key={item.label}
-                      href={item.href}
-                      style={{
-                        display: "block",
-                        padding: "12px 18px",
-                        fontFamily: "'Barlow Condensed', sans-serif",
-                        fontWeight: 600,
-                        fontSize: 14,
-                        color: "#F5F5F5",
-                        textDecoration: "none",
-                        borderBottom: "1px solid rgba(255,255,255,0.05)",
-                        letterSpacing: 1,
-                      }}
-                    >
-                      {item.label}
-                    </a>
+                    <a key={item.label} href={item.href} style={{ display: "block", padding: "12px 18px", fontFamily: font, fontWeight: 600, fontSize: 14, color: "#F5F5F5", textDecoration: "none", borderBottom: "1px solid rgba(255,255,255,0.05)", letterSpacing: 1 }}>{item.label}</a>
                   ))}
-                  <button
-                    onClick={logout}
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "12px 18px",
-                      fontFamily: "'Barlow Condensed', sans-serif",
-                      fontWeight: 600,
-                      fontSize: 14,
-                      color: "#DC2626",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      letterSpacing: 1,
-                    }}
-                  >
-                    🚪 Logout
-                  </button>
+                  <button onClick={logout} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 18px", fontFamily: font, fontWeight: 600, fontSize: 14, color: "#DC2626", background: "none", border: "none", cursor: "pointer", letterSpacing: 1 }}>🚪 Logout</button>
                 </div>
               )}
             </div>
           ) : (
-            <a
-              href="/register"
-              style={{
-                background: "#DC2626",
-                color: "#fff",
-                padding: "8px 18px",
-                borderRadius: 6,
-                fontFamily: "'Barlow Condensed', sans-serif",
-                fontWeight: 700,
-                fontSize: 13,
-                letterSpacing: 2,
-                textDecoration: "none",
-              }}
-            >
-              JOIN FREE
-            </a>
+            <a href="/register" style={{ background: "#DC2626", color: "#fff", padding: "8px 18px", borderRadius: 6, fontFamily: font, fontWeight: 700, fontSize: 13, letterSpacing: 2, textDecoration: "none" }}>JOIN FREE</a>
           )}
         </div>
 
-        <button
-          onClick={() => setOpen(!open)}
-          className="md:hidden"
-          aria-expanded={open}
-          aria-label={open ? "Close navigation" : "Open navigation"}
-          style={{ display: "flex", flexDirection: "column", gap: 5, padding: 8, background: "transparent", border: "none", cursor: "pointer" }}
-        >
-          <span
-            style={{
-              display: "block",
-              height: 3,
-              width: 26,
-              background: open ? "#DC2626" : "#F5F5F5",
-              borderRadius: 2,
-              transition: "all 0.2s",
-              transform: open ? "rotate(45deg) translate(5px, 8px)" : "none",
-            }}
-          />
-          <span
-            style={{
-              display: "block",
-              height: 3,
-              width: 26,
-              background: "#F5F5F5",
-              borderRadius: 2,
-              opacity: open ? 0 : 1,
-              transition: "all 0.2s",
-            }}
-          />
-          <span
-            style={{
-              display: "block",
-              height: 3,
-              width: 26,
-              background: open ? "#DC2626" : "#F5F5F5",
-              borderRadius: 2,
-              transition: "all 0.2s",
-              transform: open ? "rotate(-45deg) translate(5px, -8px)" : "none",
-            }}
-          />
+        <button onClick={() => setOpen(!open)} className="md:hidden" aria-expanded={open} aria-label={open ? "Close navigation" : "Open navigation"} style={{ display: "flex", flexDirection: "column", gap: 5, padding: 8, background: "transparent", border: "none", cursor: "pointer" }}>
+          <span style={{ display: "block", height: 3, width: 26, background: open ? "#DC2626" : "#F5F5F5", borderRadius: 2, transition: "all 0.2s", transform: open ? "rotate(45deg) translate(5px, 8px)" : "none" }} />
+          <span style={{ display: "block", height: 3, width: 26, background: "#F5F5F5", borderRadius: 2, opacity: open ? 0 : 1, transition: "all 0.2s" }} />
+          <span style={{ display: "block", height: 3, width: 26, background: open ? "#DC2626" : "#F5F5F5", borderRadius: 2, transition: "all 0.2s", transform: open ? "rotate(-45deg) translate(5px, -8px)" : "none" }} />
         </button>
       </div>
 
       {open && (
-        <div
-          style={{
-            position: "fixed",
-            top: 60,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            overflowY: "auto",
-            WebkitOverflowScrolling: "touch",
-            background: "#050505",
-            borderTop: "1px solid rgba(255,255,255,0.05)",
-            padding: "8px 16px 24px",
-            zIndex: 49,
-          }}
-        >
-          {NAV_LINKS.map((link) => {
-            const isKnowledge = link.featured === "rules";
-            return (
-              <a
-                key={link.label}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                style={{
-                  display: "block",
-                  padding: "14px 0",
-                  borderBottom: "1px solid rgba(255,255,255,0.05)",
-                  fontFamily: "'Barlow Condensed', sans-serif",
-                  fontWeight: 700,
-                  fontSize: 22,
-                  color: isKnowledge ? "#22C55E" : "#F5F5F5",
-                  letterSpacing: 3,
-                  textDecoration: "none",
-                }}
-              >
-                {isKnowledge ? `📚 ${link.label}` : link.label}
-              </a>
-            );
-          })}
-
+        <div style={{ position: "fixed", top: 60, left: 0, right: 0, bottom: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", background: "#050505", borderTop: "1px solid rgba(255,255,255,0.05)", padding: "8px 16px 24px", zIndex: 49 }}>
+          {NAV_LINKS.map((link) => renderLink(link, true))}
           {registered ? (
             <>
               {MEMBER_LINKS.map((item) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  style={{
-                    display: "block",
-                    padding: "14px 0",
-                    borderBottom: "1px solid rgba(255,255,255,0.05)",
-                    fontFamily: "'Barlow Condensed', sans-serif",
-                    fontWeight: 700,
-                    fontSize: 20,
-                    color: "#FACC15",
-                    letterSpacing: 3,
-                    textDecoration: "none",
-                  }}
-                >
-                  {item.label}
-                </a>
+                <a key={item.label} href={item.href} onClick={() => setOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontFamily: font, fontWeight: 700, fontSize: 20, color: "#FACC15", letterSpacing: 3, textDecoration: "none" }}>{item.label}</a>
               ))}
-              <button
-                onClick={logout}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  marginTop: 8,
-                  background: "transparent",
-                  border: "1px solid rgba(220,38,38,0.3)",
-                  color: "#DC2626",
-                  padding: "14px",
-                  borderRadius: 8,
-                  fontFamily: "'Barlow Condensed', sans-serif",
-                  fontWeight: 700,
-                  fontSize: 18,
-                  letterSpacing: 3,
-                  cursor: "pointer",
-                }}
-              >
-                🚪 LOGOUT
-              </button>
+              <button onClick={logout} style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, background: "transparent", border: "1px solid rgba(220,38,38,0.3)", color: "#DC2626", padding: "14px", borderRadius: 8, fontFamily: font, fontWeight: 700, fontSize: 18, letterSpacing: 3, cursor: "pointer" }}>🚪 LOGOUT</button>
             </>
           ) : (
-            <a
-              href="/register"
-              onClick={() => setOpen(false)}
-              style={{
-                display: "block",
-                marginTop: 16,
-                background: "#DC2626",
-                color: "#fff",
-                textAlign: "center",
-                padding: "14px",
-                borderRadius: 8,
-                fontFamily: "'Barlow Condensed', sans-serif",
-                fontWeight: 700,
-                fontSize: 18,
-                letterSpacing: 3,
-                textDecoration: "none",
-              }}
-            >
-              JOIN FREE — REGISTER NOW
-            </a>
+            <a href="/register" onClick={() => setOpen(false)} style={{ display: "block", marginTop: 16, background: "#DC2626", color: "#fff", textAlign: "center", padding: "14px", borderRadius: 8, fontFamily: font, fontWeight: 700, fontSize: 18, letterSpacing: 3, textDecoration: "none" }}>JOIN FREE — REGISTER NOW</a>
           )}
         </div>
       )}
