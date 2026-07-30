@@ -5,6 +5,12 @@ const LINKS = {
     { label: "Gallery", href: "/gallery" },
     { label: "Blog", href: "/blog" },
   ],
+  Learn: [
+    { label: "Rules & Classes", href: "/rules" },
+    { label: "Build Guides", href: "/guides" },
+    { label: "Motor Guide", href: "/guides/motors" },
+    { label: "Parts Compatibility", href: "/guides/parts-compatibility" },
+  ],
   Join: [
     { label: "How to Join", href: "/how-to-join" },
     { label: "Register", href: "/register" },
@@ -31,9 +37,9 @@ export default function Footer() {
             <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", lineHeight: 1.6 }}>Greenland's premier Tamiya racing community. Race. Connect. Build.</p>
           </div>
 
-          {Object.entries(LINKS).map(([col, links]) => (
-            <div key={col}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700, color: "#B8C1CC", letterSpacing: 3, marginBottom: 14 }}>{col.toUpperCase()}</div>
+          {Object.entries(LINKS).map(([column, links]) => (
+            <div key={column}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700, color: "#B8C1CC", letterSpacing: 3, marginBottom: 14 }}>{column.toUpperCase()}</div>
               {links.map((link) => (
                 <a key={link.label} href={link.href} style={{ display: "block", fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", marginBottom: 10 }}>{link.label}</a>
               ))}
@@ -42,9 +48,9 @@ export default function Footer() {
 
           <div>
             <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700, color: "#B8C1CC", letterSpacing: 3, marginBottom: 14 }}>FOLLOW US</div>
-            {SOCIAL.map((s) => (
-              <a key={s.name} href={s.href} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", marginBottom: 10 }}>
-                <span>{s.icon}</span>{s.name}
+            {SOCIAL.map((social) => (
+              <a key={social.name} href={social.href} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#B8C1CC", marginBottom: 10 }}>
+                <span>{social.icon}</span>{social.name}
               </a>
             ))}
           </div>
