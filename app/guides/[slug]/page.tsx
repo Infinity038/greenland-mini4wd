@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import Footer from '@/components/layout/Footer';
 import Navbar from '@/components/layout/Navbar';
 import KnowledgeTabs from '@/components/knowledge/KnowledgeTabs';
+import ResponsiveDataTable from '@/components/knowledge/ResponsiveDataTable';
 import { getGuideTopic, GUIDE_TOPICS } from '@/lib/rulesGuidesContent';
 
 const headingFont = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
@@ -9,58 +10,6 @@ const bodyFont = { fontFamily: "'DM Sans', sans-serif" } as const;
 
 export function generateStaticParams() {
   return GUIDE_TOPICS.map((entry) => ({ slug: entry.slug }));
-}
-
-function GuideTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
-  return (
-    <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, marginTop: 18 }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620, background: '#071426' }}>
-        <thead>
-          <tr>
-            {headers.map((header) => (
-              <th
-                key={header}
-                style={{
-                  ...headingFont,
-                  textAlign: 'left',
-                  padding: '13px 14px',
-                  fontSize: 12,
-                  letterSpacing: 1,
-                  color: '#F5F5F5',
-                  borderBottom: '1px solid rgba(255,255,255,0.1)',
-                  background: '#0A0F1C',
-                }}
-              >
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={`${row[0]}-${rowIndex}`}>
-              {row.map((cell, cellIndex) => (
-                <td
-                  key={`${cell}-${cellIndex}`}
-                  style={{
-                    ...bodyFont,
-                    padding: '12px 14px',
-                    fontSize: 13,
-                    color: cellIndex === 0 ? '#F5F5F5' : '#B8C1CC',
-                    fontWeight: cellIndex === 0 ? 600 : 400,
-                    lineHeight: 1.55,
-                    borderBottom: rowIndex === rows.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.05)',
-                  }}
-                >
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 export default async function GuideDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -123,7 +72,16 @@ export default async function GuideDetailPage({ params }: { params: Promise<{ sl
                   ))}
                 </ul>
               )}
-              {section.table && <GuideTable headers={section.table.headers} rows={section.table.rows} />}
+              {section.table && (
+                <div style={{ marginTop: 18 }}>
+                  <ResponsiveDataTable
+                    headers={section.table.headers}
+                    rows={section.table.rows}
+                    ariaLabel={`${guide.title}: ${section.title}`}
+                    minWidth={620}
+                  />
+                </div>
+              )}
               {section.callout && (
                 <div
                   style={{
