@@ -15,7 +15,7 @@ describe('ResponsiveDataTable', () => {
     );
 
     const table = container.querySelector('table');
-    expect(table).toHaveAttribute('aria-label', 'Class comparison');
+    expect(table?.getAttribute('aria-label')).toBe('Class comparison');
     expect(container.querySelectorAll('thead th')).toHaveLength(3);
     expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
   });
@@ -27,10 +27,10 @@ describe('ResponsiveDataTable', () => {
 
     const cards = container.querySelectorAll('article');
     expect(cards).toHaveLength(2);
-    expect(cards[0]).toHaveTextContent('Configuration');
-    expect(cards[0]).toHaveTextContent('Chassis cutting');
-    expect(cards[0]).toHaveTextContent('Box Stock');
-    expect(cards[0]).toHaveTextContent('B-Max');
+    expect(cards[0].textContent).toContain('Configuration');
+    expect(cards[0].textContent).toContain('Chassis cutting');
+    expect(cards[0].textContent).toContain('Box Stock');
+    expect(cards[0].textContent).toContain('B-Max');
   });
 
   it('uses a durable dash for missing values', () => {
