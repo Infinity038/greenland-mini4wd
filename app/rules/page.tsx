@@ -1,6 +1,7 @@
 import Footer from '@/components/layout/Footer';
 import Navbar from '@/components/layout/Navbar';
 import KnowledgeTabs from '@/components/knowledge/KnowledgeTabs';
+import ResponsiveDataTable from '@/components/knowledge/ResponsiveDataTable';
 import {
   CLASS_MATRIX,
   GENERAL_RULES,
@@ -26,58 +27,6 @@ function SectionTitle({ eyebrow, title, intro }: { eyebrow: string; title: strin
           {intro}
         </p>
       )}
-    </div>
-  );
-}
-
-function DataTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
-  return (
-    <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680, background: '#071426' }}>
-        <thead>
-          <tr>
-            {headers.map((header) => (
-              <th
-                key={header}
-                style={{
-                  ...headingFont,
-                  textAlign: 'left',
-                  padding: '13px 14px',
-                  fontSize: 12,
-                  letterSpacing: 1,
-                  color: '#F5F5F5',
-                  borderBottom: '1px solid rgba(255,255,255,0.1)',
-                  background: '#0A0F1C',
-                }}
-              >
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={`${row[0]}-${rowIndex}`}>
-              {row.map((cell, cellIndex) => (
-                <td
-                  key={`${cell}-${cellIndex}`}
-                  style={{
-                    ...bodyFont,
-                    padding: '12px 14px',
-                    fontSize: 13,
-                    color: cellIndex === 0 ? '#F5F5F5' : '#B8C1CC',
-                    fontWeight: cellIndex === 0 ? 600 : 400,
-                    lineHeight: 1.5,
-                    borderBottom: rowIndex === rows.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.05)',
-                  }}
-                >
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -171,7 +120,12 @@ export default function RulesPage() {
 
           <section style={{ marginBottom: 64 }}>
             <SectionTitle eyebrow="MEASUREMENT" title="MACHINE LIMITS" />
-            <DataTable headers={['Inspection item', 'Requirement']} rows={MACHINE_LIMITS} />
+            <ResponsiveDataTable
+              headers={['Inspection item', 'Requirement']}
+              rows={MACHINE_LIMITS}
+              ariaLabel="Greenland Mini 4WD machine limits"
+              minWidth={520}
+            />
           </section>
 
           <section style={{ marginBottom: 64 }}>
@@ -212,7 +166,12 @@ export default function RulesPage() {
 
           <section style={{ marginBottom: 64 }}>
             <SectionTitle eyebrow="QUICK COMPARISON" title="CLASS MATRIX" />
-            <DataTable headers={['Configuration', 'Box Stock', 'Open Box', 'B-Max', 'Open']} rows={CLASS_MATRIX} />
+            <ResponsiveDataTable
+              headers={['Configuration', 'Box Stock', 'Open Box', 'B-Max', 'Open']}
+              rows={CLASS_MATRIX}
+              ariaLabel="Greenland Mini 4WD class comparison"
+              minWidth={760}
+            />
           </section>
 
           <section id="motor-matrix" style={{ marginBottom: 64, scrollMarginTop: 84 }}>
@@ -221,7 +180,12 @@ export default function RulesPage() {
               title="MOTOR LEGALITY"
               intro="A checkmark means the motor is permitted only when it is genuine, unopened and compatible with the chassis. Event announcements may impose a lower motor limit."
             />
-            <DataTable headers={['Motor group', 'Box Stock', 'Open Box', 'B-Max', 'Open', 'Notes']} rows={MOTOR_MATRIX} />
+            <ResponsiveDataTable
+              headers={['Motor group', 'Box Stock', 'Open Box', 'B-Max', 'Open', 'Notes']}
+              rows={MOTOR_MATRIX}
+              ariaLabel="Greenland Mini 4WD motor legality by class"
+              minWidth={900}
+            />
           </section>
 
           <section style={{ marginBottom: 64 }}>
