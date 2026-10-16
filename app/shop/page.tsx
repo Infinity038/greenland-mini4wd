@@ -586,9 +586,9 @@ export default function ShopPage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: '#050505', color: '#F5F5F5', paddingTop: 60 }}>
+      <main className="club-atmosphere" style={{ background: '#050505', color: '#F5F5F5', paddingTop: 60 }}>
 
-        <section style={{ background: '#071426', borderBottom: '1px solid rgba(220,38,38,0.15)', padding: '48px 24px 40px' }}>
+        <section style={{ background: 'linear-gradient(90deg,rgba(7,20,38,.94),rgba(7,20,38,.52)),url(/IMG_5377.png) center 48% / cover', borderBottom: '1px solid rgba(220,38,38,0.15)', padding: '48px 24px 40px' }}>
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>CLUB SHOP</div>
             <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px, 8vw, 72px)', color: '#F5F5F5', margin: '0 0 10px', lineHeight: 0.95 }}>CARS · PARTS · MERCH</h1>
