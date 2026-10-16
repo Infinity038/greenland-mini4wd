@@ -222,7 +222,18 @@ export default function LeaderboardPage() {
                         <td style={{ ...s.td, ...getRankStyle(r.season_rank), fontWeight: 900, fontFamily: "'Barlow Condensed', sans-serif" }}>
                           {r.season_rank === 1 ? '🏆' : r.season_rank === 2 ? '🥈' : r.season_rank === 3 ? '🥉' : `#${r.season_rank}`}
                         </td>
-                        <td style={{ ...s.td, fontWeight: 600 }}>{r.member_name}</td>
+                        <td style={{ ...s.td, fontWeight: 600 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 135 }}>
+                            {r.photo_opt_in === true && typeof r.public_avatar_url === 'string' && /^https:\/\//.test(r.public_avatar_url) ? (
+                              <img src={r.public_avatar_url} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                            ) : (
+                              <span aria-hidden="true" style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#16263B', color: '#F5F5F5', fontWeight: 800 }}>
+                                {(r.public_display_name || r.member_name || 'R').slice(0, 1).toUpperCase()}
+                              </span>
+                            )}
+                            <span>{r.public_display_name || r.member_name || 'Racer'}</span>
+                          </div>
+                        </td>
                         <td style={{ ...s.td, color: '#B8C1CC' }}>{r.races_attended}</td>
                         <td style={{ ...s.td, color: '#FACC15', fontWeight: 700 }}>{r.total_wins}</td>
                         <td style={{ ...s.td, color: '#B8C1CC' }}>{r.podiums ?? '—'}</td>
