@@ -44,6 +44,8 @@ export default function TicketsPage() {
   const [error, setError]                 = useState('');
   const [earlyBirdLeft, setEarlyBirdLeft] = useState(null);
   const [entries, setEntries]             = useState([]);
+  const [entriesError, setEntriesError] = useState('');
+  const [slotError, setSlotError] = useState('');
   const [fighter, setFighter]             = useState(null);
   const [weeklyProgress, setWeeklyProgress] = useState(0);
   const [seasonProgress, setSeasonProgress] = useState(0);
@@ -66,17 +68,25 @@ export default function TicketsPage() {
   useEffect(() => { if (member?.email) fetchLoyalty(member.email); }, [member]);
 
   async function fetchEarlyBirdSlots() {
-    const { data } = await supabase.from('race_tickets').select('quantity').eq('ticket_type', 'weekly_earlybird').eq('payment_status', 'payment_confirmed');
-    const { data: cfg } = await supabase.from('admin_config').select('value').eq('key', 'earlybird_slots').single();
-    const maxSlots = cfg ? parseInt(cfg.value) : 10;
-    // Sum quantity field — one row can represent multiple tickets
-    const used = (data || []).reduce((sum, row) => sum + (Number(row.quantity) || 1), 0);
-    setEarlyBirdLeft(Math.max(0, maxSlots - used));
+    setEarlyBirdLeft(null);setSlotError('');
+    try {
+      const [{data,error},{data:cfg,error:cfgError}]=await Promise.all([
+        supabase.from('race_tickets').select('quantity').eq('ticket_type','weekly_earlybird').eq('payment_status','payment_confirmed'),
+        supabase.from('admin_config').select('value').eq('key','earlybird_slots').single(),
+      ]);
+      if(error||cfgError||!cfg)throw error||cfgError||new Error('No confirmed slot configuration');
+      const maxSlots=Number(cfg.value);
+      if(!Number.isFinite(maxSlots)||maxSlots<0)throw new Error('Invalid slot configuration');
+      const used=(data||[]).reduce((sum,row)=>sum+(Number(row.quantity)||1),0);
+      setEarlyBirdLeft(Math.max(0,maxSlots-used));
+    }catch{setSlotError('Early Bird availability could not be verified. This ticket type is temporarily unavailable.');}
   }
 
   async function fetchEntries() {
-    const { data } = await supabase.from('race_entries').select('*').order('created_at', { ascending: true });
-    setEntries(data || []);
+    setEntriesError('');
+    const {data,error}=await supabase.from('race_entries').select('*').order('created_at',{ascending:true});
+    if(error){setEntries([]);setEntriesError('Live entries could not be verified. Please retry rather than assuming the event has no entrants.');return;}
+    setEntries(data||[]);
   }
 
   async function fetchLoyalty(email) {
@@ -89,6 +99,8 @@ export default function TicketsPage() {
 
   async function placeOrder() {
     if (!member) { window.location.href = '/register'; return; }
+    if (ticketId) { setError('An order was already created in this session. Do not create a duplicate; contact staff with the existing order reference if payment setup failed.'); return; }
+    if (ticketType === 'weekly_earlybird' && (earlyBirdLeft === null || quantity > earlyBirdLeft)) {setError('Early Bird availability cannot be verified for this quantity. Please choose another type or retry later.');return;}
     setUploading(true); setError('');
     const memberName = member.name || member.email;
     try {
@@ -100,24 +112,31 @@ export default function TicketsPage() {
       }).select().single();
       if (err || !data) throw new Error(err?.message || 'failed');
       const ref = generatePaymentRef(data.id);
-      await supabase.from('race_tickets').update({ payment_reference: ref }).eq('id', data.id);
-      setTicketId(data.id); setPayRef(ref); setStep('payment');
+      setTicketId(data.id);
+      const {error: refError, data: confirmedRef}=await supabase.from('race_tickets').update({payment_reference:ref}).eq('id',data.id).select('id,payment_reference').single();
+      if(refError||confirmedRef?.payment_reference!==ref)throw new Error('The order was created but its payment reference could not be verified. Do NOT pay or create another order. Contact club staff and quote order ID: '+data.id);
+      setPayRef(ref); setStep('payment');
     } catch (e) { setError(e.message || 'Something went wrong.'); }
     setUploading(false);
   }
 
   async function uploadProof() {
-    if (!proofFile || !ticketId) return;
-    setUploading(true); setError('');
-    const r = new FileReader();
-    r.onloadend = async () => {
-      try {
-        await supabase.from('race_tickets').update({ payment_proof_url: r.result, payment_status: 'proof_uploaded' }).eq('id', ticketId);
+    if(!proofFile||!ticketId)return;
+    setUploading(true);setError('');
+    const reader=new FileReader();
+    reader.onerror=()=>{setError('Could not read the selected image. Please choose the proof again.');setUploading(false);};
+    reader.onloadend=async()=>{
+      try{
+        if(!reader.result)throw new Error('Empty image');
+        const {data,error}=await supabase.from('race_tickets')
+          .update({payment_proof_url:reader.result,payment_status:'proof_uploaded'})
+          .eq('id',ticketId).select('id,payment_status').single();
+        if(error||data?.payment_status!=='proof_uploaded')throw error||new Error('Proof status not confirmed');
         setStep('done');
-      } catch { setError('Upload failed. Try again.'); }
-      setUploading(false);
+      }catch{setError('Proof submission was not confirmed by the database. Stay on this screen and retry; do not assume staff received it.');}
+      finally{setUploading(false);}
     };
-    r.readAsDataURL(proofFile);
+    reader.readAsDataURL(proofFile);
   }
 
   const handleFile = (e) => {
@@ -163,7 +182,7 @@ export default function TicketsPage() {
                 <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
                   <div style={{ ...F, fontWeight:700, fontSize:13, letterSpacing:3, color:'#B8C1CC' }}>SELECT TICKET TYPE</div>
                   {TICKET_TYPES.map(t => {
-                    const noSlots = t.id === 'weekly_earlybird' && earlyBirdLeft === 0;
+                    const noSlots = t.id === 'weekly_earlybird' && (earlyBirdLeft === null || earlyBirdLeft === 0);
                     const sel     = ticketType === t.id;
                     return (
                       <div key={t.id} onClick={() => !noSlots && setTicketType(t.id)}
@@ -173,7 +192,7 @@ export default function TicketsPage() {
                             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
                               <span style={{ ...F, fontSize:10, letterSpacing:2, padding:'2px 8px', borderRadius:20, background:t.color+'22', color:t.color, border:`1px solid ${t.color}44` }}>{t.badge}</span>
                               {t.id === 'weekly_earlybird' && earlyBirdLeft !== null && earlyBirdLeft > 0 && <span style={{ ...FB, fontSize:11, color:'#22C55E' }}>{earlyBirdLeft} slots left</span>}
-                              {noSlots && <span style={{ ...FB, fontSize:11, color:'#DC2626' }}>SOLD OUT</span>}
+                              {noSlots && <span style={{ ...FB, fontSize:11, color:'#DC2626' }}>{earlyBirdLeft===null ? 'AVAILABILITY UNVERIFIED' : 'SOLD OUT'}</span>}
                             </div>
                             <div style={{ ...F, fontWeight:900, fontSize:20, color:'#F5F5F5', marginBottom:4 }}>{t.label}</div>
                             <div style={{ ...FB, fontSize:13, color:'#B8C1CC' }}>{t.desc}</div>
@@ -188,6 +207,7 @@ export default function TicketsPage() {
                     );
                   })}
 
+                  {slotError && <div role="alert" style={{...FB,color:'#FACC15',fontSize:13}}>{slotError} <button onClick={fetchEarlyBirdSlots} style={{marginLeft:8,padding:7,cursor:'pointer'}}>Retry availability</button></div>}
                   {/* Quantity */}
                   <div style={{ background:'#071426', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:20 }}>
                     <div style={{ ...F, fontWeight:700, fontSize:13, letterSpacing:3, color:'#B8C1CC', marginBottom:14 }}>QUANTITY</div>
@@ -229,7 +249,7 @@ export default function TicketsPage() {
                     <div style={{ ...FB, fontSize:13, color:'#B8C1CC' }}>📧 <span style={{ color:'#F5F5F5' }}>{member?.email}</span></div>
                   </div>
                   {error && <div style={{ ...FB, fontSize:12, color:'#DC2626' }}>{error}</div>}
-                  <button onClick={placeOrder} disabled={uploading}
+                  <button onClick={placeOrder} disabled={uploading || !!ticketId}
                     style={{ background:'#DC2626', color:'#fff', border:'none', borderRadius:12, padding:16, ...F, fontWeight:900, fontSize:18, letterSpacing:2, cursor:'pointer', opacity: uploading ? 0.5 : 1 }}>
                     {uploading ? 'PROCESSING...' : 'CONFIRM ORDER →'}
                   </button>
@@ -300,7 +320,7 @@ export default function TicketsPage() {
               <div style={{ ...FB, fontSize:13, color:'#B8C1CC', marginBottom:20 }}>
                 Members who have registered their car for a race. Grouped by category.
               </div>
-              {entries.length === 0 ? (
+              {entriesError ? <div role="alert" style={{...FB,color:'#FACC15',padding:24}}>{entriesError} <button onClick={fetchEntries} style={{padding:8,marginLeft:8,cursor:'pointer'}}>Retry</button></div> : entries.length === 0 ? (
                 <div style={{ textAlign:'center', padding:'60px 20px' }}>
                   <div style={{ fontSize:40, marginBottom:12 }}>🏁</div>
                   <div style={{ ...F, fontWeight:900, fontSize:20, color:'#F5F5F5', marginBottom:8 }}>NO ENTRIES YET</div>
