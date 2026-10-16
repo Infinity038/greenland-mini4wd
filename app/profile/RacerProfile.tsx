@@ -140,6 +140,7 @@ export default function RacerProfile() {
 
   const [addingCar, setAddingCar] = useState(false);
   const [carSaving, setCarSaving] = useState(false);
+  const [carError,setCarError] = useState('');
   const [carForm, setCarForm] = useState({
     name: '',
     chassis: 'AR',
@@ -299,35 +300,39 @@ export default function RacerProfile() {
   }
 
   async function registerCar() {
-    if (!carForm.name.trim() || !member?.email) return;
-    setCarSaving(true);
-    await supabase.from('cars').insert({
-      ...carForm,
-      name: carForm.name.trim(),
-      member_email: member.email,
-      member_name: memberName(member),
-      status: 'pending',
-    });
-    const { data } = await supabase
-      .from('cars')
-      .select('*')
-      .eq('member_email', member.email)
-      .order('created_at', { ascending: false });
-    setCars(data || []);
-    setCarForm({ name: '', chassis: 'AR', series: '', color: '', image_url: '', bought_from: 'outside', notes: '' });
-    setAddingCar(false);
-    setCarSaving(false);
+    if(!carForm.name.trim() || !member?.email || !profileDataReady) {setCarError('Please verify your live profile before registering a car.');return;}
+    setCarSaving(true);setCarError('');
+    try {
+      const {error:insertError}=await supabase.from('cars').insert({
+        ...carForm,name:carForm.name.trim(),member_email:member.email,
+        member_name:memberName(member),status:'pending',
+      });
+      if(insertError)throw insertError;
+      const {data,error:readError}=await supabase.from('cars').select('*')
+        .eq('member_email',member.email).order('created_at',{ascending:false});
+      if(readError){setCarError('The car submission may have succeeded, but the garage refresh failed. Do not submit it again until staff verify it.');return;}
+      setCars(data||[]);
+      setCarForm({name:'',chassis:'AR',series:'',color:'',image_url:'',bought_from:'outside',notes:''});
+      setAddingCar(false);
+    }catch{setCarError('Car submission was not confirmed. No success is being reported; please retry after verifying your live account.');}
+    finally{setCarSaving(false);}
   }
 
-  async function removeCar(id: string) {
-    if (!window.confirm('Remove this car from your garage?')) return;
-    await supabase.from('cars').delete().eq('id', id);
-    setCars(previous => previous.filter(car => car.id !== id));
+  async function removeCar(id:string) {
+    if(!profileDataReady){setCarError('Verify your live profile before making garage changes.');return;}
+    if(!window.confirm('Remove this car from your garage?'))return;
+    const {error}=await supabase.from('cars').delete().eq('id',id);
+    if(error){setCarError('Could not remove the car. Please retry.');return;}
+    setCars(previous=>previous.filter(car=>car.id!==id));
+    setCarError('');
   }
 
-  async function removeWishlistItem(id: string) {
-    await supabase.from('wishlist').delete().eq('id', id);
-    setWishlist(previous => previous.filter(item => item.id !== id));
+  async function removeWishlistItem(id:string) {
+    if(!profileDataReady){setCarError('Verify your live profile before changing saved items.');return;}
+    const {error}=await supabase.from('wishlist').delete().eq('id',id);
+    if(error){setCarError('Could not remove the saved item. Please retry.');return;}
+    setWishlist(previous=>previous.filter(item=>item.id!==id));
+    setCarError('');
   }
 
   if (loading) {
@@ -661,8 +666,9 @@ export default function RacerProfile() {
                   </div>
                   <input ref={carFileRef} type="file" accept="image/*" onChange={handleCarFile} style={{ display: 'none' }} />
 
+                  {carError && <div role="alert" style={{ ...FB, fontSize:12, color:'#FACC15', marginTop:10 }}>{carError}</div>}
                   <div style={{ display: 'flex', gap: 9, marginTop: 14 }}>
-                    <button onClick={registerCar} disabled={carSaving || !carForm.name.trim()} style={{ flex: 1, background: '#DC2626', border: 'none', borderRadius: 8, color: '#fff', padding: 11, cursor: 'pointer', opacity: carSaving || !carForm.name.trim() ? 0.5 : 1, ...F, fontWeight: 900, letterSpacing: 1 }}>{carSaving ? 'SAVING…' : 'REGISTER CAR'}</button>
+                    <button onClick={registerCar} disabled={carSaving || !profileDataReady || !carForm.name.trim()} style={{ flex: 1, background: '#DC2626', border: 'none', borderRadius: 8, color: '#fff', padding: 11, cursor: 'pointer', opacity: carSaving || !carForm.name.trim() ? 0.5 : 1, ...F, fontWeight: 900, letterSpacing: 1 }}>{carSaving ? 'SAVING…' : 'REGISTER CAR'}</button>
                     <button onClick={() => setAddingCar(false)} style={{ background: 'none', color: '#B8C1CC', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '0 15px', cursor: 'pointer' }}>Cancel</button>
                   </div>
                 </Card>
