@@ -4,8 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { stampNewRegularPrizePolicy, isFixedPrizePolicy } from '@/lib/prizePolicy';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
-const SC: Record<string, string> = { upcoming: '#3B82F6', ongoing: '#22C55E', completed: '#6B7280', cancelled: '#DC2626' };
-const STATUSES = ['upcoming', 'ongoing', 'completed', 'cancelled'];
+const SC: Record<string, string> = { upcoming: '#3B82F6', ongoing: '#22C55E', completed: '#6B7280', postponed: '#FACC15', cancelled: '#DC2626' };
+const STATUSES = ['upcoming', 'ongoing', 'completed', 'postponed', 'cancelled'];
 const RACE_CLASSES = ['Box Stock', 'Open Box Stock', 'B-Max', 'Open Class'];
 const CLASS_COLORS: Record<string, string> = { 'Box Stock': '#22C55E', 'Open Box Stock': '#3B82F6', 'B-Max': '#F97316', 'Open Class': '#DC2626' };
 const CLASS_ICONS: Record<string, string> = { 'Box Stock': '📦', 'Open Box Stock': '🔓', 'B-Max': '⚡', 'Open Class': '🔥' };
@@ -81,7 +81,12 @@ export default function AdminTournamentsPage() {
     };
     const del = async (id: string) => { if (!confirm('Delete?'))
         return; await supabase.from('tournaments').delete().eq('id', id); await loadData(); };
-    const qs = async (id: string, status: string) => { await supabase.from('tournaments').update({ status }).eq('id', id); await loadData(); };
+    const qs = async (id: string, status: string) => {
+      if (status === 'postponed' && !confirm('Confirm the six DISTINCT paid-racer minimum against verified payments, notify affected entrants, announce the next opening-day date and offer an original-payment refund. Changing status does not send notifications or issue refunds automatically. Continue?')) return;
+      const { error } = await supabase.from('tournaments').update({ status }).eq('id', id);
+      if (error) alert('Could not update status: '+error.message);
+      await loadData();
+    };
     const openEdit = async (t: any) => {
         let d = t.date || '';
         if (d && d.length > 16)
