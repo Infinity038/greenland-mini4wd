@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getPrizePolicy } from '@/lib/prizePolicy';
+import { publicEventDescription, publicPrizeSummary } from '@/lib/prizePolicy';
 import { isRegistered } from '@/lib/member';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
@@ -20,10 +20,11 @@ const STATUS_STYLES: Record<string, { color: string; label: string }> = {
   ongoing: { color: '#22C55E', label: '🔴 LIVE NOW' },
   completed: { color: '#6B7280', label: '✓ COMPLETED' },
   cancelled: { color: '#DC2626', label: '✕ CANCELLED' },
+  postponed: { color: '#FACC15', label: '⏳ POSTPONED · NEXT DATE TO BE ANNOUNCED' },
 };
 
 function autoStatus(t: any): string {
-  if (t.status === 'cancelled') return 'cancelled';
+  if (t.status === 'cancelled' || t.status === 'postponed') return t.status;
   if (!t.date) return t.status;
   const now = new Date();
   const eventDate = new Date(t.date);
@@ -37,7 +38,7 @@ export default function EventsPage() {
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [registered, setRegistered] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'ongoing' | 'completed'>('all');
+  const [filter, setFilter] = useState<'all' | 'upcoming' | 'ongoing' | 'completed' | 'postponed'>('all');
 
   useEffect(() => {
     setRegistered(isRegistered());
@@ -80,7 +81,7 @@ export default function EventsPage() {
         </section>
 
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 24px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {(['all', 'upcoming', 'ongoing', 'completed'] as const).map(f => (
+          {(['all', 'upcoming', 'ongoing', 'postponed', 'completed'] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)} style={{ ...F, fontWeight: 700, fontSize: 12, letterSpacing: 2, padding: '8px 16px', borderRadius: 20, border: 'none', cursor: 'pointer', background: filter === f ? '#DC2626' : 'rgba(255,255,255,0.06)', color: filter === f ? '#fff' : '#B8C1CC' }}>
               {f.toUpperCase()}
             </button>
@@ -102,7 +103,7 @@ export default function EventsPage() {
                 const st = autoStatus(t);
                 const style = STATUS_STYLES[st] || STATUS_STYLES.upcoming;
                 const cats: string[] = t.race_categories || [];
-                const isPast = st === 'completed' || st === 'cancelled';
+                const isPast = st === 'completed' || st === 'cancelled' || st === 'postponed';
                 const isLive = st === 'ongoing';
                 return (
                   <div key={t.id} style={{ background: isLive ? 'linear-gradient(135deg, #071426, #0a1f0a)' : '#071426', border: `1.5px solid ${isLive ? 'rgba(34,197,94,0.3)' : isPast ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 16, overflow: 'hidden', opacity: isPast ? 0.75 : 1 }}>
@@ -121,8 +122,9 @@ export default function EventsPage() {
                             {t.date && <span>📅 {new Date(t.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })} · {new Date(t.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
                             {t.location && <span>📍 {t.location}</span>}
                           </div>
-                          <p style={{ ...FB, fontSize:12, color:'#FACC15', margin:'8px 0 0' }}>🏆 {getPrizePolicy(t).prizePct}% prize pool · {getPrizePolicy(t).clubPct}% club operations</p>
-                {t.description && <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', margin: '8px 0 0', lineHeight: 1.6, whiteSpace:'pre-line' }}>{t.description}</p>}
+                          <p style={{ ...FB, fontSize:12, color:'#FACC15', margin:'8px 0 0' }}>🏆 {publicPrizeSummary(t)}</p>
+                {st === 'postponed' && <p style={{...FB,fontSize:13,color:'#FACC15',lineHeight:1.6}}>The minimum was not met. The organiser will announce the next opening day. Affected paid entrants can transfer their entry or request an original-payment refund with their payment reference. Staff will verify and process the request manually.</p>}
+                {publicEventDescription(t.description) && <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', margin: '8px 0 0', lineHeight: 1.6, whiteSpace:'pre-line' }}>{publicEventDescription(t.description)}</p>}
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                           <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#B8C1CC' }}>ENTRY</div>

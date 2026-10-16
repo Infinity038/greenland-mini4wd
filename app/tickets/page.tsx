@@ -142,7 +142,7 @@ export default function TicketsPage() {
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 6 }}>THE ARCTIC HUSTLE</div>
             <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px,8vw,64px)', margin: '0 0 8px', lineHeight: 0.95 }}>RACE TICKETS</h1>
             <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', margin: '0 0 24px' }}>Buy your entry, register your car, race for glory.</p>
-            <p style={{ ...FB, fontSize:12, color:'#FACC15', margin:'0 0 20px', lineHeight:1.6 }}>Regular competition prize allocation: 35% of paid ticket revenue funds prizes; 65% supports club operations. Each event displays its applicable published terms. Bonus tickets do not add cash to the prize pool.</p>
+            <p style={{ ...FB, fontSize:12, color:'#FACC15', margin:'0 0 20px', lineHeight:1.6 }}>New regular races require at least 6 distinct paying racers. The prize starts at 350 DKK and grows by 25 DKK per additional distinct paying racer. If fewer than six are verified at the scheduled start, the organiser will announce the next opening-day date; affected paid entrants may transfer their entry or request a verified-payment refund. Check the individual event before buying: previously sold events retain their original published conditions. Bonus/free entries do not grow the prize.</p>
             <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
               {[{id:'buy',label:'🎟️ BUY TICKETS'},{id:'entrants',label:'🏎️ ENTRANTS'},{id:'pass',label:'🏆 RACE PASS'},{id:'rules',label:'📋 RULES'}].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}

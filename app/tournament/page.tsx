@@ -7,7 +7,7 @@ import Footer from '@/components/layout/Footer';
 import { isRegistered, getMemberData } from '@/lib/member';
 import { isMemberActive } from '@/lib/loyalty';
 import { supabase } from '@/lib/supabase';
-import { getPrizePolicy, getPrizeAllocation } from '@/lib/prizePolicy';
+import { isFixedPrizePolicy, calculateFixedPrize, publicPrizeSummary } from '@/lib/prizePolicy';
 
 const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -28,39 +28,33 @@ function safeName(name: string | null | undefined, fallback = 'Racer'): string {
 }
 
 function PrizeCalculator() {
-  const [paid, setPaid]   = useState(20);
-  const [bonus, setBonus] = useState(0);
-  const [price, setPrice] = useState(150);
-  const pct = 35;
-  const total = Math.max(0, paid) * Math.max(0, price);
-  const { prizes: pool, club: org } = getPrizeAllocation(total, pct);
-  const inp = { background:'#0D1B2A', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'12px 16px', color:'#F5F5F5', fontSize:20, fontWeight:700, width:'100%', outline:'none', fontFamily:"'Barlow Condensed', sans-serif", boxSizing:'border-box' };
+  const [racers, setRacers] = useState(6);
+  const result = calculateFixedPrize(racers);
   return (
     <div style={{ background:'#071426', border:'1px solid rgba(220,38,38,0.25)', borderRadius:16, padding:'32px 28px' }}>
-      <div style={{ ...F, fontSize:11, letterSpacing:5, color:'#DC2626', marginBottom:6 }}>LIVE CALCULATOR</div>
-      <h3 style={{ ...F, fontWeight:900, fontSize:28, color:'#F5F5F5', margin:'0 0 24px' }}>PRIZE POOL ESTIMATOR</h3>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:16, marginBottom:28 }}>
-        {[{l:'TICKET PRICE (DKK)',v:price,s:setPrice,min:50,max:500},{l:'PAID ENTRIES',v:paid,s:setPaid,min:2,max:100},{l:'BONUS TICKETS',v:bonus,s:setBonus,min:0,max:20}].map(f=>(
-          <div key={f.l}><div style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',marginBottom:8}}>{f.l}</div><input style={inp} type="number" min={f.min} max={f.max} value={f.v} onChange={e=>f.s(Number(e.target.value))}/></div>
-        ))}
-      </div>
-      <div style={{ background:'#050505', borderRadius:12, padding:20, marginBottom:16 }}>
-        {[{l:'Total entries',v:paid+bonus,c:'#F5F5F5'},{l:'Paid revenue',v:`${total.toLocaleString()} DKK`,c:'#F5F5F5'},{l:`Club operations (${100-pct}%)`,v:`${org.toLocaleString()} DKK`,c:'#B8C1CC'}].map(r=>(
-          <div key={r.l} style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><span style={{...FB,color:'#B8C1CC',fontSize:14}}>{r.l}</span><span style={{...F,fontWeight:700,color:r.c,fontSize:16}}>{r.v}</span></div>
-        ))}
-        <div style={{height:1,background:'rgba(255,255,255,0.08)',margin:'12px 0'}}/>
-        <div style={{display:'flex',justifyContent:'space-between'}}><span style={{...F,fontSize:16,letterSpacing:2,color:'#FACC15'}}>PRIZE POOL ({pct}%)</span><span style={{...F,fontWeight:900,fontSize:24,color:'#FACC15'}}>{pool.toLocaleString()} DKK</span></div>
-      </div>
-      <p style={{ ...FB, fontSize:11, color:'#B8C1CC', lineHeight:1.6 }}>This is an estimate using paid entries only. Bonus tickets add no prize revenue. The published terms on the individual event govern; the club share is not owner take-home profit.</p>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
-        {[{p:'🥇 1ST',pct:'65%',v:pool-Math.round(pool*.25)-Math.round(pool*.10),c:'#FACC15'},{p:'🥈 2ND',pct:'25%',v:Math.round(pool*.25),c:'#B8C1CC'},{p:'🥉 3RD',pct:'10%',v:Math.round(pool*.10),c:'#CD7F32'}].map(r=>(
-          <div key={r.p} style={{background:'#050505',borderRadius:10,padding:'16px 12px',textAlign:'center',border:`1px solid ${r.c}22`}}>
-            <div style={{...F,fontSize:13,color:r.c,marginBottom:4}}>{r.p}</div>
-            <div style={{...F,fontWeight:900,fontSize:22,color:r.c}}>{r.v.toLocaleString()}</div>
-            <div style={{...FB,fontSize:11,color:'#6B7280'}}>DKK · {r.pct}</div>
+      <div style={{ ...F, fontSize:11, letterSpacing:5, color:'#DC2626', marginBottom:6 }}>REGULAR RACE EXAMPLE</div>
+      <h3 style={{ ...F, fontWeight:900, fontSize:28, color:'#F5F5F5', margin:'0 0 16px' }}>PRIZE POOL ESTIMATOR</h3>
+      <p style={{ ...FB, color:'#B8C1CC',fontSize:14,lineHeight:1.65 }}>At least six distinct paying racers are needed to start a regular competition. The prize begins at 350 DKK and rises by 25 DKK for each additional distinct paying racer.</p>
+      <label htmlFor="paid-racer-count" style={{...F,fontSize:12,letterSpacing:2,color:'#B8C1CC',display:'block',margin:'22px 0 9px'}}>DISTINCT PAYING RACERS</label>
+      <input id="paid-racer-count" type="number" value={racers} min={0} max={100} step={1}
+        onChange={e=>setRacers(Math.min(100,Math.max(0,Math.floor(Number(e.target.value)||0))))}
+        style={{ background:'#0D1B2A',border:'1px solid rgba(255,255,255,0.15)',borderRadius:8,padding:'12px 16px',color:'#F5F5F5',fontSize:23,fontWeight:800,width:'100%',maxWidth:270 }} />
+      <div aria-live="polite" style={{background:'#050505',borderRadius:12,padding:20,margin:'19px 0 14px'}}>
+        {result.eligible ? (
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+            <span style={{...F,fontWeight:800,fontSize:18,color:'#FACC15'}}>TOTAL PRIZE POOL</span>
+            <span style={{...F,fontWeight:900,fontSize:30,color:'#FACC15'}}>{result.prizeDkk.toLocaleString()} DKK</span>
           </div>
-        ))}
+        ) : (
+          <div style={{...FB,color:'#FACC15',fontSize:15,lineHeight:1.6}}>
+            Minimum not reached — {result.missing} more distinct paying racer{result.missing === 1 ? '' : 's'} needed. No competition or prize is confirmed yet.
+          </div>
+        )}
       </div>
+      <div style={{...FB,fontSize:13,color:'#B8C1CC',lineHeight:1.7}}>
+        If fewer than six distinct paying racers are confirmed at the scheduled race start, the event is postponed to the next announced opening day. Affected paid entrants may keep their entry for the new date or request a refund of their verified original payment. Refunds are reviewed and processed by the organiser, not automatically issued by this calculator. Bonus/free entries do not count towards the minimum or grow the prize.
+      </div>
+      <p style={{...FB,fontSize:11,color:'#6B7280',marginTop:12}}>Illustration only. The individual event’s published terms govern. Previously sold events keep their original commitments.</p>
     </div>
   );
 }
@@ -182,8 +176,9 @@ export default function TournamentPage() {
   };
 
   const withdrawEntry = async (entryId) => {
-    if (!confirm('Withdraw this entry?')) return;
-    await supabase.from('race_entries').delete().eq('id',entryId);
+    if (!confirm('Withdrawing removes your entry but does NOT request or issue a refund. For a postponed race, contact the organiser with your original payment reference to choose a transfer or verified refund instead. Continue withdrawing?')) return;
+    const { error } = await supabase.from('race_entries').delete().eq('id',entryId);
+    if (error) { alert('Entry withdrawal failed. Please try again or contact the organiser.'); return; }
     const { data: me } = await supabase.from('race_entries').select('*').eq('member_email',member?.email);
     setMyEntries(me||[]);
     const { data: ae } = await supabase.from('race_entries').select('*').order('created_at',{ascending:true});
@@ -271,7 +266,7 @@ export default function TournamentPage() {
                               {t.location && <span>📍 {t.location}</span>}
                             </div>
 
-                            <div style={{ ...FB, fontSize:12, color:'#FACC15', marginBottom:8 }}>🏆 Published allocation: {getPrizePolicy(t).prizePct}% prizes · {getPrizePolicy(t).clubPct}% club operations</div>
+                            <div style={{ ...FB, fontSize:12, color:'#FACC15', marginBottom:8 }}>🏆 {publicPrizeSummary(t)}</div>
 
                             {/* My confirmed entries for this race */}
                             {loggedIn && myCount > 0 && (
@@ -294,7 +289,7 @@ export default function TournamentPage() {
                           <div style={{ textAlign:'right', flexShrink:0 }}>
                             {t.ticket_price_dkk && <div style={{ ...F, fontWeight:900, fontSize:28, color:'#FACC15' }}>{t.ticket_price_dkk} DKK</div>}
                             <div style={{ ...FB, fontSize:11, color:'#B8C1CC', marginBottom:8 }}>
-                              {t.ticket_type === 'season' ? '⚠️ Min 2 racers to proceed' : '⚠️ Min 5 per category or pushed to next week'}
+                              {isFixedPrizePolicy(t) ? '⚠️ Min 6 distinct paying racers · otherwise postponed, with refund choice' : 'Original published event minimum applies'}
                             </div>
                             <div style={{ display:'flex', flexDirection:'column', gap:8, alignItems:'flex-end' }}>
                               {/* View Entrants button */}
@@ -389,7 +384,7 @@ export default function TournamentPage() {
           <section style={{ marginBottom:64 }}>
             <div style={{ ...F, fontSize:11, letterSpacing:5, color:'#DC2626', marginBottom:8 }}>PUBLISHED EVENT TERMS</div>
             <h2 style={{ ...F, fontWeight:900, fontSize:'clamp(32px,6vw,52px)', margin:'0 0 8px' }}>PRIZE POOL</h2>
-            <p style={{ ...FB, fontSize:15, color:'#B8C1CC', margin:'0 0 32px' }}>Regular competitions allocate 35% of paid entry revenue to prizes and 65% to club operating costs. Bonus entries do not increase the cash pool. Published commitments for any previously sold event remain honoured under that event’s own terms.</p>
+            <p style={{ ...FB, fontSize:15, color:'#B8C1CC', margin:'0 0 32px' }}>New regular competitions: six distinct paying racers minimum. The prize starts at 350 DKK and increases by 25 DKK for every additional distinct paying racer. If the minimum is not reached by the event’s published registration cutoff, the race moves to the next announced opening day; affected paid entrants can request a refund instead. Existing sold events keep their original published terms.</p>
             <PrizeCalculator />
           </section>
 

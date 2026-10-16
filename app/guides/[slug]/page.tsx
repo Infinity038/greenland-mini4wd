@@ -17,6 +17,9 @@ export default async function GuideDetailPage({ params }: { params: Promise<{ sl
   const guide = getGuideTopic(slug);
 
   if (!guide) notFound();
+  const currentIndex = GUIDE_TOPICS.findIndex(topic => topic.slug === slug);
+  const previous = currentIndex > 0 ? GUIDE_TOPICS[currentIndex - 1] : null;
+  const next = currentIndex >= 0 && currentIndex < GUIDE_TOPICS.length - 1 ? GUIDE_TOPICS[currentIndex + 1] : null;
 
   return (
     <>
@@ -30,7 +33,7 @@ export default async function GuideDetailPage({ params }: { params: Promise<{ sl
           }}
         >
           <div style={{ maxWidth: 920, margin: '0 auto' }}>
-            <a href="/guides" style={{ ...headingFont, color: '#B8C1CC', textDecoration: 'none', fontSize: 13, letterSpacing: 2 }}>← ALL GUIDES</a>
+            <a href="/guides" aria-label="Back to all build guides" style={{ ...headingFont, display:'inline-block', padding:'11px 17px', background:'#172B45', border:'1px solid rgba(255,255,255,0.24)', borderRadius:8, color: '#F5F5F5', textDecoration:'none', fontSize: 15, fontWeight:900, letterSpacing: 1.5 }}>← BACK TO ALL GUIDES</a>
             <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginTop: 28 }}>
               <span style={{ fontSize: 52 }}>{guide.icon}</span>
               <div>
@@ -101,6 +104,12 @@ export default async function GuideDetailPage({ params }: { params: Promise<{ sl
               )}
             </section>
           ))}
+
+          <nav aria-label="Build guide navigation" style={{ background:'#071426',border:'1px solid rgba(255,255,255,0.16)',borderRadius:12,padding:18,margin:'20px 0 32px',display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
+            {previous ? <a href={`/guides/${previous.slug}`} style={{...headingFont,color:'#B8C1CC',fontWeight:800,textDecoration:'none',padding:'10px 12px'}}>← {previous.title}</a> : <span />}
+            <a href="/guides" style={{...headingFont,background:'#DC2626',color:'#fff',fontWeight:900,textDecoration:'none',padding:'11px 20px',borderRadius:8}}>← BACK TO ALL GUIDES</a>
+            {next ? <a href={`/guides/${next.slug}`} style={{...headingFont,color:'#B8C1CC',fontWeight:800,textDecoration:'none',padding:'10px 12px'}}>{next.title} →</a> : <span />}
+          </nav>
 
           <section
             style={{

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { publicEventDescription, publicPrizeSummary } from '@/lib/prizePolicy';
 import { createClient } from '@supabase/supabase-js';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
@@ -18,6 +19,7 @@ interface Post {
   category: string;
   published: boolean;
   created_at: string;
+  tournament_id?: string | null;
 }
 
 const CATEGORIES = ['All', 'Community', 'Racing', 'Guide', 'Event', 'News'];
@@ -131,7 +133,7 @@ export default function BlogPage() {
               <div style={s.modalCat}>{selected.category}</div>
               <div style={s.modalTitle}>{selected.title}</div>
               <div style={s.modalDate}>{new Date(selected.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-              <div style={s.modalText}>{selected.body || selected.summary}</div>
+              <div style={s.modalText}>{selected.tournament_id ? [publicEventDescription(selected.body || selected.summary), publicPrizeSummary({ description: selected.body })].filter(Boolean).join('\n\n') : (selected.body || selected.summary)}</div>
               <button style={s.closeBtn} onClick={() => setSelected(null)}>← Back to News</button>
             </div>
           </div>
