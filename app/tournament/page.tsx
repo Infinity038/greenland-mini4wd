@@ -52,7 +52,7 @@ function PrizeCalculator() {
         )}
       </div>
       <div style={{...FB,fontSize:13,color:'#B8C1CC',lineHeight:1.7}}>
-        If fewer than six distinct paying racers are confirmed at the published registration cutoff, the event is postponed to the next announced opening day. Affected paid entrants may keep their entry for the new date or request a refund of their verified original payment. Refunds are reviewed and processed by the organiser, not automatically issued by this calculator. Bonus/free entries do not count towards the minimum or grow the prize.
+        If fewer than six distinct paying racers are confirmed at the scheduled race start, the event is postponed to the next announced opening day. Affected paid entrants may keep their entry for the new date or request a refund of their verified original payment. Refunds are reviewed and processed by the organiser, not automatically issued by this calculator. Bonus/free entries do not count towards the minimum or grow the prize.
       </div>
       <p style={{...FB,fontSize:11,color:'#6B7280',marginTop:12}}>Illustration only. The individual event’s published terms govern. Previously sold events keep their original commitments.</p>
     </div>
@@ -176,8 +176,9 @@ export default function TournamentPage() {
   };
 
   const withdrawEntry = async (entryId) => {
-    if (!confirm('Withdraw this entry?')) return;
-    await supabase.from('race_entries').delete().eq('id',entryId);
+    if (!confirm('Withdrawing removes your entry but does NOT request or issue a refund. For a postponed race, contact the organiser with your original payment reference to choose a transfer or verified refund instead. Continue withdrawing?')) return;
+    const { error } = await supabase.from('race_entries').delete().eq('id',entryId);
+    if (error) { alert('Entry withdrawal failed. Please try again or contact the organiser.'); return; }
     const { data: me } = await supabase.from('race_entries').select('*').eq('member_email',member?.email);
     setMyEntries(me||[]);
     const { data: ae } = await supabase.from('race_entries').select('*').order('created_at',{ascending:true});
