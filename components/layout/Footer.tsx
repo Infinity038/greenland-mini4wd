@@ -16,7 +16,7 @@ const LINKS = {
   Join: [
     { label: "How to Join", href: "/how-to-join" },
     { label: "Register", href: "/register" },
-    { label: "Membership", href: "/register" },
+    { label: "Membership", href: "/membership" },
     { label: "Shop", href: "/shop" },
   ],
 };
