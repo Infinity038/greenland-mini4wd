@@ -117,20 +117,26 @@ export default function AdminTicketsPage() {
         else {
             setMsg('✅ Updated');
         }
-        await supabase.from('race_tickets').update(ticketUpdates).eq('id', id);
+        const {error:updateError}=await supabase.from('race_tickets').update(ticketUpdates).eq('id', id);
+        if(updateError) setMsg('Ticket status could not be saved. Any previously attempted reward/loyalty changes need reconciliation before retrying: '+updateError.message);
         loadData();
         setSaving(null);
         setTimeout(() => setMsg(''), 4000);
     }
     async function saveEarlyBirdSlots() {
         setSavingConfig(true);
-        await supabase.from('admin_config').upsert({ key: 'earlybird_slots', value: String(earlyBirdSlots) }, { onConflict: 'key' });
+        const {error}=await supabase.from('admin_config').upsert({ key: 'earlybird_slots', value: String(earlyBirdSlots) }, { onConflict: 'key' });
         setSavingConfig(false);
-        setMsg('✅ Early bird slots saved');
+        setMsg(error ? 'Early Bird slot update failed: '+error.message : '✅ Early bird slots saved');
         setTimeout(() => setMsg(''), 2000);
     }
     async function deleteTicket(id: string) {
-        if (!confirm('Delete this ticket?'))
+        const ticket=tickets.find(t=>t.id===id);
+        if(!ticket)return;
+        if(ticket.rewards_applied || !['awaiting_payment','rejected','cancelled'].includes(ticket.payment_status)) {
+          setMsg('Paid, proof-uploaded or rewarded tickets cannot be deleted; preserve payment history and use a reconciled cancellation/refund.'); return;
+        }
+        if (!confirm('Delete this unpaid ticket draft?'))
             return;
         const { error } = await supabase.from('race_tickets').delete().eq('id', id);
         if (error) {
