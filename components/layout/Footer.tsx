@@ -1,6 +1,7 @@
 const LINKS = {
   Club: [
     { label: "About", href: "/about" },
+    { label: "Club Guide", href: "/club-guide" },
     { label: "Events", href: "/events" },
     { label: "Gallery", href: "/gallery" },
     { label: "Blog", href: "/blog" },
