@@ -76,3 +76,11 @@ Matches repo: `members.id`, `members.auth_user_id`, `is_admin()` exist in repo m
 - Creating a Supabase dev branch (billable) for migration rehearsal.
 - Customer Auth migration plan and member communications.
 - Any migration to production.
+
+## 10. Re-check after owner authorization (2026-10-16, second pass)
+- Supabase MCP `list_organizations`: still exactly one org, "Infinity038's Org" (`hjywefzdubyscsqtspoc`).
+- `list_projects`: still exactly `straks-timelog`, `property-app`, `straks-saas`. **No Greenland Mini4WD project.** All three are unrelated projects and were not queried.
+- **VERIFIED blocker:** the connected Supabase account/token has no membership in the organization that owns the Greenland Mini4WD project. Vercel stores `NEXT_PUBLIC_SUPABASE_URL` as a sensitive (write-only) variable, so the project ref cannot be derived from Vercel either.
+- Consequence: items "verify live schema / FKs / RLS / staff permissions / anon grants on `members.password_hash`" and "corrected migration" are **not performed**. Section 3-6 findings remain **repo-inferred, unverified**. The migration file was not modified.
+- Exact fix needed from owner (any one): (a) invite the connected Supabase account to the org that owns the Greenland project (Supabase dashboard → Organization → Team → Invite, read-only/developer role), and reconnect the MCP; or (b) state the project ref (from Supabase dashboard URL or Vercel env value) so access can be verified; or (c) provide a read-only DB role connection via the secure channel.
+- No writes, migrations, projects or branches were created.
