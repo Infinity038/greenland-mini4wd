@@ -24,9 +24,9 @@ export function ProductImageFallback({ category, itemNo, chassis }: FallbackProp
   const meta = [chassis, itemNo ? `#${itemNo}` : null].filter(Boolean).join(' · ');
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 8, textAlign: 'center' }}>
-      <span style={{ fontSize: 28, opacity: 0.35 }}>{icon}</span>
-      {meta && <span style={{ ...F, fontWeight: 900, fontSize: 13, color: 'rgba(255,255,255,0.28)', letterSpacing: 1 }}>{meta}</span>}
-      <span style={{ ...FB, fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>Image being prepared</span>
+      <span style={{ fontSize: 35, opacity: 0.82 }}>{icon}</span>
+      {meta && <span style={{ ...F, fontWeight: 900, fontSize: 13, color: 'rgba(255,255,255,0.78)', letterSpacing: 1 }}>{meta}</span>}
+      <span style={{ ...FB, fontSize: 10, color: 'rgba(255,255,255,0.68)' }}>Product photo pending</span>
     </div>
   );
 }
