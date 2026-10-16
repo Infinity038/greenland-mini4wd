@@ -19,6 +19,7 @@ interface Post {
   category: string;
   published: boolean;
   created_at: string;
+  tournament_id?: string | null;
 }
 
 const CATEGORIES = ['All', 'Community', 'Racing', 'Guide', 'Event', 'News'];
