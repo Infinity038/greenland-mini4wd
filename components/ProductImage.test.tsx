@@ -4,22 +4,22 @@ import '@testing-library/jest-dom/vitest';
 import { ProductImage, ProductImageFallback } from './ProductImage';
 
 describe('ProductImageFallback', () => {
-  it('shows the durable "Image being prepared" fallback with chassis and item number', () => {
+  it('shows the durable "Product photo pending" fallback with chassis and item number', () => {
     render(<ProductImageFallback category="cars" itemNo="18099" chassis="VZ" />);
-    expect(screen.getByText('Image being prepared')).toBeInTheDocument();
+    expect(screen.getByText('Product photo pending')).toBeInTheDocument();
     expect(screen.getByText('VZ · #18099')).toBeInTheDocument();
   });
 
   it('still renders without chassis/item number metadata', () => {
     render(<ProductImageFallback category="parts" />);
-    expect(screen.getByText('Image being prepared')).toBeInTheDocument();
+    expect(screen.getByText('Product photo pending')).toBeInTheDocument();
   });
 });
 
 describe('ProductImage', () => {
   it('renders the fallback (never a blank card) when there is no image URL', () => {
     render(<ProductImage imageUrl="" name="Ray Spear" category="cars" itemNo="18099" chassis="VZ" />);
-    expect(screen.getByText('Image being prepared')).toBeInTheDocument();
+    expect(screen.getByText('Product photo pending')).toBeInTheDocument();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
@@ -34,7 +34,7 @@ describe('ProductImage', () => {
     const img = screen.getByRole('img', { name: 'Ray Spear' });
     fireEvent.error(img);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    expect(screen.getByText('Image being prepared')).toBeInTheDocument();
+    expect(screen.getByText('Product photo pending')).toBeInTheDocument();
     expect(screen.getByText('VZ · #18099')).toBeInTheDocument();
   });
 });
