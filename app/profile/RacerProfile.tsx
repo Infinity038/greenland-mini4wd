@@ -158,6 +158,7 @@ export default function RacerProfile() {
     }
 
     setLoadError('');
+    let coreLoaded = false;
     try {
       const [fetchedMember, memberOrders, ticketWallet, carsResult, ticketResult, entryResult, wishlistResult] = await withDeadline(Promise.all([
         getMemberDataFromSupabase(local.email),
@@ -168,6 +169,7 @@ export default function RacerProfile() {
         supabase.from('race_entries').select('*').eq('member_email', local.email).order('created_at', { ascending: false }),
         supabase.from('wishlist').select('*').eq('member_email', local.email).order('created_at', { ascending: false }),
       ]), 7500);
+      if ([carsResult, ticketResult, entryResult, wishlistResult].some(result => result.error)) throw new Error('Account records unavailable');
       const resolvedMember = fetchedMember || local;
       setMember(resolvedMember);
       setEditForm({ name: memberName(resolvedMember), avatar_url: resolvedMember?.avatar_url || '' });
@@ -177,6 +179,7 @@ export default function RacerProfile() {
       setTicketHistory(ticketResult.data || []);
       setRaceEntries(entryResult.data || []);
       setProfileDataReady(true);
+      coreLoaded = true;
       // Render the essential account information before optional reward/photo and wishlist lookups.
       setLoading(false);
 
@@ -223,9 +226,13 @@ export default function RacerProfile() {
         setWishlist([]);
       }
     } catch (error) {
-      setMember(local);
-      setProfileDataReady(false);
-      setLoadError('Live profile records did not respond in time. Your saved identity is shown, but statistics and available tickets may be outdated. Do not rely on these values for redemption; retry when the connection returns.');
+      if (!coreLoaded) {
+        setMember(local);
+        setProfileDataReady(false);
+        setLoadError('Live account records did not respond in time. Your saved identity is shown, but statistics and available tickets are unverified. Please retry before redemption or account changes.');
+      } else {
+        setLoadError('Your main profile loaded, but some optional rewards or wishlist details could not refresh. Retry when the connection returns.');
+      }
     } finally {
       setLoading(false);
     }
@@ -408,7 +415,7 @@ export default function RacerProfile() {
         </section>
 
         <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 20px 56px' }}>
-          {loadError && <div style={{ ...FB, color: '#FACC15', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.22)', borderRadius: 10, padding: '11px 14px', marginBottom: 16 }}>{loadError}</div>}
+          {loadError && <div style={{ ...FB, color: '#FACC15', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.22)', borderRadius: 10, padding: '11px 14px', marginBottom: 16 }}>{loadError} <button type="button" onClick={() => { setLoading(true); loadProfile(); }} style={{ color:'#050505',background:'#FACC15',border:0,borderRadius:6,padding:'6px 12px',marginLeft:12,cursor:'pointer',fontWeight:700 }}>Retry refresh</button></div>}
 
           {tab === 'overview' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
