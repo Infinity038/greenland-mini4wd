@@ -767,7 +767,7 @@ export default function ShopPage() {
                                   ) : (
                                     <>
                                       <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>SOLD OUT</div>
-                                      <button disabled={!liveCatalogVerified} title={!liveCatalogVerified ? 'Waiting for verified live catalogue' : undefined} onClick={() => openPreorder(p, v.key) style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                                      <button disabled={!liveCatalogVerified} title={!liveCatalogVerified ? 'Waiting for verified live catalogue' : undefined} onClick={() => openPreorder(p, v.key)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
                                     </>
                                   )}
                                 </div>
