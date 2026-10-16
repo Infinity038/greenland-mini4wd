@@ -54,6 +54,8 @@ export function ProductImage({ imageUrl, name, category, itemNo, chassis, onClic
       <img
         src={current}
         alt={name}
+        loading="lazy"
+        decoding="async"
         onError={() => setFailed(f => ({ ...f, [idx]: true }))}
         onClick={onClick}
         style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', cursor: onClick ? 'zoom-in' : 'default' }}
