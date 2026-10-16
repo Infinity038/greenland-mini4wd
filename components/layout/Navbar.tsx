@@ -14,6 +14,7 @@ const NAV_LINKS: NavLink[] = [
   { label: "Shop", href: "/shop" },
   { label: "Blog", href: "/blog" },
   { label: "How to Join", href: "/how-to-join" },
+  { label: "Club Guide", href: "/club-guide" },
   { label: "About", href: "/about" },
 ];
 
