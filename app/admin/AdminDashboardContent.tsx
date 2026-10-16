@@ -84,6 +84,10 @@ export default function AdminDashboardContent({ roles }: { roles: StaffRole[] })
     router.refresh();
   }
 
+  const adminModules = roles.includes('admin')
+    ? [...NAV, { href: '/admin/prediction-pit', icon: '🔒', label: 'Prediction Pit Access', desc: 'Invitation-only member approvals' }]
+    : NAV;
+
   const cards = [
     ['Total Members', stats.totalMembers, '👥', '#3B82F6', '/admin/members'],
     ['Official Members', stats.officialMembers, '✓', '#22C55E', '/admin/members'],
@@ -138,7 +142,7 @@ export default function AdminDashboardContent({ roles }: { roles: StaffRole[] })
 
         <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>ALL MODULES</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-          {NAV.map(module => (
+          {adminModules.map(module => (
             <Link key={module.href} href={module.href} style={{ textDecoration: 'none' }}>
               <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px 14px' }}>
                 <div style={{ fontSize: 22, marginBottom: 8 }}>{module.icon}</div>
