@@ -84,3 +84,27 @@ Matches repo: `members.id`, `members.auth_user_id`, `is_admin()` exist in repo m
 - Consequence: items "verify live schema / FKs / RLS / staff permissions / anon grants on `members.password_hash`" and "corrected migration" are **not performed**. Section 3-6 findings remain **repo-inferred, unverified**. The migration file was not modified.
 - Exact fix needed from owner (any one): (a) invite the connected Supabase account to the org that owns the Greenland project (Supabase dashboard → Organization → Team → Invite, read-only/developer role), and reconnect the MCP; or (b) state the project ref (from Supabase dashboard URL or Vercel env value) so access can be verified; or (c) provide a read-only DB role connection via the secure channel.
 - No writes, migrations, projects or branches were created.
+
+## 11. Third pass — correct Supabase org now connected (2026-10-16)
+**VERIFIED (Supabase management API, metadata only):**
+- Connected org: "Arctic Force" (`kvhjxwswpmvfxqcubxnm`).
+- Projects in org:
+  | Name | Ref | Region | Status | Created |
+  |---|---|---|---|---|
+  | `greenland-mini4wd` | `eojdjqihmxxaqltudqjx` | us-east-1 | **INACTIVE (paused)** | 2026-05-17 |
+  | `greenland-mini4wd-auth-test` | `srtqqgyaemugmkjuhczx` | us-east-1 | **INACTIVE (paused)** | 2026-07-18 |
+  | `SCT Rengøring ApS` | `cwwldjpgdkoyztoncqpm` | eu-west-1 | INACTIVE | 2026-05-29 (unrelated; not touched) |
+- A read-only `list_tables` on `eojdjqihmxxaqltudqjx` failed with *connection timeout* — consistent with a paused database.
+
+**PROBABLE (not verified):** production uses `greenland-mini4wd` (`eojdjqihmxxaqltudqjx`): name match, created the day before the Vercel project (2026-05-18), `-auth-test` created 2026-07-18 alongside the auth-rollout migrations. Vercel env values are sensitive/unreadable, so this cannot be confirmed from Vercel. Note: if production is serving live traffic while this project reports INACTIVE, the site is likely failing live reads — matches the "stale-data / failed live-record refresh" symptoms in `FULL_SITE_AUDIT_PUBLIC_ADMIN_2026-10-16.md`; i.e. the production project may itself be paused. Owner should confirm in the dashboard.
+
+**Remaining blocker (exact):** both Greenland projects are paused. Un-pausing (`restore_project`) is a state change on the production project (and may carry billing/availability implications). It was outside the "read-only, no account changes" authorization, so it was NOT done. No schema, FK, RLS, grant, `password_hash` exposure, migration-compat or auth-linkage findings could be verified; §3–§6 remain repo-inferred. The proposed migration was not changed (corrections in §7 stand as recommendations).
+
+**Owner decision needed (any one):**
+1. Explicitly authorize restoring `greenland-mini4wd` (`eojdjqihmxxaqltudqjx`) so read-only inspection can proceed (recommended: take/confirm a backup first; restore is non-destructive but changes project state), or
+2. Restore it yourself in the Supabase dashboard (Project → Restore), then re-run this audit, or
+3. Authorize restoring `greenland-mini4wd-auth-test` only, for schema/RLS inspection on a non-production copy (note: it may not hold production data or match live schema).
+
+**Planned read-only checks after restore:** `list_tables(verbose)` for FKs; `pg_policies`; `information_schema.role_table_grants` / column grants for `anon` and `authenticated` on `members`, `cars`, `race_*`, `season_standings`; `has_column_privilege('anon','public.members','password_hash','SELECT')` (privilege test only, no data read); `list_migrations`; security advisors; count-only queries for members with/without `auth_user_id`; type check of `members.id`.
+
+**Secure Prediction Pit access design (to be validated live):** server-verified Supabase Auth session → `members.auth_user_id` link → `prediction_pit_allowed()` evaluated server-side on every request (RSC/route handler, 404 on false) and again in RLS/RPC for all Prediction Pit tables; tab visibility is UX only. Cookie/localStorage never authoritative. Requires customer Auth migration first (not started).
