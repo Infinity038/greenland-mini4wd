@@ -625,6 +625,7 @@ export default function RacerProfile() {
                 <button onClick={() => setAddingCar(true)} style={{ background: '#DC2626', border: 'none', borderRadius: 8, padding: '9px 15px', color: '#fff', cursor: 'pointer', ...F, fontWeight: 900, letterSpacing: 1 }}>+ ADD CAR</button>
               </div>
 
+              {carError && !addingCar && <div role="alert" style={{ ...FB, fontSize:12, color:'#FACC15', padding:12, background:'#241519', borderRadius:8 }}>{carError}</div>}
               {addingCar && (
                 <Card style={{ borderColor: 'rgba(220,38,38,0.28)' }}>
                   <div style={{ ...F, fontSize: 18, fontWeight: 900, marginBottom: 15 }}>REGISTER A CAR</div>
