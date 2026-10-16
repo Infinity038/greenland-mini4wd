@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getPrizePolicy } from '@/lib/prizePolicy';
+import { publicEventDescription, publicPrizeSummary } from '@/lib/prizePolicy';
 import { isRegistered } from '@/lib/member';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
@@ -121,8 +121,8 @@ export default function EventsPage() {
                             {t.date && <span>📅 {new Date(t.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })} · {new Date(t.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
                             {t.location && <span>📍 {t.location}</span>}
                           </div>
-                          <p style={{ ...FB, fontSize:12, color:'#FACC15', margin:'8px 0 0' }}>🏆 {getPrizePolicy(t).prizePct}% prize pool · {getPrizePolicy(t).clubPct}% club operations</p>
-                {t.description && <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', margin: '8px 0 0', lineHeight: 1.6, whiteSpace:'pre-line' }}>{t.description}</p>}
+                          <p style={{ ...FB, fontSize:12, color:'#FACC15', margin:'8px 0 0' }}>🏆 {publicPrizeSummary(t)}</p>
+                {publicEventDescription(t.description) && <p style={{ ...FB, fontSize: 13, color: '#B8C1CC', margin: '8px 0 0', lineHeight: 1.6, whiteSpace:'pre-line' }}>{publicEventDescription(t.description)}</p>}
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                           <div style={{ ...F, fontSize: 10, letterSpacing: 3, color: '#B8C1CC' }}>ENTRY</div>
