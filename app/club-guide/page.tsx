@@ -51,6 +51,11 @@ export default function ClubGuide() {
             </section>
           </div>
           <section style={{ ...panel, marginTop: 18 }}>
+            <h2 style={{ ...heading, fontSize: 28, margin: "0 0 10px" }}>CAMERAS & VISITOR CHOICE</h2>
+            <p style={body}>Announced race media may be filmed in a marked area. If you do not wish to appear, speak to the organiser and use the non-filmed area where available. Security CCTV, if installed, has a different purpose and is never used as social-media content. A sign alone is not blanket permission for publishing identifiable images, especially of children.</p>
+            <a href="/filming-policy" style={{ color:"#FACC15", fontWeight:700 }}>Read the filming & CCTV policy →</a>
+          </section>
+          <section style={{ ...panel, marginTop: 18 }}>
             <h2 style={{ ...heading, fontSize: 28, margin: "0 0 10px" }}>RACE DAY QUESTIONS</h2>
             <p style={body}><strong style={{ color: "white" }}>Must I book regular practice?</strong> No advance booking is planned. Track access is managed through fair, supervised walk-in turns subject to event capacity.</p>
             <p style={body}><strong style={{ color: "white" }}>Can I enter a tournament using a house car?</strong> A free introductory trial does not include tournament entry. Each tournament publishes its entry and car-eligibility rules separately.</p>
