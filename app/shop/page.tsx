@@ -370,7 +370,8 @@ export default function ShopPage() {
     // how fetch failures are handled, not what data is used.
     setLoading(true);
     const { data, error } = await resilientCatalogFetch<Product>(CATALOG_CACHE_KEY, () =>
-      supabase.from('products').select('*').order('created_at', { ascending: true })
+      supabase.from('products').select('*').order('created_at', { ascending: true }),
+      (cached) => { setProducts(cached); setLoading(false); }
     );
     setProducts(data);
     setCatalogError(error);
@@ -420,6 +421,7 @@ export default function ShopPage() {
   // button alone is not treated as sufficient.
   const openModal = (p: Product, variantKey: string) => {
     if (isPriceOnRequest(p)) { openInquiry(p); return; }
+    if (catalogError) { setError('Live catalogue is temporarily unavailable; ordering is paused until stock can be verified.'); return; }
     if (!isRegistered()) { window.location.href = '/register'; return; }
     if (isCarProduct(p)) {
       if (!isVariantAvailable(p, variantKey, globalCaseStock)) return;
@@ -440,6 +442,7 @@ export default function ShopPage() {
   };
 
   const sendPreorder = async () => {
+    if (catalogError) { setError('Live catalogue is unavailable. Please retry before sending an order.'); return; }
     if (!preorderTarget || !member) return;
     if (isPriceOnRequest(preorderTarget.product)) return;
     setPreorderSending(true);
@@ -600,7 +603,7 @@ export default function ShopPage() {
         {catalogError && (
           <div style={{ maxWidth: 1100, margin: '16px auto 0', padding: '0 24px' }}>
             <div style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ ...FB, fontSize: 13, color: '#FCA5A5' }}>{catalogError}</div>
+              <div style={{ ...FB, fontSize: 13, color: '#FCA5A5' }}>{catalogError} Ordering is paused until current availability is verified.</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => fetchProducts()} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', ...F, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>RETRY</button>
                 <button onClick={() => setCatalogError(null)} style={{ background: 'transparent', color: '#B8C1CC', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '6px 14px', ...F, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>DISMISS</button>
