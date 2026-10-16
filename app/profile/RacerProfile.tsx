@@ -122,6 +122,7 @@ export default function RacerProfile() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [profileDataReady, setProfileDataReady] = useState(false);
+  const [rewardDataReady, setRewardDataReady] = useState(false);
   const [tab, setTab] = useState<Tab>(() => {
     if (typeof window === 'undefined') return 'overview';
     const requested = new URLSearchParams(window.location.search).get('tab');
@@ -158,6 +159,8 @@ export default function RacerProfile() {
     }
 
     setLoadError('');
+    setProfileDataReady(false);
+    setRewardDataReady(false);
     let coreLoaded = false;
     try {
       const [fetchedMember, memberOrders, ticketWallet, carsResult, ticketResult, entryResult, wishlistResult] = await withDeadline(Promise.all([
@@ -206,9 +209,11 @@ export default function RacerProfile() {
           ? normalizeRewardPoints(rewardData?.points_balance)
           : rewardPointsFromEligibleSpend((resolvedMember as any)?.lifetime_spending);
         setRewardPoints(balance);
+        setRewardDataReady(true);
         setPendingRequest(requestData || null);
       } else {
         setRewardPoints(0);
+        setRewardDataReady(true);
         setPendingRequest(null);
       }
 
@@ -387,12 +392,12 @@ export default function RacerProfile() {
                 <div style={{ ...FB, color: '#B8C1CC', fontSize: 13, marginBottom: 11 }}>{member.email}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
                   <span style={{ ...F, fontSize: 10, letterSpacing: 1.5, fontWeight: 800, padding: '4px 10px', borderRadius: 20, background: member.member_status === 'official' ? 'rgba(250,204,21,0.14)' : 'rgba(59,130,246,0.14)', color: member.member_status === 'official' ? '#FACC15' : '#93C5FD', border: `1px solid ${member.member_status === 'official' ? 'rgba(250,204,21,0.32)' : 'rgba(59,130,246,0.32)'}` }}>
-                    {member.member_status === 'official' ? '✓ OFFICIAL RACER' : 'REGISTERED RACER'}
+                    {profileDataReady ? (member.member_status === 'official' ? '✓ OFFICIAL RACER' : 'REGISTERED RACER') : 'SAVED PROFILE · NOT VERIFIED'}
                   </span>
                   <span style={{ ...F, fontSize: 10, letterSpacing: 1.5, fontWeight: 800, padding: '4px 10px', borderRadius: 20, background: active ? 'rgba(34,197,94,0.14)' : 'rgba(220,38,38,0.14)', color: active ? '#22C55E' : '#F87171', border: `1px solid ${active ? 'rgba(34,197,94,0.32)' : 'rgba(220,38,38,0.32)'}` }}>
-                    {active ? `🟢 MEMBERSHIP ACTIVE · ${daysLeft} DAYS` : '🔴 MEMBERSHIP INACTIVE'}
+                    {!profileDataReady ? 'MEMBERSHIP STATUS UNVERIFIED' : active ? `🟢 MEMBERSHIP ACTIVE · ${daysLeft} DAYS` : '🔴 MEMBERSHIP INACTIVE'}
                   </span>
-                  {achievement && (
+                  {profileDataReady && achievement && (
                     <span style={{ ...F, fontSize: 10, letterSpacing: 1.5, fontWeight: 800, padding: '4px 10px', borderRadius: 20, background: `${achievement.color}18`, color: achievement.color, border: `1px solid ${achievement.color}55` }}>
                       {achievement.label}
                     </span>
@@ -415,7 +420,7 @@ export default function RacerProfile() {
         </section>
 
         <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 20px 56px' }}>
-          {loadError && <div style={{ ...FB, color: '#FACC15', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.22)', borderRadius: 10, padding: '11px 14px', marginBottom: 16 }}>{loadError} <button type="button" onClick={() => { setLoading(true); loadProfile(); }} style={{ color:'#050505',background:'#FACC15',border:0,borderRadius:6,padding:'6px 12px',marginLeft:12,cursor:'pointer',fontWeight:700 }}>Retry refresh</button></div>}
+          {loadError && <div role="alert" style={{ ...FB, color: '#FACC15', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.22)', borderRadius: 10, padding: '11px 14px', marginBottom: 16 }}>{loadError} <button type="button" onClick={() => { setLoading(true); loadProfile(); }} style={{ color:'#050505',background:'#FACC15',border:0,borderRadius:6,padding:'6px 12px',marginLeft:12,cursor:'pointer',fontWeight:700 }}>Retry refresh</button></div>}
 
           {tab === 'overview' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -428,7 +433,7 @@ export default function RacerProfile() {
                 ].map(stat => (
                   <Card key={stat.label}>
                     <div style={{ fontSize: 21, marginBottom: 7 }}>{stat.icon}</div>
-                    <div style={{ ...F, fontSize: 34, lineHeight: 1, fontWeight: 900, color: stat.color }}>{profileDataReady ? stat.value : '—'}</div>
+                    <div style={{ ...F, fontSize: 34, lineHeight: 1, fontWeight: 900, color: stat.color }}>{(stat.label === 'Reward Points' ? rewardDataReady : profileDataReady) ? stat.value : '—'}</div>
                     <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 5 }}>{stat.label}</div>
                   </Card>
                 ))}
@@ -441,12 +446,12 @@ export default function RacerProfile() {
                     <div style={{ ...FB, color: '#B8C1CC', fontSize: 13, marginTop: 3 }}>1 point for every 100 DKK of confirmed eligible purchases.</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ ...F, color: '#FACC15', fontWeight: 900, fontSize: 30, lineHeight: 1 }}>{rewardPoints}</div>
+                    <div style={{ ...F, color: '#FACC15', fontWeight: 900, fontSize: 30, lineHeight: 1 }}>{rewardDataReady ? rewardPoints : '—'}</div>
                     <div style={{ ...FB, color: '#6B7280', fontSize: 11 }}>CURRENT BALANCE</div>
                   </div>
                 </div>
 
-                {progress.next ? (
+                {rewardDataReady ? (progress.next ? (
                   <>
                     <div style={{ height: 10, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
                       <div style={{ width: `${progress.percentage}%`, height: '100%', background: 'linear-gradient(90deg, #F59E0B, #FACC15)', borderRadius: 10 }} />
@@ -458,7 +463,7 @@ export default function RacerProfile() {
                   </>
                 ) : (
                   <div style={{ ...FB, color: '#22C55E', fontSize: 13 }}>Maximum listed reward milestone reached.</div>
-                )}
+                )) : <div style={{ ...FB,color:'#FACC15',fontSize:13 }}>Reward balance unavailable until the live account refresh succeeds.</div>}
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginTop: 18 }}>
                   {REWARD_MILESTONES.map(milestone => {
@@ -474,7 +479,7 @@ export default function RacerProfile() {
 
                 <div style={{ ...FB, color: '#6B7280', fontSize: 11, lineHeight: 1.6, borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 16, paddingTop: 12 }}>
                   Your spending total is not displayed on your profile. Staff can redeem an available fixed reward when you make an eligible purchase.
-                  {unlockedReward && <span style={{ color: '#FACC15' }}> You currently qualify for up to {unlockedReward.discountDkk} DKK.</span>}
+                  {rewardDataReady && unlockedReward && <span style={{ color: '#FACC15' }}> You currently qualify for up to {unlockedReward.discountDkk} DKK.</span>}
                 </div>
               </Card>
 
@@ -482,7 +487,7 @@ export default function RacerProfile() {
                 <div style={{ ...F, fontSize: 16, fontWeight: 900, letterSpacing: 1.5, marginBottom: 15 }}>RACER DETAILS</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 16 }}>
                   {[
-                    ['Membership', active ? `Active · ${daysLeft} days left` : 'Inactive'],
+                    ['Membership', !profileDataReady ? 'Not verified' : active ? `Active · ${daysLeft} days left` : 'Inactive'],
                     ['Member Since', formatDate(member.created_at)],
                     ['City', member.city || '—'],
                     ['Nationality', member.nationality || '—'],
