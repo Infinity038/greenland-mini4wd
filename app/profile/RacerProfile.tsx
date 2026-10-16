@@ -27,6 +27,15 @@ import { supabase } from '@/lib/supabase';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 
+// Bound slow external reads so a stalled catalogue/account request cannot leave
+// the profile on a permanent loading screen. This does not modify stored data.
+function withDeadline<T>(work: PromiseLike<T>, ms = 7500): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Profile refresh timed out')), ms);
+    Promise.resolve(work).then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
+  });
+}
+
 const ZERO_WALLET: TicketWallet = {
   paid_total: 0,
   paid_used: 0,
@@ -112,6 +121,7 @@ export default function RacerProfile() {
   const [wishlist, setWishlist] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [profileDataReady, setProfileDataReady] = useState(false);
   const [tab, setTab] = useState<Tab>(() => {
     if (typeof window === 'undefined') return 'overview';
     const requested = new URLSearchParams(window.location.search).get('tab');
@@ -148,17 +158,19 @@ export default function RacerProfile() {
     }
 
     setLoadError('');
+    let coreLoaded = false;
     try {
-      const resolvedMember = await getMemberDataFromSupabase(local.email) || local;
-      const [memberOrders, ticketWallet, carsResult, ticketResult, entryResult, wishlistResult] = await Promise.all([
+      const [fetchedMember, memberOrders, ticketWallet, carsResult, ticketResult, entryResult, wishlistResult] = await withDeadline(Promise.all([
+        getMemberDataFromSupabase(local.email),
         getMemberOrdersFromSupabase(local.email),
         getTicketWallet(local.email),
         supabase.from('cars').select('*').eq('member_email', local.email).order('created_at', { ascending: false }),
         supabase.from('race_tickets').select('*').eq('member_email', local.email).order('created_at', { ascending: false }),
         supabase.from('race_entries').select('*').eq('member_email', local.email).order('created_at', { ascending: false }),
         supabase.from('wishlist').select('*').eq('member_email', local.email).order('created_at', { ascending: false }),
-      ]);
-
+      ]), 7500);
+      if ([carsResult, ticketResult, entryResult, wishlistResult].some(result => result.error)) throw new Error('Account records unavailable');
+      const resolvedMember = fetchedMember || local;
       setMember(resolvedMember);
       setEditForm({ name: memberName(resolvedMember), avatar_url: resolvedMember?.avatar_url || '' });
       setOrders(memberOrders || []);
@@ -166,9 +178,13 @@ export default function RacerProfile() {
       setCars(carsResult.data || []);
       setTicketHistory(ticketResult.data || []);
       setRaceEntries(entryResult.data || []);
+      setProfileDataReady(true);
+      coreLoaded = true;
+      // Render the essential account information before optional reward/photo and wishlist lookups.
+      setLoading(false);
 
       if (resolvedMember?.id) {
-        const [{ data: rewardData }, { data: requestData }] = await Promise.all([
+        const [{ data: rewardData }, { data: requestData }] = await withDeadline(Promise.all([
           supabase
             .from('loyalty_points')
             .select('points_balance, points_rate')
@@ -180,7 +196,7 @@ export default function RacerProfile() {
             .eq('member_id', resolvedMember.id)
             .eq('status', 'pending')
             .maybeSingle(),
-        ]);
+        ]), 4500);
 
         // During the migration preview, legacy percentage rows do not have the
         // fixed rate marker yet. Derive their temporary display from the stored
@@ -198,10 +214,10 @@ export default function RacerProfile() {
 
       const wishlistRows = wishlistResult.data || [];
       if (wishlistRows.length) {
-        const { data: products } = await supabase
+        const { data: products } = await withDeadline(supabase
           .from('products')
           .select('*')
-          .in('id', wishlistRows.map((row: any) => row.product_id));
+          .in('id', wishlistRows.map((row: any) => row.product_id)), 4500);
         setWishlist(wishlistRows.map((row: any) => ({
           ...row,
           product: (products || []).find((product: any) => product.id === row.product_id),
@@ -210,8 +226,13 @@ export default function RacerProfile() {
         setWishlist([]);
       }
     } catch (error) {
-      setMember(local);
-      setLoadError('Some profile information could not be refreshed. Please try again.');
+      if (!coreLoaded) {
+        setMember(local);
+        setProfileDataReady(false);
+        setLoadError('Live account records did not respond in time. Your saved identity is shown, but statistics and available tickets are unverified. Please retry before redemption or account changes.');
+      } else {
+        setLoadError('Your main profile loaded, but some optional rewards or wishlist details could not refresh. Retry when the connection returns.');
+      }
     } finally {
       setLoading(false);
     }
@@ -306,7 +327,7 @@ export default function RacerProfile() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="club-atmosphere" style={{ minHeight: '100vh', background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ ...FB, color: '#B8C1CC' }}>Loading racer profile…</div>
       </div>
     );
@@ -394,7 +415,7 @@ export default function RacerProfile() {
         </section>
 
         <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 20px 56px' }}>
-          {loadError && <div style={{ ...FB, color: '#FACC15', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.22)', borderRadius: 10, padding: '11px 14px', marginBottom: 16 }}>{loadError}</div>}
+          {loadError && <div style={{ ...FB, color: '#FACC15', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.22)', borderRadius: 10, padding: '11px 14px', marginBottom: 16 }}>{loadError} <button type="button" onClick={() => { setLoading(true); loadProfile(); }} style={{ color:'#050505',background:'#FACC15',border:0,borderRadius:6,padding:'6px 12px',marginLeft:12,cursor:'pointer',fontWeight:700 }}>Retry refresh</button></div>}
 
           {tab === 'overview' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -407,7 +428,7 @@ export default function RacerProfile() {
                 ].map(stat => (
                   <Card key={stat.label}>
                     <div style={{ fontSize: 21, marginBottom: 7 }}>{stat.icon}</div>
-                    <div style={{ ...F, fontSize: 34, lineHeight: 1, fontWeight: 900, color: stat.color }}>{stat.value}</div>
+                    <div style={{ ...F, fontSize: 34, lineHeight: 1, fontWeight: 900, color: stat.color }}>{profileDataReady ? stat.value : '—'}</div>
                     <div style={{ ...FB, fontSize: 12, color: '#B8C1CC', marginTop: 5 }}>{stat.label}</div>
                   </Card>
                 ))}

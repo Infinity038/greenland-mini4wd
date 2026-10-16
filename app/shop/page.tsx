@@ -220,6 +220,7 @@ export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [liveCatalogVerified, setLiveCatalogVerified] = useState(false);
   const [filter, setFilter] = useState('all');
   const [globalCaseStock, setGlobalCaseStock] = useState(0);
 
@@ -369,11 +370,14 @@ export default function ShopPage() {
     // remains the only data source for every category; this only changes
     // how fetch failures are handled, not what data is used.
     setLoading(true);
+    setLiveCatalogVerified(false);
     const { data, error } = await resilientCatalogFetch<Product>(CATALOG_CACHE_KEY, () =>
-      supabase.from('products').select('*').order('created_at', { ascending: true })
+      supabase.from('products').select('*').order('created_at', { ascending: true }),
+      (cached) => { setProducts(cached); setLoading(false); }
     );
     setProducts(data);
     setCatalogError(error);
+    setLiveCatalogVerified(!error);
     setLoading(false);
   }
 
@@ -420,6 +424,7 @@ export default function ShopPage() {
   // button alone is not treated as sufficient.
   const openModal = (p: Product, variantKey: string) => {
     if (isPriceOnRequest(p)) { openInquiry(p); return; }
+    if (!liveCatalogVerified) { setError('Live catalogue is temporarily unavailable; ordering is paused until stock can be verified.'); return; }
     if (!isRegistered()) { window.location.href = '/register'; return; }
     if (isCarProduct(p)) {
       if (!isVariantAvailable(p, variantKey, globalCaseStock)) return;
@@ -434,12 +439,14 @@ export default function ShopPage() {
 
   const openPreorder = (p: Product, variantKey: string) => {
     if (isPriceOnRequest(p)) { openInquiry(p); return; }
+    if (!liveCatalogVerified) return;
     if (!isRegistered()) { window.location.href = '/register'; return; }
     setPreorderTarget({ product: p, variantKey });
     setPreorderDone(false);
   };
 
   const sendPreorder = async () => {
+    if (!liveCatalogVerified) { setError('Live catalogue is unavailable. Please retry before sending an order.'); return; }
     if (!preorderTarget || !member) return;
     if (isPriceOnRequest(preorderTarget.product)) return;
     setPreorderSending(true);
@@ -487,6 +494,7 @@ export default function ShopPage() {
   };
 
   const placeOrder = async () => {
+    if (!liveCatalogVerified) { setError('Stock is not currently verified. Please retry catalogue refresh before ordering.'); return; }
     if (!selected || !member) return;
     // Hard guard on the actual order-creation write path, not just the UI
     // entry point above — a price-on-request product must never be able to
@@ -586,9 +594,9 @@ export default function ShopPage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: '#050505', color: '#F5F5F5', paddingTop: 60 }}>
+      <main className="club-atmosphere" style={{ background: '#050505', color: '#F5F5F5', paddingTop: 60 }}>
 
-        <section style={{ background: '#071426', borderBottom: '1px solid rgba(220,38,38,0.15)', padding: '48px 24px 40px' }}>
+        <section style={{ background: 'linear-gradient(90deg,rgba(7,20,38,.94),rgba(7,20,38,.52)),url(/IMG_5377.png) center 48% / cover', borderBottom: '1px solid rgba(220,38,38,0.15)', padding: '48px 24px 40px' }}>
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>CLUB SHOP</div>
             <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px, 8vw, 72px)', color: '#F5F5F5', margin: '0 0 10px', lineHeight: 0.95 }}>CARS · PARTS · MERCH</h1>
@@ -600,10 +608,10 @@ export default function ShopPage() {
         {catalogError && (
           <div style={{ maxWidth: 1100, margin: '16px auto 0', padding: '0 24px' }}>
             <div style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ ...FB, fontSize: 13, color: '#FCA5A5' }}>{catalogError}</div>
+              <div style={{ ...FB, fontSize: 13, color: '#FCA5A5' }}>{catalogError} Ordering is paused until current availability is verified.</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => fetchProducts()} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', ...F, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>RETRY</button>
-                <button onClick={() => setCatalogError(null)} style={{ background: 'transparent', color: '#B8C1CC', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '6px 14px', ...F, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>DISMISS</button>
+                <span style={{ ...FB, color:'#FCA5A5', fontSize:11 }}>Live verification required</span>
               </div>
             </div>
           </div>
@@ -664,9 +672,9 @@ export default function ShopPage() {
                               </div>
                             </div>
                             {unbuiltAvailable ? (
-                              <button onClick={() => openModal(p, 'unbuilt')} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                              <button disabled={!liveCatalogVerified} title={!liveCatalogVerified ? 'Waiting for verified live catalogue' : undefined} onClick={() => openModal(p, 'unbuilt')} style={{ background: '#FACC15', color: '#050505', border: 'none', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
                             ) : (
-                              <button onClick={() => openPreorder(p, 'unbuilt')} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                              <button disabled={!liveCatalogVerified} title={!liveCatalogVerified ? 'Waiting for verified live catalogue' : undefined} onClick={() => openPreorder(p, 'unbuilt')} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 18px', ...F, fontWeight: 900, fontSize: 13, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
                             )}
                           </>
                         )}
@@ -755,11 +763,11 @@ export default function ShopPage() {
                                     <div style={{ ...F, fontWeight: 900, fontSize: 15, color: available ? (original ? '#22C55E' : (isCollector ? '#FACC15' : '#F5F5F5')) : '#6B7280' }}>{price.toLocaleString()} kr</div>
                                   </div>
                                   {available ? (
-                                    <button onClick={() => openModal(p, v.key)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
+                                    <button disabled={!liveCatalogVerified} title={!liveCatalogVerified ? 'Waiting for verified live catalogue' : undefined} onClick={() => openModal(p, v.key)} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>RESERVE</button>
                                   ) : (
                                     <>
                                       <div style={{ ...F, fontSize: 9, letterSpacing: 1, color: '#DC2626', fontWeight: 700 }}>SOLD OUT</div>
-                                      <button onClick={() => openPreorder(p, v.key)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
+                                      <button disabled={!liveCatalogVerified} title={!liveCatalogVerified ? 'Waiting for verified live catalogue' : undefined} onClick={() => openPreorder(p, v.key)} style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '6px 0', ...F, fontWeight: 700, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>PREORDER</button>
                                     </>
                                   )}
                                 </div>

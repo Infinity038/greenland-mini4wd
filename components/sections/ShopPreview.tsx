@@ -40,7 +40,7 @@ export default function ShopPreview() {
     // instead of instantly falling back to the generic placeholder cards.
     resilientCatalogFetch(CATALOG_CACHE_KEY, () =>
       supabase.from('products').select('*').in('status', ['in stock', 'limited', 'preorder only']).order('created_at', { ascending: false }).limit(4)
-    ).then(({ data }) => setItems(data && data.length > 0 ? data : FALLBACK));
+    , cached => { if (cached.length > 0) setItems(cached); }).then(({ data }) => setItems(data && data.length > 0 ? data : FALLBACK));
   }, []);
 
   const display = items.length > 0 ? items : FALLBACK;

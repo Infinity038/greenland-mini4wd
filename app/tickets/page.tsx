@@ -142,7 +142,7 @@ export default function TicketsPage() {
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 6 }}>THE ARCTIC HUSTLE</div>
             <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px,8vw,64px)', margin: '0 0 8px', lineHeight: 0.95 }}>RACE TICKETS</h1>
             <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', margin: '0 0 24px' }}>Buy your entry, register your car, race for glory.</p>
-            <p style={{ ...FB, fontSize:12, color:'#FACC15', margin:'0 0 20px', lineHeight:1.6 }}>Prize policy is specific to each event: newly published regular competitions allocate 35% of paid entry revenue to prizes and 65% to club operating costs; events previously published under 70/30 retain their original terms. Review the event notice before buying. Bonus tickets do not add cash to the pool.</p>
+            <p style={{ ...FB, fontSize:12, color:'#FACC15', margin:'0 0 20px', lineHeight:1.6 }}>Regular competition prize allocation: 35% of paid ticket revenue funds prizes; 65% supports club operations. Each event displays its applicable published terms. Bonus tickets do not add cash to the prize pool.</p>
             <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
               {[{id:'buy',label:'🎟️ BUY TICKETS'},{id:'entrants',label:'🏎️ ENTRANTS'},{id:'pass',label:'🏆 RACE PASS'},{id:'rules',label:'📋 RULES'}].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}

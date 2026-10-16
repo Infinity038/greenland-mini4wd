@@ -56,6 +56,19 @@ describe('resilientCatalogFetch', () => {
     expect(result.error).not.toBeNull();
   });
 
+  it('renders cached products immediately without waiting for the live refresh', async () => {
+    const cached: Product[] = [{ id: 'old', name: 'Cached model' }];
+    await resilientCatalogFetch<Product>(CACHE_KEY, async () => ({ data: cached, error: null }));
+    let complete!: (result: { data: Product[]; error: null }) => void;
+    const stalled = new Promise<{ data: Product[]; error: null }>(resolve => { complete = resolve; });
+    const received: Product[][] = [];
+    const pending = resilientCatalogFetch<Product>(CACHE_KEY, () => stalled, items => received.push(items));
+    expect(received).toEqual([cached]);
+    const fresh: Product[] = [{ id: 'new', name: 'Fresh model' }];
+    complete({ data: fresh, error: null });
+    expect(await pending).toEqual({ data: fresh, error: null });
+  });
+
   it('recovers on a subsequent retry after a failed call', async () => {
     const cached: Product[] = [{ id: '1', name: 'Ray Spear' }];
     await resilientCatalogFetch<Product>(CACHE_KEY, async () => ({ data: cached, error: null }));

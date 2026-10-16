@@ -26,11 +26,11 @@ export default function Hero() {
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
-        opacity: 0.18,
+        opacity: 0.62,
       }} />
 
       {/* Dark overlay */}
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,5,5,0.6) 0%, rgba(5,5,5,0.4) 50%, rgba(5,5,5,0.95) 100%)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,5,5,0.42) 0%, rgba(5,5,5,0.32) 50%, rgba(5,5,5,0.86) 100%)" }} />
 
       {/* Grid pattern */}
       <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(220,38,38,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(220,38,38,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
@@ -62,7 +62,7 @@ export default function Hero() {
           ) : (
             <>
               <a href="/register" style={{ display: "block", background: "#DC2626", color: "#fff", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>JOIN THE CLUB FREE →</a>
-              <a href="#events" style={{ display: "block", border: "1px solid rgba(255,255,255,0.2)", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>HOW CLUB DAYS WORK →</a>
+              <a href="/club-guide" style={{ display: "block", border: "1px solid rgba(255,255,255,0.2)", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>HOW CLUB DAYS WORK →</a>
             </>
           )}
         </div>
