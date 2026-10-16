@@ -1,15 +1,18 @@
 // @ts-nocheck
 'use client';
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { isRegistered } from '@/lib/member';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// The shared client keeps all public data pages on the same configuration.
+function deadline<T>(promise: PromiseLike<T>, ms = 6500): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Request timed out')), ms);
+    Promise.resolve(promise).then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
+  });
+}
 
 const CATEGORIES = ['Box Stock', 'Open Box Stock', 'B-Max', 'Open Class'];
 
@@ -48,6 +51,9 @@ export default function LeaderboardPage() {
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>(CATEGORIES[0]);
   const [loading, setLoading] = useState(true);
+  const [boardError, setBoardError] = useState('');
+  const [hofError, setHofError] = useState('');
+  const [hofLoading, setHofLoading] = useState(true);
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -65,34 +71,47 @@ export default function LeaderboardPage() {
   }, [selectedSeason, selectedCategory]);
 
   async function fetchSeasons() {
-    const { data } = await supabase.from('seasons').select('*').order('created_at', { ascending: false });
-    if (data) {
-      setSeasons(data);
-      const active = data.find((s: any) => s.is_active);
-      if (active) {
-        setActiveSeason(active);
-        setSelectedSeason(active.id);
-      } else if (data.length > 0) {
-        setSelectedSeason(data[0].id);
-      }
+    setLoading(true);
+    setBoardError('');
+    try {
+      const { data, error } = await deadline(supabase.from('seasons').select('*').order('created_at', { ascending: false }));
+      if (error) throw error;
+      const list = data || [];
+      setSeasons(list);
+      const active = list.find((season: any) => season.is_active) || list[0];
+      setActiveSeason(list.find((season: any) => season.is_active) || null);
+      if (active) setSelectedSeason(active.id);
+      else { setSelectedSeason(''); setStandings([]); setLoading(false); }
+    } catch {
+      setBoardError('Could not connect to live race records. Rankings are unavailable until the connection is restored.');
+      setSeasons([]); setStandings([]); setSelectedSeason(''); setLoading(false);
     }
   }
 
   async function fetchStandings(seasonId: string, category: string) {
     setLoading(true);
-    const { data } = await supabase
-      .from('season_standings')
-      .select('*')
-      .eq('season_id', seasonId)
-      .eq('race_category', category)
-      .order('season_rank', { ascending: true });
-    setStandings(data || []);
-    setLoading(false);
+    setBoardError('');
+    try {
+      const { data, error } = await deadline(supabase.from('season_standings').select('*')
+        .eq('season_id', seasonId).eq('race_category', category).order('season_rank', { ascending: true }));
+      if (error) throw error;
+      setStandings(data || []);
+    } catch {
+      setStandings([]);
+      setBoardError('Standings could not be verified. Please retry; no ranking or result has been changed.');
+    } finally { setLoading(false); }
   }
 
   async function fetchHof() {
-    const { data } = await supabase.from('hall_of_fame').select('*');
-    setHof(data || []);
+    setHofLoading(true); setHofError('');
+    try {
+      const { data, error } = await deadline(supabase.from('hall_of_fame').select('*'));
+      if (error) throw error;
+      setHof(data || []);
+    } catch {
+      setHof([]);
+      setHofError('Hall of Fame records could not be loaded. Please retry when the connection returns.');
+    } finally { setHofLoading(false); }
   }
 
   function timeSince(date: string) {
@@ -192,8 +211,12 @@ export default function LeaderboardPage() {
               ))}
             </div>
 
-            {loading ? (
+            {boardError ? (
+              <div role="alert" style={{ ...s.empty, color:'#FACC15' }}>{boardError} <button type="button" onClick={fetchSeasons} style={{ display:'block',margin:'16px auto 0',padding:'9px 18px',background:'#DC2626',border:0,borderRadius:6,color:'#fff',cursor:'pointer' }}>Retry rankings</button></div>
+            ) : loading ? (
               <div style={s.empty}>Loading standings...</div>
+            ) : !selectedSeason ? (
+              <div style={s.empty}>No season has been published yet.</div>
             ) : standings.length === 0 ? (
               <div style={s.empty}>
                 <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏁</div>
@@ -268,7 +291,7 @@ export default function LeaderboardPage() {
             <div style={{ marginBottom: '24px', fontSize: '13px', color: '#6B7280' }}>
               Records are permanent and tracked across all categories combined. Updated instantly when broken. 🏛️ Hall of Fame holders earn <span style={{ color: '#FACC15', fontWeight: 700 }}>8% coins rate</span>.
             </div>
-            <div style={s.hofGrid}>
+            {hofError ? <div role="alert" style={{ ...s.empty,color:'#FACC15' }}>{hofError} <button type="button" onClick={fetchHof} style={{ display:'block',margin:'16px auto 0',padding:'9px 18px',background:'#DC2626',border:0,borderRadius:6,color:'#fff',cursor:'pointer' }}>Retry records</button></div> : hofLoading ? <div style={s.empty}>Loading Hall of Fame…</div> : hof.length === 0 ? <div style={s.empty}>No Hall of Fame records have been published yet.</div> : <div style={s.hofGrid}>
               {hof.map((record: any) => (
                 <div key={record.id} style={s.hofCard}>
                   <div style={s.hofCategory}>{HOF_LABELS[record.category] || record.category}</div>
@@ -287,7 +310,7 @@ export default function LeaderboardPage() {
                   )}
                 </div>
               ))}
-            </div>
+            </div>}
           </>
         )}
       </div>
