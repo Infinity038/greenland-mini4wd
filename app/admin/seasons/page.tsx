@@ -47,35 +47,25 @@ export default function AdminSeasons() {
         if (standings) {
             for (const s of standings) {
                 let tier = 'member';
-                let rate = 2.00;
                 if (s.season_rank === 1) {
                     tier = 'season_1st';
-                    rate = 5.00;
                 }
                 else if (s.season_rank === 2) {
                     tier = 'season_2nd';
-                    rate = 4.00;
                 }
                 else if (s.season_rank === 3) {
                     tier = 'season_3rd';
-                    rate = 3.00;
                 }
                 if (s.member_id) {
-                    await supabase.from('members').update({ loyalty_tier: tier, points_rate: rate }).eq('id', s.member_id);
-                    await supabase.from('loyalty_points').upsert({ member_id: s.member_id, member_name: s.member_name, tier, points_rate: rate }, { onConflict: 'member_id' });
+                    await supabase.from('members').update({ loyalty_tier: tier }).eq('id', s.member_id);
+                    // Prestige is separate from fixed financial reward points. Do not overwrite
+                    // loyalty_points here: an upsert on member_id could also reset existing balances.
                 }
             }
         }
         setMsg('✅ Season activated and tiers updated!');
         loadSeasons();
         setTimeout(() => setMsg(''), 4000);
-    }
-    async function handleDelete(id: string) {
-        if (!confirm('Delete this season? Race results linked to it will also be deleted.'))
-            return;
-        await supabase.from('race_results').delete().eq('season_id', id);
-        await supabase.from('seasons').delete().eq('id', id);
-        loadSeasons();
     }
     const s: Record<string, any> = {
         page: { background: '#050505', minHeight: '100vh', color: '#F5F5F5', fontFamily: "'DM Sans', sans-serif", padding: '32px 24px' },
@@ -133,7 +123,7 @@ export default function AdminSeasons() {
               </div>
               <div>
                 {!season.is_active && (<button style={s.activateBtn} onClick={() => setActive(season.id)}>Set Active</button>)}
-                <button style={s.deleteBtn} onClick={() => handleDelete(season.id)}>Delete</button>
+                <button style={s.deleteBtn} disabled title="Protected: season and race records require an owner-approved archive operation, not destructive deletion">ARCHIVE REQUIRED</button>
               </div>
             </div>))}
         </div>

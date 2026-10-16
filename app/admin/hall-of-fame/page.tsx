@@ -69,8 +69,9 @@ export default function AdminHallOfFame() {
         }).eq('id', editing.id);
         // Update member tier to hall_of_fame if member selected
         if (form.member_id) {
-            await supabase.from('members').update({ loyalty_tier: 'hall_of_fame', points_rate: 8.00 }).eq('id', form.member_id);
-            await supabase.from('loyalty_points').upsert({ member_id: form.member_id, member_name: form.member_name, tier: 'hall_of_fame', points_rate: 8.00 }, { onConflict: 'member_id' });
+            await supabase.from('members').update({ loyalty_tier: 'hall_of_fame' }).eq('id', form.member_id);
+            // Hall of Fame is a prestige title, never a multiplier on fixed reward points.
+            // Do not upsert a partial loyalty_points row; preserve the actual balance.
         }
         if (error)
             setMsg('Error: ' + error.message);
