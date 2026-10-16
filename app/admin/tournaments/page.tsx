@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { stampNewRegularPrizePolicy, getPrizePolicy } from '@/lib/prizePolicy';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const SC: Record<string, string> = { upcoming: '#3B82F6', ongoing: '#22C55E', completed: '#6B7280', cancelled: '#DC2626' };
@@ -32,6 +33,11 @@ export default function AdminTournamentsPage() {
             return;
         setSaving(true);
         const { auto_publish_news, news_category, ...tournamentFields } = editing;
+        // A prospective, visible policy is applied to NEW regular events only.
+        // Existing published events retain their original 70/30 commitment.
+        tournamentFields.description = stampNewRegularPrizePolicy(
+          tournamentFields.description || '', Boolean(editing.id), tournamentFields.ticket_type || 'weekly'
+        );
         let tournamentId = editing.id;
         let err: any = null;
         if (tournamentId) {
@@ -116,6 +122,7 @@ export default function AdminTournamentsPage() {
                     <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
                       <div><span style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC' }}>TICKET </span><span style={{ ...F, fontWeight: 700, fontSize: 14, color: '#FACC15' }}>{t.ticket_price_dkk} kr</span></div>
                       <div><span style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC' }}>MAX </span><span style={{ ...F, fontWeight: 700, fontSize: 14, color: '#F5F5F5' }}>{t.max_participants}</span></div>
+                      <div><span style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC' }}>PRIZES </span><span style={{ ...F, fontWeight: 700, fontSize: 14, color: '#FACC15' }}>{getPrizePolicy(t).prizePct}% prize / {getPrizePolicy(t).clubPct}% club</span></div>
                       {t.ticket_type && <div><span style={{ ...F, fontSize: 10, letterSpacing: 2, color: '#B8C1CC' }}>TYPE </span><span style={{ ...F, fontWeight: 700, fontSize: 14, color: '#B8C1CC' }}>{t.ticket_type}</span></div>}
                     </div>
                     {t.description && <div style={{ ...FB, fontSize: 12, color: '#6B7280', marginTop: 8 }}>{t.description}</div>}
@@ -183,6 +190,7 @@ export default function AdminTournamentsPage() {
                 </div>
                 <div><label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 6 }}>TICKET (DKK)</label><input type="number" value={editing.ticket_price_dkk} onChange={e => setEditing({ ...editing, ticket_price_dkk: Number(e.target.value) })} style={inp()}/></div>
               </div>
+              <div style={{ ...FB, fontSize: 12, color: '#FACC15', lineHeight: 1.6 }}>New weekly events use 35% prize / 65% club operations. Existing events keep the published 70/30 terms. The policy is automatically appended to new regular event descriptions; season/sponsored events require separately published terms.</div>
               <div><label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 6 }}>MAX SPOTS</label><input type="number" value={editing.max_participants} onChange={e => setEditing({ ...editing, max_participants: Number(e.target.value) })} style={inp()}/></div>
               <div><label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 6 }}>DESCRIPTION (optional)</label><textarea value={editing.description || ''} onChange={e => setEditing({ ...editing, description: e.target.value })} rows={2} style={inp({ resize: 'vertical' })}/></div>
               <div><label style={{ ...F, fontSize: 11, letterSpacing: 3, color: '#B8C1CC', display: 'block', marginBottom: 6 }}>STATUS</label><select value={editing.status} onChange={e => setEditing({ ...editing, status: e.target.value })} style={inp()}>{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>

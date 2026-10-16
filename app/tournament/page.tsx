@@ -7,6 +7,7 @@ import Footer from '@/components/layout/Footer';
 import { isRegistered, getMemberData } from '@/lib/member';
 import { isMemberActive } from '@/lib/loyalty';
 import { supabase } from '@/lib/supabase';
+import { getPrizePolicy, getPrizeAllocation } from '@/lib/prizePolicy';
 
 const F  = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -30,26 +31,30 @@ function PrizeCalculator() {
   const [paid, setPaid]   = useState(20);
   const [bonus, setBonus] = useState(0);
   const [price, setPrice] = useState(150);
-  const total   = paid * price;
-  const pool    = Math.round(total * 0.70);
-  const org     = Math.round(total * 0.30);
+  const [policy, setPolicy] = useState<'new'|'existing'>('new');
+  const pct = policy === 'new' ? 35 : 70;
+  const total = Math.max(0, paid) * Math.max(0, price);
+  const { prizes: pool, club: org } = getPrizeAllocation(total, pct);
   const inp = { background:'#0D1B2A', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'12px 16px', color:'#F5F5F5', fontSize:20, fontWeight:700, width:'100%', outline:'none', fontFamily:"'Barlow Condensed', sans-serif", boxSizing:'border-box' };
   return (
     <div style={{ background:'#071426', border:'1px solid rgba(220,38,38,0.25)', borderRadius:16, padding:'32px 28px' }}>
       <div style={{ ...F, fontSize:11, letterSpacing:5, color:'#DC2626', marginBottom:6 }}>LIVE CALCULATOR</div>
       <h3 style={{ ...F, fontWeight:900, fontSize:28, color:'#F5F5F5', margin:'0 0 24px' }}>PRIZE POOL ESTIMATOR</h3>
+      <label style={{ ...FB, display:'block', color:'#B8C1CC', fontSize:12, marginBottom:8 }} htmlFor="prize-policy">Which published policy?</label>
+      <select id="prize-policy" value={policy} onChange={e => setPolicy(e.target.value as 'new'|'existing')} style={{ background:'#050505', border:'1px solid #334155', borderRadius:8, padding:12, color:'#F5F5F5', width:'100%', marginBottom:18 }}><option value="new">New regular competition — 35% prizes / 65% club</option><option value="existing">Existing published competition — 70% prizes / 30% club</option></select>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:16, marginBottom:28 }}>
         {[{l:'TICKET PRICE (DKK)',v:price,s:setPrice,min:50,max:500},{l:'PAID ENTRIES',v:paid,s:setPaid,min:2,max:100},{l:'BONUS TICKETS',v:bonus,s:setBonus,min:0,max:20}].map(f=>(
           <div key={f.l}><div style={{...F,fontSize:11,letterSpacing:3,color:'#B8C1CC',marginBottom:8}}>{f.l}</div><input style={inp} type="number" min={f.min} max={f.max} value={f.v} onChange={e=>f.s(Number(e.target.value))}/></div>
         ))}
       </div>
       <div style={{ background:'#050505', borderRadius:12, padding:20, marginBottom:16 }}>
-        {[{l:'Total entries',v:paid+bonus,c:'#F5F5F5'},{l:'Paid revenue',v:`${total.toLocaleString()} DKK`,c:'#F5F5F5'},{l:'Organizer (30%)',v:`${org.toLocaleString()} DKK`,c:'#B8C1CC'}].map(r=>(
+        {[{l:'Total entries',v:paid+bonus,c:'#F5F5F5'},{l:'Paid revenue',v:`${total.toLocaleString()} DKK`,c:'#F5F5F5'},{l:`Club operations (${100-pct}%)`,v:`${org.toLocaleString()} DKK`,c:'#B8C1CC'}].map(r=>(
           <div key={r.l} style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><span style={{...FB,color:'#B8C1CC',fontSize:14}}>{r.l}</span><span style={{...F,fontWeight:700,color:r.c,fontSize:16}}>{r.v}</span></div>
         ))}
         <div style={{height:1,background:'rgba(255,255,255,0.08)',margin:'12px 0'}}/>
-        <div style={{display:'flex',justifyContent:'space-between'}}><span style={{...F,fontSize:16,letterSpacing:2,color:'#FACC15'}}>PRIZE POOL (70%)</span><span style={{...F,fontWeight:900,fontSize:24,color:'#FACC15'}}>{pool.toLocaleString()} DKK</span></div>
+        <div style={{display:'flex',justifyContent:'space-between'}}><span style={{...F,fontSize:16,letterSpacing:2,color:'#FACC15'}}>PRIZE POOL ({pct}%)</span><span style={{...F,fontWeight:900,fontSize:24,color:'#FACC15'}}>{pool.toLocaleString()} DKK</span></div>
       </div>
+      <p style={{ ...FB, fontSize:11, color:'#B8C1CC', lineHeight:1.6 }}>This is an estimate using paid entries only. Bonus tickets add no prize revenue. The published terms on the individual event govern; the club share is not owner take-home profit.</p>
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
         {[{p:'🥇 1ST',pct:'65%',v:Math.round(pool*.65),c:'#FACC15'},{p:'🥈 2ND',pct:'25%',v:Math.round(pool*.25),c:'#B8C1CC'},{p:'🥉 3RD',pct:'10%',v:Math.round(pool*.10),c:'#CD7F32'}].map(r=>(
           <div key={r.p} style={{background:'#050505',borderRadius:10,padding:'16px 12px',textAlign:'center',border:`1px solid ${r.c}22`}}>
@@ -269,6 +274,8 @@ export default function TournamentPage() {
                               {t.location && <span>📍 {t.location}</span>}
                             </div>
 
+                            <div style={{ ...FB, fontSize:12, color:'#FACC15', marginBottom:8 }}>🏆 Published allocation: {getPrizePolicy(t).prizePct}% prizes · {getPrizePolicy(t).clubPct}% club operations</div>
+
                             {/* My confirmed entries for this race */}
                             {loggedIn && myCount > 0 && (
                               <div style={{ display:'flex', flexDirection:'column', gap:5, marginTop:8 }}>
@@ -383,9 +390,9 @@ export default function TournamentPage() {
 
           {/* Prize Pool */}
           <section style={{ marginBottom:64 }}>
-            <div style={{ ...F, fontSize:11, letterSpacing:5, color:'#DC2626', marginBottom:8 }}>70/30 SPLIT</div>
+            <div style={{ ...F, fontSize:11, letterSpacing:5, color:'#DC2626', marginBottom:8 }}>PUBLISHED EVENT TERMS</div>
             <h2 style={{ ...F, fontWeight:900, fontSize:'clamp(32px,6vw,52px)', margin:'0 0 8px' }}>PRIZE POOL</h2>
-            <p style={{ ...FB, fontSize:15, color:'#B8C1CC', margin:'0 0 32px' }}>70% of paid ticket sales goes to the prize pool. Bonus tickets don't contribute.</p>
+            <p style={{ ...FB, fontSize:15, color:'#B8C1CC', margin:'0 0 32px' }}>New regular competitions: 35% of paid entries funds prizes and 65% is retained by the club for operating costs. Previously published races retain the earlier 70/30 terms. The event-specific notice always takes precedence. Bonus entries do not increase the cash pool.</p>
             <PrizeCalculator />
           </section>
 

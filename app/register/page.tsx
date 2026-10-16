@@ -40,7 +40,9 @@ export default function RegisterPage() {
   }, []);
 
   const setSession = (data: any) => {
-    saveMemberData(data);
+    const safeMemberData = { ...data };
+    delete safeMemberData.password_hash;
+    saveMemberData(safeMemberData);
     document.cookie = "gm4wd_registered=1; path=/; max-age=31536000";
     router.push("/");
   };
@@ -48,7 +50,7 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (reg.password.length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (reg.password.length < 8) { setError("Password must be at least 8 characters."); return; }
     setLoading(true);
     try {
       const bcrypt = await import("bcryptjs");
@@ -61,7 +63,8 @@ export default function RegisterPage() {
         .single();
 
       if (existing) {
-        setSession(existing);
+        setError("An account with that email already exists. Please log in or contact the club administrator.");
+        setTab("login");
         return;
       }
 
@@ -105,7 +108,7 @@ export default function RegisterPage() {
       if (fetchError || !data) { setError("No account found with that email."); return; }
 
       if (!data.password_hash) {
-        setSession(data);
+        setError("This account requires a secure password setup. Contact the club administrator.");
         return;
       }
 

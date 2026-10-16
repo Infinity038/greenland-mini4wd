@@ -30,48 +30,15 @@ export default function HowToJoin() {
           </section>
 
           <section style={{ marginBottom: 60 }}>
-            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>2. Become a Member</h2>
-            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              You automatically become a member by making your first purchase — whether that's a car kit, parts, tickets, or merchandise. There is no fixed membership fee.
-            </p>
-            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              <strong style={{ color: '#F5F5F5' }}>Your membership length is tied directly to how much you spend:</strong> every 20 DKK you spend adds 1 day of membership. The more active you are, the longer your membership stays active.
-            </p>
-
-            <div style={{ background: '#071426', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
-              <div style={{ ...F, fontSize: 14, fontWeight: 700, color: '#DC2626', marginBottom: 12 }}>💡 EXAMPLE</div>
-              <div style={{ ...FB, fontSize: 14, color: '#B8C1CC', lineHeight: 1.8 }}>
-                You spend 200 DKK on a chassis kit → +10 days of membership. Later that season you spend 1,000 DKK on tickets and parts → +50 more days. Keep racing and shopping, and your membership stays active continuously.
-              </div>
-            </div>
+            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>2. Registration, legacy access and future Club Pass</h2>
+            <p style={{ ...FB, fontSize:15, color:'#B8C1CC',lineHeight:1.8 }}>Account registration is free and permanent. The current spending-based programme (one earned membership day per 20 DKK qualifying spend) remains in effect during the transition. Previously earned dates and ticket benefits will be honoured; no existing balance has been removed. Any future paid Club Pass will be a separate product for track and welcome benefits, not a replacement for your racer identity.</p>
+            <p style={{ ...FB, fontSize:14, color:'#FACC15',lineHeight:1.8 }}>New paid Club Passes and the one-time beginner-car offer are not yet on sale. Final prices, availability, redemption conditions, and the migration date for future day accrual will be published before any change takes effect.</p>
+            <a href="/membership" style={{ color:'#FACC15', fontWeight:700 }}>Understand membership types →</a>
           </section>
 
           <section style={{ marginBottom: 60 }}>
-            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>3. Earn Loyalty Points</h2>
-            <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', marginBottom: 16, lineHeight: 1.8 }}>
-              Every DKK you spend earns you loyalty points. Your earn rate depends on your membership tier:
-            </p>
-            <div style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
-              {[
-                { tier: 'Non-Member', rate: '0%', example: 'Spend 500 kr → 0 points' },
-                { tier: 'Member', rate: '2%', example: 'Spend 500 kr → 10 points' },
-                { tier: 'Pro Racer', rate: '3%', example: 'Spend 500 kr → 15 points' },
-                { tier: 'Elite Racer', rate: '4%', example: 'Spend 500 kr → 20 points' },
-                { tier: 'Arctic Champion', rate: '5%', example: 'Spend 500 kr → 25 points' },
-                { tier: 'Hall of Fame', rate: '8%', example: 'Spend 500 kr → 40 points' },
-              ].map((t, i) => (
-                <div key={i} style={{ background: '#0D1B2A', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ ...F, fontSize: 14, fontWeight: 700, color: '#F5F5F5' }}>{t.tier}</div>
-                    <div style={{ ...F, fontSize: 16, fontWeight: 900, color: '#FACC15' }}>{t.rate}</div>
-                  </div>
-                  <div style={{ ...FB, fontSize: 13, color: '#B8C1CC' }}>{t.example}</div>
-                </div>
-              ))}
-            </div>
-            <p style={{ ...FB, fontSize: 14, color: '#B8C1CC', fontStyle: 'italic' }}>
-              💰 Bonus: Every 10 paid race tickets you buy gives you 1 FREE bonus ticket, courtesy of the club!
-            </p>
+            <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>3. Fixed Reward Points</h2>
+            <p style={{ ...FB, fontSize:15, color:'#B8C1CC',lineHeight:1.8 }}>Reward points are separate from membership days and racing rank. The current fixed programme earns one whole point for every cumulative 100 DKK of eligible confirmed spending. Your actual available rewards are shown in your profile. The existing punch-card bonus ticket programme remains separate.</p>
           </section>
 
           <section style={{ marginBottom: 60 }}>
@@ -165,7 +132,7 @@ export default function HowToJoin() {
                 },
                 {
                   q: 'What if my membership runs out?',
-                  a: 'You can still buy and race with tickets. To reactivate membership benefits, make any purchase — every 20 DKK you spend adds 1 day back.',
+                  a: 'You can still buy and race with tickets. Under the current legacy programme, eligible confirmed spending still earns access days until a published transition date. The forthcoming Club Pass will be separate.',
                 },
                 {
                   q: 'How do I move up in rank?',
