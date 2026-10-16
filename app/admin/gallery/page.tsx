@@ -44,7 +44,7 @@ export default function AdminGalleryPage() {
           : await supabase.from('gallery_items').insert({...payload,created_at:new Date().toISOString()});
         if(result.error)throw result.error;
         setEditing(null);setPreview('');await fetchItems();
-      }catch{setDbError('Gallery save failed. No successful save has been confirmed.');}
+      }catch{setUseDb(false);setDbError('Gallery save failed. No successful save has been confirmed.');}
       finally{setSaving(false);}
     };
     const del=async(id:string)=>{
@@ -66,7 +66,7 @@ export default function AdminGalleryPage() {
         </div>
       </div>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px' }}>
-        {!useDb && <div role="alert" style={{padding:15,background:'#241519',border:'1px solid #DC2626',borderRadius:9,color:'#FACC15',marginBottom:15}}>{dbError || 'Connecting to verified gallery records…'} <button type="button" onClick={fetchItems} style={{padding:7,marginLeft:12,cursor:'pointer'}}>Retry</button></div>}
+        {(!useDb || dbError) && <div role="alert" style={{padding:15,background:'#241519',border:'1px solid #DC2626',borderRadius:9,color:'#FACC15',marginBottom:15}}>{dbError || 'Connecting to verified gallery records…'} <button type="button" onClick={fetchItems} style={{padding:7,marginLeft:12,cursor:'pointer'}}>Retry</button></div>}
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 20, paddingBottom: 4 }}>
           {['all', ...CATS].map(c => (<button key={c} onClick={() => setFilter(c)} style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, padding: '7px 14px', borderRadius: 8, border: filter === c ? 'none' : '1px solid rgba(255,255,255,0.08)', background: filter === c ? '#DC2626' : '#071426', color: filter === c ? '#fff' : '#B8C1CC', cursor: 'pointer', whiteSpace: 'nowrap' as const, flexShrink: 0 }}>{c.toUpperCase()}</button>))}
         </div>
