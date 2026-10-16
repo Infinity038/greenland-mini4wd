@@ -67,11 +67,6 @@ export default function AdminSeasons() {
         loadSeasons();
         setTimeout(() => setMsg(''), 4000);
     }
-    async function handleDelete(id: string) {
-        if (!confirm('Deleting a season could erase permanent race history. Confirm that deletion should stay blocked while archival is developed.'))
-            return;
-        setMsg('Season deletion is locked until an owner-approved archive and race-history preservation flow is available. No records were deleted.');
-    }
     const s: Record<string, any> = {
         page: { background: '#050505', minHeight: '100vh', color: '#F5F5F5', fontFamily: "'DM Sans', sans-serif", padding: '32px 24px' },
         card: { background: '#071426', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', maxWidth: '700px', margin: '0 auto 24px' },
@@ -128,7 +123,7 @@ export default function AdminSeasons() {
               </div>
               <div>
                 {!season.is_active && (<button style={s.activateBtn} onClick={() => setActive(season.id)}>Set Active</button>)}
-                <button style={s.deleteBtn} onClick={() => handleDelete(season.id)}>Delete</button>
+                <button style={s.deleteBtn} disabled title="Protected: season and race records require an owner-approved archive operation, not destructive deletion">ARCHIVE REQUIRED</button>
               </div>
             </div>))}
         </div>
