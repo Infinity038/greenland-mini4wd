@@ -438,8 +438,8 @@ export default function ShopPage() {
   };
 
   const openPreorder = (p: Product, variantKey: string) => {
-    if (!liveCatalogVerified) return;
     if (isPriceOnRequest(p)) { openInquiry(p); return; }
+    if (!liveCatalogVerified) return;
     if (!isRegistered()) { window.location.href = '/register'; return; }
     setPreorderTarget({ product: p, variantKey });
     setPreorderDone(false);
