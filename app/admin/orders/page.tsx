@@ -145,9 +145,15 @@ export default function AdminOrders() {
         setTimeout(() => setMsg(''), 3000);
     }
     async function deleteOrder(id: string) {
-        if (!confirm('Delete this order permanently?'))
+        const order=orders.find((item:any)=>item.id===id);
+        if (!order) return;
+        if (order.rewards_applied || !['awaiting_payment','rejected'].includes(order.payment_status)) {
+            setMsg('Deletion blocked: paid, fulfilled or rewarded orders must remain auditable. Use the reconciliation/archive process instead.');
             return;
-        await supabase.from('orders').delete().eq('id', id);
+        }
+        if(!confirm('Delete only this unpaid order draft? This cannot be undone.'))return;
+        const {error}=await supabase.from('orders').delete().eq('id',id);
+        if(error){setMsg('Delete failed: '+error.message);return;}
         loadData();
     }
     const filtered = filter === 'all' ? orders : orders.filter((o: any) => o.payment_status === filter);
@@ -244,7 +250,7 @@ export default function AdminOrders() {
                     <button style={s.saveBtn} disabled={saving === order.id} onClick={() => updateStatus(order.id, notes[`${order.id}_status`] || order.payment_status)}>
                       {saving === order.id ? '...' : 'SAVE'}
                     </button>
-                    <button style={s.delBtn} onClick={() => deleteOrder(order.id)}>Delete</button>
+                    <button style={s.delBtn} disabled={!!order.rewards_applied || !['awaiting_payment','rejected'].includes(order.payment_status)} title={!!order.rewards_applied || !['awaiting_payment','rejected'].includes(order.payment_status) ? 'Auditable paid orders cannot be deleted' : 'Delete unpaid order draft'} onClick={() => deleteOrder(order.id)}>Delete</button>
                   </div>
                 </div>);
             })}
