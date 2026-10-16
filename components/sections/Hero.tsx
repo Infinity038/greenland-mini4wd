@@ -2,11 +2,11 @@
 import { useEffect, useState } from "react";
 import { isRegistered } from "@/lib/member";
 
-const STATS = [
-  { value: "42+", label: "Members", red: true },
-  { value: "8", label: "Races Run", red: false },
-  { value: "3", label: "Cities", red: false },
-  { value: "2026", label: "Season", red: false },
+const HIGHLIGHTS = [
+  { value: "FREE", label: "Account registration", red: true },
+  { value: "4", label: "Racing classes", red: false },
+  { value: "NUUK", label: "Our community", red: false },
+  { value: "ONLINE", label: "Event calendar", red: false },
 ];
 
 export default function Hero() {
@@ -62,13 +62,13 @@ export default function Hero() {
           ) : (
             <>
               <a href="/register" style={{ display: "block", background: "#DC2626", color: "#fff", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>JOIN THE CLUB FREE →</a>
-              <a href="#events" style={{ display: "block", border: "1px solid rgba(255,255,255,0.2)", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>SEE EVENTS →</a>
+              <a href="#events" style={{ display: "block", border: "1px solid rgba(255,255,255,0.2)", color: "#F5F5F5", padding: "14px", borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 16, letterSpacing: 3, textAlign: "center", textDecoration: "none" }}>HOW CLUB DAYS WORK →</a>
             </>
           )}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-          {STATS.map((s, i) => (
+          {HIGHLIGHTS.map((s, i) => (
             <div key={s.label} style={{ textAlign: "center", padding: "16px 8px", borderRight: i < 3 ? "1px solid rgba(255,255,255,0.08)" : "none" }}>
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 32, lineHeight: 1, color: s.red ? "#DC2626" : "#F5F5F5" }}>{s.value}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9, color: "#B8C1CC", letterSpacing: 3, marginTop: 4, textTransform: "uppercase" }}>{s.label}</div>
