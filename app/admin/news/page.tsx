@@ -42,7 +42,7 @@ export default function AdminNewsPage() {
         if(result.error) throw result.error;
         setEditing(null);
         await fetchPosts();
-      } catch {setDbError('Save failed. The post was not confirmed saved. Retry after checking the database.');}
+      } catch {setUseDb(false);setDbError('Save failed. The post was not confirmed saved. Retry after checking the database.');}
       finally {setSaving(false);}
     };
     const del=async(id:string)=>{
@@ -69,7 +69,7 @@ export default function AdminNewsPage() {
         </div>
       </div>
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 20px' }}>
-        {!useDb && <div role="alert" style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 10, padding: '12px 16px', ...FB, fontSize: 13, color: '#FACC15', marginBottom: 20 }}>{dbError || 'Connecting to verified news records…'} <button type="button" onClick={fetchPosts} style={{marginLeft:12,padding:8,cursor:'pointer'}}>Retry</button></div>}
+        {(!useDb || dbError) && <div role="alert" style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 10, padding: '12px 16px', ...FB, fontSize: 13, color: '#FACC15', marginBottom: 20 }}>{dbError || 'Connecting to verified news records…'} <button type="button" onClick={fetchPosts} style={{marginLeft:12,padding:8,cursor:'pointer'}}>Retry</button></div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {posts.map(post => (<div key={post.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '16px 20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
