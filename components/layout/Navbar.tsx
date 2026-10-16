@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { getMemberData, isRegistered, logout } from "@/lib/member";
+import { createSupabaseBrowserClient } from "@/lib/supabaseAuth/browserClient";
 
 type NavLink = { label: string; href: string; featured?: "rules" | "tickets" };
 const NAV_LINKS: NavLink[] = [
@@ -30,6 +31,7 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [pitAllowed, setPitAllowed] = useState(false);
   const [member, setMember] = useState<any>(null);
 
   useEffect(() => {
@@ -41,6 +43,27 @@ export default function Navbar() {
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [open]);
+
+  // This is only navigation visibility. The route and every future game API must
+  // independently enforce the verified server-side allowlist. Ignore local member cookies.
+  useEffect(() => {
+    let cancelled = false;
+    const auth = createSupabaseBrowserClient();
+    async function checkPrivateAccess() {
+      const { data: { user }, error } = await auth.auth.getUser();
+      if (cancelled) return;
+      if (error || !user) { setPitAllowed(false); return; }
+      const result = await auth.rpc('prediction_pit_allowed');
+      if (!cancelled) setPitAllowed(!result.error && result.data === true);
+    }
+    void checkPrivateAccess();
+    window.addEventListener('focus', checkPrivateAccess);
+    return () => { cancelled = true; window.removeEventListener('focus', checkPrivateAccess); };
+  }, []);
+
+  const visibleNavLinks: NavLink[] = pitAllowed
+    ? [NAV_LINKS[0], { label: "🔒 Prediction Pit", href: "/prediction-pit" }, ...NAV_LINKS.slice(1)]
+    : NAV_LINKS;
 
   const firstName = member?.name?.split(" ")[0] || member?.first_name || "Member";
 
@@ -81,7 +104,7 @@ export default function Navbar() {
         </a>
 
         <div className="hidden md:flex" style={{ alignItems: "center", gap: 18 }}>
-          {NAV_LINKS.map((link) => renderLink(link))}
+          {visibleNavLinks.map((link) => renderLink(link))}
           {registered ? (
             <div style={{ position: "relative" }}>
               <button onClick={() => setMenuOpen(!menuOpen)} style={{ display: "flex", alignItems: "center", gap: 8, background: "#071426", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 6, padding: "7px 14px", cursor: "pointer", color: "#F5F5F5" }}>
@@ -112,7 +135,7 @@ export default function Navbar() {
 
       {open && (
         <div style={{ position: "fixed", top: 60, left: 0, right: 0, bottom: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", background: "#050505", borderTop: "1px solid rgba(255,255,255,0.05)", padding: "8px 16px 24px", zIndex: 49 }}>
-          {NAV_LINKS.map((link) => renderLink(link, true))}
+          {visibleNavLinks.map((link) => renderLink(link, true))}
           {registered ? (
             <>
               {MEMBER_LINKS.map((item) => (
