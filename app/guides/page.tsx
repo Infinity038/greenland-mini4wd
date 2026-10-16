@@ -2,6 +2,7 @@ import Footer from '@/components/layout/Footer';
 import Navbar from '@/components/layout/Navbar';
 import KnowledgeTabs from '@/components/knowledge/KnowledgeTabs';
 import { GUIDE_TOPICS } from '@/lib/rulesGuidesContent';
+import GuideIcon from '@/components/knowledge/GuideIcon';
 
 const headingFont = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const bodyFont = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -63,7 +64,7 @@ export default function GuidesPage() {
                 <div style={{ height: 4, background: guide.color }} />
                 <div style={{ padding: 22 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontSize: 32 }}>{guide.icon}</span>
+                    <GuideIcon slug={guide.slug} icon={guide.icon} size={32} />
                     <span style={{ ...headingFont, fontSize: 11, letterSpacing: 2, color: '#6B7280' }}>{String(index + 1).padStart(2, '0')}</span>
                   </div>
                   <h2 style={{ ...headingFont, fontSize: 27, margin: '14px 0 8px', color: guide.color }}>{guide.title}</h2>

@@ -4,6 +4,7 @@ import Navbar from '@/components/layout/Navbar';
 import KnowledgeTabs from '@/components/knowledge/KnowledgeTabs';
 import ResponsiveDataTable from '@/components/knowledge/ResponsiveDataTable';
 import { getGuideTopic, GUIDE_TOPICS } from '@/lib/rulesGuidesContent';
+import GuideIcon from '@/components/knowledge/GuideIcon';
 
 const headingFont = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const bodyFont = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -35,7 +36,7 @@ export default async function GuideDetailPage({ params }: { params: Promise<{ sl
           <div style={{ maxWidth: 920, margin: '0 auto' }}>
             <a href="/guides" aria-label="Back to all build guides" style={{ ...headingFont, display:'inline-block', padding:'11px 17px', background:'#172B45', border:'1px solid rgba(255,255,255,0.24)', borderRadius:8, color: '#F5F5F5', textDecoration:'none', fontSize: 15, fontWeight:900, letterSpacing: 1.5 }}>← BACK TO ALL GUIDES</a>
             <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginTop: 28 }}>
-              <span style={{ fontSize: 52 }}>{guide.icon}</span>
+              <GuideIcon slug={guide.slug} icon={guide.icon} size={52} />
               <div>
                 <div style={{ ...headingFont, color: guide.color, fontSize: 12, letterSpacing: 4 }}>{guide.audience.toUpperCase()}</div>
                 <h1 style={{ ...headingFont, fontSize: 'clamp(46px, 9vw, 82px)', lineHeight: 0.95, margin: '4px 0 10px' }}>{guide.title.toUpperCase()}</h1>

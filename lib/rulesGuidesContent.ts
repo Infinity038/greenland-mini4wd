@@ -507,7 +507,7 @@ export const GUIDE_TOPICS: GuideTopic[] = [
   {
     slug: 'tires-wheels',
     title: 'Tires & Wheels',
-    icon: '🛞',
+    icon: '◉',
     color: '#A855F7',
     summary: 'Control grip, bounce, diameter and stability without violating class rules.',
     audience: 'All racers',

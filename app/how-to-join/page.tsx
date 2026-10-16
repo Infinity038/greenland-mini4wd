@@ -32,7 +32,7 @@ export default function HowToJoin() {
           <section style={{ marginBottom: 60 }}>
             <h2 style={{ ...F, fontSize: 28, fontWeight: 900, marginBottom: 20, color: '#FACC15' }}>2. Registration, legacy access and future Club Pass</h2>
             <p style={{ ...FB, fontSize:15, color:'#B8C1CC',lineHeight:1.8 }}>Account registration is free and permanent. The current spending-based programme (one earned membership day per 20 DKK qualifying spend) remains in effect during the transition. Previously earned dates and ticket benefits will be honoured; no existing balance has been removed. Any future paid Club Pass will be a separate product for track and welcome benefits, not a replacement for your racer identity.</p>
-            <p style={{ ...FB, fontSize:14, color:'#FACC15',lineHeight:1.8 }}>New paid Club Passes and the one-time beginner-car offer are not yet on sale. Final prices, availability, redemption conditions, and the migration date for future day accrual will be published before any change takes effect.</p>
+            <p style={{ ...FB, fontSize:14, color:'#FACC15',lineHeight:1.8 }}>New paid Club Passes and the one-time beginner-car offer are not yet on sale. Future packages are planned in club opening-day units, NOT calendar-month equivalents; final credit quantities, consumption rules, prices, redemption conditions and the migration date will be published before any change takes effect. Existing earned access remains unchanged.</p>
             <a href="/membership" style={{ color:'#FACC15', fontWeight:700 }}>Understand membership types →</a>
           </section>
 
