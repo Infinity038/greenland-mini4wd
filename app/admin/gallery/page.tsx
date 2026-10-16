@@ -5,50 +5,54 @@ const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const CATS = ['race day', 'builds', 'community', 'AI promo', 'events'];
 const inp = (x?: any) => ({ width: '100%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '11px 14px', color: '#F5F5F5', fontFamily: "'DM Sans',sans-serif", fontSize: 14, outline: 'none', boxSizing: 'border-box' as const, ...x });
-const DEMO = [{ id: '1', title: 'Arctic Sprint #1', caption: 'Our first race event!', image_url: '/IMG_5374.png', category: 'race day' }, { id: '2', title: 'AR Build', caption: 'Member showcase', image_url: '/IMG_5375.png', category: 'builds' }, { id: '3', title: 'Community Meetup', caption: 'First gathering', image_url: '/IMG_5376.png', category: 'community' }];
 export default function AdminGalleryPage() {
-    const [items, setItems] = useState<any[]>(DEMO);
+    const [items, setItems] = useState<any[]>([]);
     const [editing, setEditing] = useState<any>(null);
     const [filter, setFilter] = useState('all');
     const [saving, setSaving] = useState(false);
     const [useDb, setUseDb] = useState(false);
+    const [dbError,setDbError] = useState('');
     const [preview, setPreview] = useState('');
     const fileRef = useRef<HTMLInputElement>(null);
     useEffect(() => { fetchItems(); }, []);
-    const fetchItems = async () => { const { data, error } = await supabase.from('gallery_items').select('*').order('created_at', { ascending: false }); if (!error && data) {
-        setItems(data);
-        setUseDb(true);
-    } };
-    const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f || !editing)
-        return; const r = new FileReader(); r.onloadend = () => { const u = r.result as string; setPreview(u); setEditing({ ...editing, image_url: u }); }; r.readAsDataURL(f); };
-    const save = async () => {
-        if (!editing)
-            return;
-        setSaving(true);
-        if (useDb) {
-            if (editing.id && !DEMO.find(d => d.id === editing.id))
-                await supabase.from('gallery_items').update(editing).eq('id', editing.id);
-            else
-                await supabase.from('gallery_items').insert({ ...editing, created_at: new Date().toISOString() });
-            await fetchItems();
-        }
-        else {
-            if (editing.id)
-                setItems(p => p.map(x => x.id === editing.id ? editing : x));
-            else
-                setItems(p => [{ ...editing, id: Date.now().toString() }, ...p]);
-        }
-        setEditing(null);
-        setPreview('');
-        setSaving(false);
+    const fetchItems=async()=>{
+      setUseDb(false); setDbError('');
+      try {
+        const {data,error}=await new Promise<any>((resolve,reject)=>{
+          const timer=setTimeout(()=>reject(new Error('Gallery request timed out')),7000);
+          Promise.resolve(supabase.from('gallery_items').select('*').order('created_at',{ascending:false})).then(
+            response=>{clearTimeout(timer);resolve(response);},reason=>{clearTimeout(timer);reject(reason);}
+          );
+        });
+        if(error) throw error;
+        setItems(data||[]);setUseDb(true);
+      } catch {setItems([]);setDbError('Live Gallery could not load. Saving and deletion are disabled until the database is verified.');}
     };
-    const del = async (id: string) => { if (!confirm('Delete?'))
-        return; if (useDb) {
-        await supabase.from('gallery_items').delete().eq('id', id);
-        await fetchItems();
-    }
-    else
-        setItems(p => p.filter(x => x.id !== id)); };
+    const handleFile=(e:React.ChangeEvent<HTMLInputElement>)=>{
+      const f=e.target.files?.[0];if(!f || !editing || !useDb)return;
+      const reader=new FileReader();
+      reader.onloadend=()=>{const url=reader.result as string;setPreview(url);setEditing({...editing,image_url:url});};
+      reader.readAsDataURL(f);
+    };
+    const save=async()=>{
+      if(!editing || !useDb)return;
+      setSaving(true);setDbError('');
+      try {
+        const payload={...editing};delete payload.id;
+        const result=editing.id
+          ? await supabase.from('gallery_items').update(payload).eq('id',editing.id)
+          : await supabase.from('gallery_items').insert({...payload,created_at:new Date().toISOString()});
+        if(result.error)throw result.error;
+        setEditing(null);setPreview('');await fetchItems();
+      }catch{setDbError('Gallery save failed. No successful save has been confirmed.');}
+      finally{setSaving(false);}
+    };
+    const del=async(id:string)=>{
+      if(!useDb||!confirm('Delete this gallery photo?'))return;
+      const {error}=await supabase.from('gallery_items').delete().eq('id',id);
+      if(error){setDbError('Gallery deletion failed: '+error.message);return;}
+      await fetchItems();
+    };
     const filtered = filter === 'all' ? items : items.filter(i => i.category === filter);
     return (<div style={{ minHeight: '100vh', background: '#050505', color: '#F5F5F5' }}>
       <div style={{ background: '#071426', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
@@ -57,11 +61,12 @@ export default function AdminGalleryPage() {
           <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', letterSpacing: 1 }}>MANAGE GALLERY</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => { setEditing({ title: '', caption: '', image_url: '', category: 'race day' }); setPreview(''); }} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', ...F, fontWeight: 700, fontSize: 14, letterSpacing: 1, cursor: 'pointer' }}>+ ADD PHOTO</button>
+          <button disabled={!useDb} onClick={() => { setEditing({ title: '', caption: '', image_url: '', category: 'race day' }); setPreview(''); }} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', ...F, fontWeight: 700, fontSize: 14, letterSpacing: 1, cursor: 'pointer' }}>+ ADD PHOTO</button>
           <a href="/admin" style={{ ...FB, fontSize: 12, color: '#B8C1CC', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '6px 12px' }}>← Dashboard</a>
         </div>
       </div>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px' }}>
+        {!useDb && <div role="alert" style={{padding:15,background:'#241519',border:'1px solid #DC2626',borderRadius:9,color:'#FACC15',marginBottom:15}}>{dbError || 'Connecting to verified gallery records…'} <button type="button" onClick={fetchItems} style={{padding:7,marginLeft:12,cursor:'pointer'}}>Retry</button></div>}
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 20, paddingBottom: 4 }}>
           {['all', ...CATS].map(c => (<button key={c} onClick={() => setFilter(c)} style={{ ...F, fontWeight: 700, fontSize: 11, letterSpacing: 1, padding: '7px 14px', borderRadius: 8, border: filter === c ? 'none' : '1px solid rgba(255,255,255,0.08)', background: filter === c ? '#DC2626' : '#071426', color: filter === c ? '#fff' : '#B8C1CC', cursor: 'pointer', whiteSpace: 'nowrap' as const, flexShrink: 0 }}>{c.toUpperCase()}</button>))}
         </div>
