@@ -2,6 +2,7 @@ const LINKS = {
   Club: [
     { label: "About", href: "/about" },
     { label: "Club Guide", href: "/club-guide" },
+    { label: "Filming & CCTV", href: "/filming-policy" },
     { label: "Events", href: "/events" },
     { label: "Gallery", href: "/gallery" },
     { label: "Blog", href: "/blog" },
