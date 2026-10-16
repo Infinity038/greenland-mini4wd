@@ -8,50 +8,55 @@ const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 // any filter the visitor clicks.
 const CATS = ['Community', 'Racing', 'Guide', 'Event', 'News'];
 const inp = (x?: any) => ({ width: '100%', background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '11px 14px', color: '#F5F5F5', fontFamily: "'DM Sans',sans-serif", fontSize: 14, outline: 'none', boxSizing: 'border-box' as const, ...x });
-const DEMO = [{ id: '1', title: 'Welcome to Greenland Mini 4WD Club', summary: 'The first Tamiya Mini 4WD community in Greenland is officially open!', body: '', image_url: '', category: 'News', published: true, created_at: new Date().toISOString() }, { id: '2', title: 'What is Box Stock Racing?', summary: 'Everything you need to know about box stock rules.', body: '', image_url: '', category: 'Guide', published: true, created_at: new Date().toISOString() }];
 export default function AdminNewsPage() {
-    const [posts, setPosts] = useState<any[]>(DEMO);
+    const [posts, setPosts] = useState<any[]>([]);
     const [editing, setEditing] = useState<any>(null);
     const [saving, setSaving] = useState(false);
     const [useDb, setUseDb] = useState(false);
+    const [dbError,setDbError] = useState('');
     useEffect(() => { fetchPosts(); }, []);
-    const fetchPosts = async () => { const { data, error } = await supabase.from('news_posts').select('*').order('created_at', { ascending: false }); if (!error && data) {
-        setPosts(data);
-        setUseDb(true);
-    } };
-    const save = async () => {
-        if (!editing)
-            return;
-        setSaving(true);
-        if (useDb) {
-            if (editing.id && !DEMO.find(d => d.id === editing.id))
-                await supabase.from('news_posts').update(editing).eq('id', editing.id);
-            else
-                await supabase.from('news_posts').insert({ ...editing, created_at: new Date().toISOString() });
-            await fetchPosts();
-        }
-        else {
-            if (editing.id)
-                setPosts(p => p.map(x => x.id === editing.id ? editing : x));
-            else
-                setPosts(p => [{ ...editing, id: Date.now().toString(), created_at: new Date().toISOString() }, ...p]);
-        }
-        setEditing(null);
-        setSaving(false);
+    const fetchPosts = async () => {
+      setUseDb(false); setDbError('');
+      try {
+        const {data,error}=await new Promise<any>((resolve,reject)=>{
+          const timer=setTimeout(()=>reject(new Error('Request timed out')),7000);
+          Promise.resolve(supabase.from('news_posts').select('*').order('created_at',{ascending:false})).then(
+            response=>{clearTimeout(timer);resolve(response);}, reason=>{clearTimeout(timer);reject(reason);}
+          );
+        });
+        if(error) throw error;
+        setPosts(data||[]); setUseDb(true);
+      } catch {
+        setPosts([]);
+        setDbError('News database is unavailable. Editing and publishing are disabled; no demo records are presented as real posts.');
+      }
     };
-    const del = async (id: string) => { if (!confirm('Delete?'))
-        return; if (useDb) {
-        await supabase.from('news_posts').delete().eq('id', id);
+    const save = async () => {
+      if (!editing || !useDb) return;
+      setSaving(true); setDbError('');
+      try {
+        const payload={...editing}; delete payload.id;
+        const result=editing.id
+          ? await supabase.from('news_posts').update(payload).eq('id',editing.id)
+          : await supabase.from('news_posts').insert({...payload,created_at:new Date().toISOString()});
+        if(result.error) throw result.error;
+        setEditing(null);
         await fetchPosts();
-    }
-    else
-        setPosts(p => p.filter(x => x.id !== id)); };
-    const toggle = async (post: any) => { const u = { ...post, published: !post.published }; if (useDb) {
-        await supabase.from('news_posts').update({ published: u.published }).eq('id', post.id);
-        await fetchPosts();
-    }
-    else
-        setPosts(p => p.map(x => x.id === post.id ? u : x)); };
+      } catch {setDbError('Save failed. The post was not confirmed saved. Retry after checking the database.');}
+      finally {setSaving(false);}
+    };
+    const del=async(id:string)=>{
+      if(!useDb || !confirm('Delete this post?')) return;
+      const {error}=await supabase.from('news_posts').delete().eq('id',id);
+      if(error){setDbError('Delete failed: '+error.message);return;}
+      await fetchPosts();
+    };
+    const toggle=async(post:any)=>{
+      if(!useDb)return;
+      const {error}=await supabase.from('news_posts').update({published:!post.published}).eq('id',post.id);
+      if(error){setDbError('Publication update failed: '+error.message);return;}
+      await fetchPosts();
+    };
     return (<div style={{ minHeight: '100vh', background: '#050505', color: '#F5F5F5' }}>
       <div style={{ background: '#071426', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -59,12 +64,12 @@ export default function AdminNewsPage() {
           <div style={{ ...F, fontWeight: 900, fontSize: 18, color: '#F5F5F5', letterSpacing: 1 }}>MANAGE NEWS</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setEditing({ title: '', summary: '', body: '', image_url: '', category: 'News', published: false })} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', ...F, fontWeight: 700, fontSize: 14, letterSpacing: 1, cursor: 'pointer' }}>+ NEW POST</button>
+          <button disabled={!useDb} onClick={() => setEditing({ title: '', summary: '', body: '', image_url: '', category: 'News', published: false })} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', ...F, fontWeight: 700, fontSize: 14, letterSpacing: 1, cursor: 'pointer' }}>+ NEW POST</button>
           <a href="/admin" style={{ ...FB, fontSize: 12, color: '#B8C1CC', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '6px 12px' }}>← Dashboard</a>
         </div>
       </div>
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 20px' }}>
-        {!useDb && <div style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 10, padding: '12px 16px', ...FB, fontSize: 13, color: '#FACC15', marginBottom: 20 }}>⚠️ Using demo data. Create Supabase table: <code>news_posts</code></div>}
+        {!useDb && <div role="alert" style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 10, padding: '12px 16px', ...FB, fontSize: 13, color: '#FACC15', marginBottom: 20 }}>{dbError || 'Connecting to verified news records…'} <button type="button" onClick={fetchPosts} style={{marginLeft:12,padding:8,cursor:'pointer'}}>Retry</button></div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {posts.map(post => (<div key={post.id} style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '16px 20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
