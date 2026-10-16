@@ -220,6 +220,7 @@ export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [liveCatalogVerified, setLiveCatalogVerified] = useState(false);
   const [filter, setFilter] = useState('all');
   const [globalCaseStock, setGlobalCaseStock] = useState(0);
 
@@ -369,12 +370,14 @@ export default function ShopPage() {
     // remains the only data source for every category; this only changes
     // how fetch failures are handled, not what data is used.
     setLoading(true);
+    setLiveCatalogVerified(false);
     const { data, error } = await resilientCatalogFetch<Product>(CATALOG_CACHE_KEY, () =>
       supabase.from('products').select('*').order('created_at', { ascending: true }),
       (cached) => { setProducts(cached); setLoading(false); }
     );
     setProducts(data);
     setCatalogError(error);
+    setLiveCatalogVerified(!error);
     setLoading(false);
   }
 
@@ -421,7 +424,7 @@ export default function ShopPage() {
   // button alone is not treated as sufficient.
   const openModal = (p: Product, variantKey: string) => {
     if (isPriceOnRequest(p)) { openInquiry(p); return; }
-    if (catalogError) { setError('Live catalogue is temporarily unavailable; ordering is paused until stock can be verified.'); return; }
+    if (!liveCatalogVerified) { setError('Live catalogue is temporarily unavailable; ordering is paused until stock can be verified.'); return; }
     if (!isRegistered()) { window.location.href = '/register'; return; }
     if (isCarProduct(p)) {
       if (!isVariantAvailable(p, variantKey, globalCaseStock)) return;
@@ -442,7 +445,7 @@ export default function ShopPage() {
   };
 
   const sendPreorder = async () => {
-    if (catalogError) { setError('Live catalogue is unavailable. Please retry before sending an order.'); return; }
+    if (!liveCatalogVerified) { setError('Live catalogue is unavailable. Please retry before sending an order.'); return; }
     if (!preorderTarget || !member) return;
     if (isPriceOnRequest(preorderTarget.product)) return;
     setPreorderSending(true);
@@ -490,6 +493,7 @@ export default function ShopPage() {
   };
 
   const placeOrder = async () => {
+    if (!liveCatalogVerified) { setError('Stock is not currently verified. Please retry catalogue refresh before ordering.'); return; }
     if (!selected || !member) return;
     // Hard guard on the actual order-creation write path, not just the UI
     // entry point above — a price-on-request product must never be able to
