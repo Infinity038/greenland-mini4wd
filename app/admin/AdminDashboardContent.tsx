@@ -43,38 +43,45 @@ export default function AdminDashboardContent({ roles }: { roles: StaffRole[] })
   const [stats, setStats] = useState<Stats>(EMPTY);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dashboardError,setDashboardError]=useState('');
+  const [retryKey,setRetryKey]=useState(0);
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const [{ data: members }, { data: orders }, { data: tournaments }, { data: products }, { data: hallOfFame }] = await Promise.all([
-        supabase.from('members').select('id, member_status'),
-        supabase.from('orders').select('id, payment_status, status, created_at, member_name, product_name').order('created_at', { ascending: false }),
-        supabase.from('tournaments').select('id, status'),
-        supabase.from('products').select('id, status, stock_qty'),
-        supabase.from('hall_of_fame').select('id, member_name').neq('member_name', 'TBD'),
-      ]);
-      if (cancelled) return;
-      const m = members || [];
-      const o = orders || [];
-      const t = tournaments || [];
-      const p = products || [];
-      setStats({
-        totalMembers: m.length,
-        officialMembers: m.filter((row: any) => row.member_status?.toLowerCase() === 'official').length,
-        pendingOrders: o.filter((row: any) => row.payment_status === 'awaiting_payment').length,
-        pendingProofs: o.filter((row: any) => row.payment_status === 'proof_uploaded').length,
-        activeTournaments: t.filter((row: any) => row.status === 'upcoming' || row.status === 'ongoing').length,
-        productsInStock: p.filter((row: any) => row.status === 'in stock').length,
-        preordersWaiting: o.filter((row: any) => row.status === 'pending').length,
-        hofRecords: hallOfFame?.length || 0,
-      });
-      setRecentOrders(o.slice(0, 5));
-      setLoading(false);
+    let cancelled=false;
+    setLoading(true);setDashboardError('');
+    (async()=>{
+      try{
+        const [mRes,oRes,tRes,pRes,hRes]=await new Promise<any>((resolve,reject)=>{
+          const timer=setTimeout(()=>reject(new Error('Dashboard request timed out')),7000);
+          Promise.all([
+            supabase.from('members').select('id, member_status'),
+            supabase.from('orders').select('id, payment_status, status, created_at, member_name, product_name').order('created_at',{ascending:false}),
+            supabase.from('tournaments').select('id, status'),
+            supabase.from('products').select('id, status, stock_qty'),
+            supabase.from('hall_of_fame').select('id, member_name').neq('member_name','TBD'),
+          ]).then(result=>{clearTimeout(timer);resolve(result);},error=>{clearTimeout(timer);reject(error);});
+        });
+        if([mRes,oRes,tRes,pRes,hRes].some(result=>result.error))throw new Error('Unverified source results');
+        if(cancelled)return;
+        const m=mRes.data||[],o=oRes.data||[],t=tRes.data||[],p=pRes.data||[];
+        setStats({
+          totalMembers:m.length,
+          officialMembers:m.filter((x:any)=>x.member_status?.toLowerCase()==='official').length,
+          pendingOrders:o.filter((x:any)=>x.payment_status==='awaiting_payment').length,
+          pendingProofs:o.filter((x:any)=>x.payment_status==='proof_uploaded').length,
+          activeTournaments:t.filter((x:any)=>x.status==='upcoming'||x.status==='ongoing').length,
+          productsInStock:p.filter((x:any)=>x.status==='in stock').length,
+          preordersWaiting:o.filter((x:any)=>x.status==='pending').length,
+          hofRecords:(hRes.data||[]).length,
+        });
+        setRecentOrders(o.slice(0,5));
+      }catch{
+        if(!cancelled){setDashboardError('The live dashboard data is unavailable or incomplete. Totals are hidden rather than showing potentially false zeroes.');setRecentOrders([]);}
+      }finally{if(!cancelled)setLoading(false);}
     })();
-    return () => { cancelled = true; };
-  }, []);
+    return()=>{cancelled=true;};
+  },[retryKey]);
 
   async function signOut() {
     setSigningOut(true);
@@ -112,6 +119,7 @@ export default function AdminDashboardContent({ roles }: { roles: StaffRole[] })
       </div>
 
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 20px' }}>
+        {dashboardError && <div role="alert" style={{padding:15,marginBottom:17,background:'#26171A',border:'1px solid #DC2626',borderRadius:8,color:'#FACC15',...FB}}>{dashboardError} <button onClick={()=>setRetryKey(x=>x+1)} style={{marginLeft:12,padding:'8px 12px',background:'#FACC15',color:'#050505',border:0,borderRadius:6,cursor:'pointer',fontWeight:800}}>Retry</button></div>}
         <div style={{ ...F, fontWeight: 900, fontSize: 'clamp(22px, 5vw, 32px)', marginBottom: 20 }}>Welcome back 👋</div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, marginBottom: 28 }}>
@@ -119,7 +127,7 @@ export default function AdminDashboardContent({ roles }: { roles: StaffRole[] })
             <Link key={label} href={href} style={{ textDecoration: 'none' }}>
               <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '14px 12px' }}>
                 <div style={{ fontSize: 18, marginBottom: 6 }}>{icon}</div>
-                <div style={{ ...F, fontWeight: 900, fontSize: 28, color, lineHeight: 1, marginBottom: 4 }}>{loading ? '—' : value}</div>
+                <div style={{ ...F, fontWeight: 900, fontSize: 28, color, lineHeight: 1, marginBottom: 4 }}>{loading || dashboardError ? '—' : value}</div>
                 <div style={{ ...F, fontSize: 10, letterSpacing: 1, color: '#B8C1CC' }}>{label}</div>
               </div>
             </Link>
@@ -128,7 +136,7 @@ export default function AdminDashboardContent({ roles }: { roles: StaffRole[] })
 
         <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>RECENT ORDERS</div>
         <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden', marginBottom: 28 }}>
-          {loading ? <div style={{ padding: 28, textAlign: 'center', ...FB, color: '#6B7280' }}>Loading…</div> : recentOrders.length === 0 ? <div style={{ padding: 28, textAlign: 'center', ...FB, color: '#6B7280' }}>No orders yet.</div> : recentOrders.map((order, index) => (
+          {loading || dashboardError ? <div style={{ padding: 28, textAlign: 'center', ...FB, color: '#B8C1CC' }}>{dashboardError ? 'Recent orders could not be verified.' : 'Loading…'}</div> : recentOrders.length === 0 ? <div style={{ padding: 28, textAlign: 'center', ...FB, color: '#6B7280' }}>No orders yet.</div> : recentOrders.map((order, index) => (
             <div key={order.id} style={{ display: 'flex', gap: 10, padding: '12px 18px', borderBottom: index < recentOrders.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
               <div style={{ flex: 1 }}><div style={{ ...F, fontWeight: 700 }}>{order.product_name}</div><div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{order.member_name}</div></div>
               <div style={{ ...FB, fontSize: 11, color: '#6B7280' }}>{new Date(order.created_at).toLocaleDateString()}</div>
