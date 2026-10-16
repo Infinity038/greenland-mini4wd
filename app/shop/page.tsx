@@ -223,6 +223,7 @@ export default function ShopPage() {
   const [liveCatalogVerified, setLiveCatalogVerified] = useState(false);
   const [filter, setFilter] = useState('all');
   const [globalCaseStock, setGlobalCaseStock] = useState(0);
+  const [caseStockVerified, setCaseStockVerified] = useState(false);
 
   const [shopTab, setShopTab] = useState<ShopTab>('cars');
   const [chassisFilter, setChassisFilter] = useState('');
@@ -382,8 +383,18 @@ export default function ShopPage() {
   }
 
   async function fetchInventory() {
-    const { data } = await supabase.from('shop_inventory').select('*').eq('id', 1).single();
-    if (data) setGlobalCaseStock(data.case_stock ?? 0);
+    setCaseStockVerified(false);
+    try {
+      const { data, error } = await new Promise<any>((resolve,reject) => {
+        const timer = setTimeout(() => reject(new Error('Inventory request timed out')),6500);
+        Promise.resolve(supabase.from('shop_inventory').select('*').eq('id',1).single()).then(
+          result => { clearTimeout(timer); resolve(result); }, err => { clearTimeout(timer); reject(err); }
+        );
+      });
+      if (error || !data) return;
+      setGlobalCaseStock(data.case_stock ?? 0);
+      setCaseStockVerified(true);
+    } catch { /* Display unverified instead of a misleading zero. */ }
   }
 
   const isCarProduct = (p: Product) => !p.category || p.category === 'cars';
@@ -601,14 +612,14 @@ export default function ShopPage() {
             <div style={{ ...F, fontSize: 11, letterSpacing: 5, color: '#DC2626', marginBottom: 8 }}>CLUB SHOP</div>
             <h1 style={{ ...F, fontWeight: 900, fontSize: 'clamp(36px, 8vw, 72px)', color: '#F5F5F5', margin: '0 0 10px', lineHeight: 0.95 }}>CARS · PARTS · MERCH</h1>
             <p style={{ ...FB, fontSize: 15, color: '#B8C1CC', margin: '0 0 10px', maxWidth: 560 }}>Preorder only — no online payment. Pay via MobilePay after reserving. Pickup in Nuuk, Greenland.</p>
-            <div style={{ ...FB, fontSize: 12, color: '#6B7280' }}>📦 Display cases in stock: <strong style={{ color: globalCaseStock > 0 ? '#22C55E' : '#DC2626' }}>{globalCaseStock}</strong> (shared across all car models)</div>
+            <div style={{ ...FB, fontSize: 12, color: '#6B7280' }}>📦 Display cases in stock: <strong style={{ color: globalCaseStock > 0 ? '#22C55E' : '#DC2626' }}>{caseStockVerified ? globalCaseStock : 'Unavailable'}</strong> (shared across all car models)</div>
           </div>
         </section>
 
         {catalogError && (
           <div style={{ maxWidth: 1100, margin: '16px auto 0', padding: '0 24px' }}>
             <div style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ ...FB, fontSize: 13, color: '#FCA5A5' }}>{catalogError} Ordering is paused until current availability is verified.</div>
+              <div style={{ ...FB, fontSize: 13, color: '#FCA5A5' }}>{catalogError} The live catalogue request is failing; previously saved listings may be outdated. Ordering remains paused until current availability is verified.</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => fetchProducts()} style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', ...F, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>RETRY</button>
                 <span style={{ ...FB, color:'#FCA5A5', fontSize:11 }}>Live verification required</span>
