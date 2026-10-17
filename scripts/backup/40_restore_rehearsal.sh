@@ -16,11 +16,12 @@ REP="$D/rehearsal_report.txt"; : > "$REP"
 if ! psql -X -v ON_ERROR_STOP=1 -q -f "$D/schema_public.sql" >>"$REP" 2>&1; then
   die "local public schema restore failed; inspect private rehearsal report (do not share row data)"
 fi
-if ! pg_restore --exit-on-error --data-only --disable-triggers --no-owner -d postgres "$D/data_public.dump" >>"$REP" 2>&1; then
-  die "local public data restore failed; inspect private rehearsal report"
-fi
+# Restore managed identity metadata before public rows that may refer to auth.users.
 if ! psql -X -v ON_ERROR_STOP=1 -q -f "$D/data_managed.sql" >>"$REP" 2>&1; then
   die "local Auth/Storage/migration data restore failed; do NOT mark recoverable"
+fi
+if ! pg_restore --exit-on-error --data-only --disable-triggers --no-owner -d postgres "$D/data_public.dump" >>"$REP" 2>&1; then
+  die "local public data restore failed; inspect private rehearsal report"
 fi
 q "$COUNT_SQL" > "$D/counts_rehearsal.tsv"
 [ -s "$D/counts_before.tsv" ] && [ -s "$D/counts_rehearsal.tsv" ] || die "missing table counts"
