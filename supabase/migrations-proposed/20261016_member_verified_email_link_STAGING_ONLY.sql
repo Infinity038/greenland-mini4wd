@@ -37,7 +37,7 @@ begin
   if verified_at is null or verified_email is null or length(btrim(verified_email))=0 then
     raise exception 'Verified email required' using errcode = '42501';
   end if;
-  select count(*)::integer, min(m.id)
+  select count(*)::integer, (array_agg(m.id))[1]
     into matches, matching_member from public.members m
     where lower(btrim(m.email))=lower(btrim(verified_email));
   if matches <> 1 then
