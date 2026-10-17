@@ -10,6 +10,11 @@
 - Supabase connector has **no backup listing/export/restore-point verification API**. All production DDL/RLS cutover stays blocked until manual export **and recoverability** have been evidenced, or a real provider backup is enabled and verified.
 - Preserve existing official race results, member IDs, shop/orders, invoices/payments, tickets, memberships, rewards and official standings. Never use the auth-test copy as proof of a production backup.
 
+## Read-only verification after owner backup screenshots
+- Count-only check (no private row content): `auth.users` 1; `storage.buckets` 1; `storage.objects` **0**; `members` 7; `cars` 5; `tournaments` 2; `orders` 4; `payment_proofs` 7; `race_tickets` 4; `race_results` 2. Zero Storage-object rows does not mean external image references or database-embedded file content can be omitted. Inventory references and preserve actual source assets where needed.
+- Supabase CLI `db dump` excludes managed schemas by default. A restore plan must explicitly account for preserving the currently existing Auth identity and Auth/Storage configuration, policies and managed metadata where applicable, and verify actual coverage rather than calling roles+schema+data alone a complete point-in-time recovery.
+- **No dump has been created or validated as a result of this audit.**
+
 ## Read-only verified risk assessment (2026-10-16 / UTC 2026-10-17)
 - `public.members` is a UUID table with `email`, `password_hash`, `auth_user_id`; RLS OFF. `anon` has table SELECT and column SELECT on `password_hash`. No actual hash was fetched. The existing `app/register/page.tsx` fetches the whole member row and compares bcrypt in the browser, so removal of that grant BEFORE replacing login would break member login.
 - Other business tables including `orders`, `loyalty_points`, `cars`, `race_tickets`, `race_entries`, `race_results`, `tournaments` have RLS OFF and `anon` SELECT/INSERT/UPDATE/DELETE (also TRUNCATE) grants. That is an authorization defect, not proof someone exploited it.
