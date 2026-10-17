@@ -22,7 +22,16 @@ load_conn() {
 }
 
 # Read-only query helper: always wrapped in a READ ONLY transaction.
-q() { psql -X -v ON_ERROR_STOP=1 -At -F $'\t' -c "BEGIN READ ONLY; $1; COMMIT;" | grep -v -E '^(BEGIN|COMMIT)$' || true; }
+q() { psql -X -qAt -v ON_ERROR_STOP=1 -F 
+
+not_in_git() {
+  git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1 && die "output dir $1 is inside a git work tree; choose a path outside any repo"
+  return 0
+}
+
+COUNT_SQL="select table_schema||'.'||table_name, (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', table_schema, table_name), false, true, '')))[1]::text::bigint
+from information_schema.tables where table_schema in ('public','auth','storage','supabase_migrations') and table_type='BASE TABLE' order by 1"
+\t' -c "BEGIN TRANSACTION READ ONLY; $1; COMMIT;"; }
 
 not_in_git() {
   git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1 && die "output dir $1 is inside a git work tree; choose a path outside any repo"
