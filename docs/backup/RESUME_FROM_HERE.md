@@ -8,13 +8,14 @@ Branch: `security/verified-member-auth-rls-plan-2026-10-16`. Full detail: `docs/
 1. [ ] Confirm production Vercel `NEXT_PUBLIC_SUPABASE_URL` host = `eojdjqihmxxaqltudqjx.supabase.co` (Vercel dashboard; don't paste it anywhere).
 2. [ ] Install PG client 17+, `age`, Docker (WSL2 on Windows). Create age key; keep private key offline; note public key `age1…`.
 3. [ ] Pick `BACKUP_ROOT` on an encrypted disk, outside the repo; ≥1 GB free.
-4. [ ] `git pull` this branch.
+4. [ ] Fresh clone of this branch inside WSL2 Ubuntu (repo has no .gitattributes; a Windows checkout may convert scripts to CRLF).
 5. [ ] Supabase Dashboard → Connect: copy **Session pooler** host; have DB password ready (type it only at the hidden prompt).
+5b. [ ] `bash scripts/backup/tests/synthetic_e2e.sh` (synthetic only, Docker) → `SYNTHETIC E2E PASSED`. Blocks everything below.
 6. [ ] `bash scripts/backup/00_preflight.sh` — must print OK.
 7. [ ] Short write freeze (orders, payments, race results, registrations).
 8. [ ] `bash scripts/backup/10_backup.sh` → note the output folder.
 9. [ ] `bash scripts/backup/20_verify.sh <folder>` → ALL CHECKS PASSED.
-10. [ ] `bash scripts/backup/40_restore_rehearsal.sh <folder>` → all `public.*` PASS.
+10. [ ] `bash scripts/backup/40_restore_rehearsal.sh <folder>` → `LOCAL RESTORE PASSED` (all four schemas' counts, structure, FKs).
 11. [ ] Take the manual config snapshot (procedure §6); check `storage.objects` count (0 expected).
 12. [ ] `AGE_RECIPIENT=age1… bash scripts/backup/30_encrypt.sh <folder>`; test decrypt; copy archive + `.sha256` off-device; delete plaintext; lift freeze.
 13. [ ] Tell Ace/Claude: pass/fail per step + archive sha256 + counts (no data, no secrets). Claude then records evidence in the security gate doc and unblocks the next phase.

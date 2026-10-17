@@ -39,20 +39,25 @@ bash scripts/backup/00_preflight.sh        # read-only; confirms tools, versions
 # Announce a short write freeze (no orders/payments/race edits/registrations), then:
 bash scripts/backup/10_backup.sh           # read-only export; prints output dir
 bash scripts/backup/20_verify.sh  "$OUT"   # checksums, TOC readable, tables present, counts stable, no secrets in text files
-bash scripts/backup/40_restore_rehearsal.sh "$OUT"   # disposable local Docker restore; counts must match
+bash scripts/backup/40_restore_rehearsal.sh "$OUT"   # disposable local Docker restore into a NEW empty DB; counts + structure + FKs must match
 export AGE_RECIPIENT=age1...               # your public key
 bash scripts/backup/30_encrypt.sh "$OUT"   # tar + encrypt + sha256
 ```
 Then: decrypt-test the archive (`age -d -i ~/greenland-backup.key FILE | tar -t`), copy archive + `.sha256` off-device, record the sha256 in the manifest note, and delete the plaintext folder (SSD-safe deletion relies on disk encryption).
 
+## 5b. Pre-flight dry run with synthetic data (required before the first real export)
+`bash scripts/backup/tests/synthetic_e2e.sh` — seeds SYNTHETIC data into a disposable localhost container and runs 10 → 20 → 40 → 30 + decrypt, plus negative tests (tampered dump, count mismatch). Must end `SYNTHETIC E2E PASSED`. No cloud connection, no credentials.
+
+Backup folder contents (current scripts): `schema_all.sql` (public+auth+storage+supabase_migrations, one dependency-ordered dump), `data_all.dump` (one consistent snapshot, custom format), `extensions.tsv`, `objects_before.tsv`, `counts_before/after.tsv`, `roles_meta.tsv`, `storage_buckets.tsv`, `storage_objects_count.txt`, `manifest.json`, `SHA256SUMS`, `backup.log`.
+
 ## 6. Manual config snapshot (no secrets)
 Screenshot/export, store with the archive: Auth → URL Configuration, Providers, Email templates, SMTP host (not password); Storage → bucket list/policies; Edge Functions list; Database → Extensions; Vercel → env var **names** and target environments; domain/DNS. If `storage.objects` > 0, download files separately (Dashboard or Storage API) and hash them.
 
 ## 7. Integrity checklist (all must pass)
-1. `20_verify.sh` prints ALL CHECKS PASSED. 2. `counts_before.tsv == counts_after.tsv`. 3. Rehearsal: every `public.*`, `auth.*`, `storage.*` and `supabase_migrations.*` table count `PASS`, with no suppressed SQL restore error. Matching counts must be supplemented by manual configuration/restore-coverage checks; never call an incomplete managed restore recoverable. 4. Encrypted archive decrypts with the offline key and `tar -t` lists the folder. 5. Archive sha256 recorded and re-checked on the off-device copy. 6. Plaintext removed.
+1. `20_verify.sh` prints ALL CHECKS PASSED. 2. `counts_before.tsv == counts_after.tsv`. 3. Rehearsal: every `public.*`, `auth.*`, `storage.*` and `supabase_migrations.*` table count `PASS`, no unexpected extra tables, structure inventory `PASS` (RLS flags, policies, functions, triggers, constraints, grants), FK re-validation passed, with no suppressed SQL restore error. Matching counts must be supplemented by manual configuration/restore-coverage checks; never call an incomplete managed restore recoverable. 4. Encrypted archive decrypts with the offline key and `tar -t` lists the folder. 5. Archive sha256 recorded and re-checked on the off-device copy. 6. Plaintext removed.
 
 ## 8. Recovery (if production data is damaged)
-Do not restore over production blindly. (a) Restore into a NEW Supabase project (Pro required — needs separate cost approval) or a local Postgres first; (b) `psql -f schema_public.sql`, then `pg_restore --data-only --disable-triggers -d <db> data_public.dump`; (c) restore `auth`/`storage` data from `data_managed.sql` into a project with matching Auth version (best effort — check `backup.log`); (d) re-apply Auth settings from section 6 snapshot; (e) point the app at the restored project only after owner sign-off. Auth user sessions will need re-login. A standalone local Docker row-count rehearsal is necessary but is not an end-to-end Supabase Auth/Storage service recovery test; document any untested managed-service configuration before authorizing production cutover.
+Do not restore over production blindly. (a) Restore into a NEW Supabase project (Pro required — needs separate cost approval) or a local Postgres first; (b) local/empty DB: create extensions from `extensions.tsv`, drop the empty default `public` schema, `psql -v ON_ERROR_STOP=1 -f schema_all.sql`, then `pg_restore --data-only --disable-triggers -d <db> data_all.dump` (exactly what `40_restore_rehearsal.sh` does); (c) for a NEW Supabase project, `auth`/`storage` schemas already exist from the platform — restore only `public` schema/data there and load `auth`/`storage` rows from `data_all.dump` (`pg_restore -n auth -n storage --data-only`) only if the platform Auth/Storage versions match (best effort; verify in `rehearsal_report.txt`); (d) re-apply Auth settings from section 6 snapshot; (e) point the app at the restored project only after owner sign-off. Auth user sessions will need re-login. A standalone local Docker row-count rehearsal is necessary but is not an end-to-end Supabase Auth/Storage service recovery test; document any untested managed-service configuration before authorizing production cutover.
 
 ## 9. Go/No-go for security work
 RLS/grant/Auth migrations stay BLOCKED until sections 5 and 7 are evidenced (manifest + hashes, no data). Do not apply `20261016_prediction_pit_access_forward.sql` or any cutover before then.
