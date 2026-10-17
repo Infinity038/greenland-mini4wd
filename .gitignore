@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Backups must never be committed
+backups/
+greenland-*/
+*.dump
+*.tar.age
+*.tar.gpg
+counts_*.tsv
