@@ -31,6 +31,16 @@ begin
   if verified_id is null then
     raise exception 'Sign-in required' using errcode = '42501';
   end if;
+  -- Fail closed: until the unsafe legacy anon writes are revoked, a malicious
+  -- client could replace a stored email then claim another member via OTP.
+  if not exists (
+    select 1 from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relname='members' and c.relrowsecurity
+  ) or has_table_privilege('anon','public.members','UPDATE') then
+    raise exception 'Member migration unavailable until legacy member writes are secured'
+      using errcode = '42501';
+  end if;
   select u.email, u.email_confirmed_at
     into verified_email, verified_at
     from auth.users u where u.id=verified_id;
