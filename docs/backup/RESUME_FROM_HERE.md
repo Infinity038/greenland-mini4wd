@@ -26,5 +26,5 @@ Branch: `security/verified-member-auth-rls-plan-2026-10-16`. Full detail: `docs/
 
 ## Known assumptions to verify on first run
 - Docker image tag `supabase/postgres:17.6.1.155` may not exist → set `SUPABASE_PG_IMAGE` to a nearby 17.x tag.
-- Auth/storage data restore in rehearsal is best-effort (managed-schema version drift); public-table counts are the hard gate.
+- **Strict stop gate:** the local rehearsal now fails on managed Auth/Storage SQL errors or mismatched counts (including Auth, Storage and migration tables). A version mismatch is a blocker to resolve, not a passing backup. Even matching counts alone do not validate Auth sign-in, role/config settings or actual Storage files; complete manual configuration/recovery checklist.
 - Pooler may require user `postgres.<ref>` (default in scripts).
