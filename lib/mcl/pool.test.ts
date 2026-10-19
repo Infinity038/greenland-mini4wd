@@ -40,7 +40,7 @@ describe('MCL virtual-only funded pool', () => {
     expect(indicativePoolMultiplier([], 'RED', 100, 4, 8)).toBe(0.4);
     const t: PoolTicket[]=[{id:'blue',outcome:'BLUE',stake:4900,weight:1}];
     expect(indicativePoolMultiplier(t,'RED',100,4,8)).toBe(8);
-    const withRed=[...t,{id:'red',outcome:'RED',stake:100,weight:4}];
+    const withRed=[...t,{id:'red',outcome:'RED',stake:400,weight:4}];
     expect(indicativePoolMultiplier(withRed,'RED',100,4,8)).toBeLessThan(8);
   });
   it('rejects duplicate ticket IDs and invalid stakes',()=>{
