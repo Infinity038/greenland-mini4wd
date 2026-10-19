@@ -94,8 +94,8 @@ export function calculateStandings(marbles: readonly Marble[], races: readonly R
     a.id.localeCompare(b.id));
 }
 /** Identical scores and finish records at the 12/13 boundary require a host-approved tie breaker. */
-export function playoffDraw(standings: readonly Standing[]): { a: string[]; b: string[] } {
-  if (standings.length < 12 || standings.some(s => s.races === 0)) throw new Error('Regular season incomplete');
+export function playoffDraw(standings: readonly Standing[], requiredMatchdays = 10): { a: string[]; b: string[] } {
+  if (standings.length < 12 || standings.some(s => s.races !== requiredMatchdays)) throw new Error('Regular season incomplete');
   const a = standings[11], b = standings[12];
   if (b && a.points === b.points && a.finishes.every((v, i) => v === b.finishes[i])) {
     throw new Error('Qualification tie requires a preannounced tie-break race');
