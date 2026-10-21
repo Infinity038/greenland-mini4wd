@@ -5,7 +5,8 @@ import { join } from 'node:path';
 const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
 const profile = read('app', 'profile', 'RacerProfile.tsx');
 const profileRoute = read('app', 'profile', 'page.tsx');
-const loyalty = read('lib', 'loyalty.ts');
+// The award logic moved from the browser library (lib/loyalty.ts) to the server service in phase 3.
+const loyalty = read('lib', 'admin', 'loyaltyService.ts');
 const adminLoyalty = read('app', 'admin', 'loyalty', 'page.tsx');
 const migration = read('supabase', 'migrations', '20260719_fixed_reward_points.sql');
 const rollback = read('supabase', 'migrations-proposed', '20260719_fixed_reward_points_rollback.sql');
@@ -41,8 +42,8 @@ describe('racer profile cleanup', () => {
 
 describe('fixed reward awarding', () => {
   it('awards from cumulative spend boundaries, not a percentage tier', () => {
-    expect(loyalty).toContain('rewardPointsEarnedBetween(previousLifetimeSpending, newLifetimeSpending)');
-    expect(loyalty).toContain('rewardPointsFromEligibleSpend(newLifetimeSpending)');
+    expect(loyalty).toContain('rewardPointsEarnedBetween(prev, next)');
+    expect(loyalty).toContain('rewardPointsFromEligibleSpend(next)');
     expect(loyalty).not.toMatch(/spendDkk\s*\*\s*rate\s*\/\s*100/);
     expect(loyalty).not.toContain('getRankFromPoints');
   });

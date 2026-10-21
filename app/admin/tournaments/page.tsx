@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminWrite, pick } from '@/lib/admin/adminWrite';
+import { EDITABLE } from '@/lib/admin/writePolicy';
 import { stampNewRegularPrizePolicy, isFixedPrizePolicy } from '@/lib/prizePolicy';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -46,14 +48,14 @@ export default function AdminTournamentsPage() {
         let tournamentId = editing.id;
         let err: any = null;
         if (tournamentId) {
-            const { error } = await supabase.from('tournaments').update(tournamentFields).eq('id', tournamentId);
+            const { error } = await adminWrite({ table: 'tournaments', op: 'update', values: pick(tournamentFields, EDITABLE.tournaments), match: { id: tournamentId } });
             err = error;
         }
         else {
-            const { data, error } = await supabase.from('tournaments').insert({ ...tournamentFields }).select().single();
+            const { id: newId, error } = await adminWrite({ table: 'tournaments', op: 'insert', values: pick(tournamentFields, EDITABLE.tournaments), returning: true });
             err = error;
-            if (!error && data)
-                tournamentId = data.id;
+            if (!error && newId)
+                tournamentId = newId;
         }
         // Auto-publish/sync the matching News & Updates post for this race event.
         if (!err && auto_publish_news && tournamentId) {
@@ -69,10 +71,10 @@ export default function AdminTournamentsPage() {
                 tournament_id: tournamentId,
             };
             if (existingPost) {
-                await supabase.from('news_posts').update(postPayload).eq('id', existingPost.id);
+                await adminWrite({ table: 'news_posts', op: 'update', values: pick(postPayload, EDITABLE.news_posts), match: { id: existingPost.id } });
             }
             else {
-                await supabase.from('news_posts').insert({ ...postPayload, created_at: new Date().toISOString() });
+                await adminWrite({ table: 'news_posts', op: 'insert', values: { ...pick(postPayload, EDITABLE.news_posts), created_at: new Date().toISOString() } });
             }
         }
         await loadData();
@@ -80,10 +82,10 @@ export default function AdminTournamentsPage() {
         setSaving(false);
     };
     const del = async (id: string) => { if (!confirm('Delete?'))
-        return; await supabase.from('tournaments').delete().eq('id', id); await loadData(); };
+        return; await adminWrite({ table: 'tournaments', op: 'delete', match: { id } }); await loadData(); };
     const qs = async (id: string, status: string) => {
       if (status === 'postponed' && !confirm('Confirm the six DISTINCT paid-racer minimum against verified payments, notify affected entrants, announce the next opening-day date and offer an original-payment refund. Changing status does not send notifications or issue refunds automatically. Continue?')) return;
-      const { error } = await supabase.from('tournaments').update({ status }).eq('id', id);
+      const { error } = await adminWrite({ table: 'tournaments', op: 'update', values: { status }, match: { id } });
       if (error) alert('Could not update status: '+error.message);
       await loadData();
     };

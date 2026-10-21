@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminWrite, pick } from '@/lib/admin/adminWrite';
+import { EDITABLE } from '@/lib/admin/writePolicy';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 const CATS = ['race day', 'builds', 'community', 'AI promo', 'events'];
@@ -38,10 +40,10 @@ export default function AdminGalleryPage() {
       if(!editing || !useDb)return;
       setSaving(true);setDbError('');
       try {
-        const payload={...editing};delete payload.id;
+        const payload=pick(editing,EDITABLE.gallery_items);
         const result=editing.id
-          ? await supabase.from('gallery_items').update(payload).eq('id',editing.id)
-          : await supabase.from('gallery_items').insert({...payload,created_at:new Date().toISOString()});
+          ? await adminWrite({ table: 'gallery_items', op: 'update', values: payload, match: { id: editing.id } })
+          : await adminWrite({ table: 'gallery_items', op: 'insert', values: {...payload,created_at:new Date().toISOString()} });
         if(result.error)throw result.error;
         setEditing(null);setPreview('');await fetchItems();
       }catch{setUseDb(false);setDbError('Gallery save failed. No successful save has been confirmed.');}
@@ -49,7 +51,7 @@ export default function AdminGalleryPage() {
     };
     const del=async(id:string)=>{
       if(!useDb||!confirm('Delete this gallery photo?'))return;
-      const {error}=await supabase.from('gallery_items').delete().eq('id',id);
+      const {error}=await adminWrite({ table: 'gallery_items', op: 'delete', match: { id } });
       if(error){setDbError('Gallery deletion failed: '+error.message);return;}
       await fetchItems();
     };

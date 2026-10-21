@@ -4,6 +4,12 @@ import { createMiddlewareSupabaseClient, copyResponseCookies } from '@/lib/supab
 const MEMBER_ONLY = ['/profile', '/tickets/checkout'];
 const PUBLIC_ADMIN_PATHS = new Set(['/admin/login', '/admin/setup']);
 
+function secureSignInRedirect(request: NextRequest, refreshedResponse: NextResponse) {
+  const url = new URL('/secure-member-signin', request.url);
+  url.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`);
+  return copyResponseCookies(refreshedResponse, NextResponse.redirect(url));
+}
+
 function adminLoginRedirect(request: NextRequest, refreshedResponse: NextResponse, reason?: string) {
   const loginUrl = new URL('/admin/login', request.url);
   loginUrl.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`);
@@ -49,7 +55,8 @@ export async function middleware(request: NextRequest) {
     }
 
     if (!PUBLIC_ADMIN_PATHS.has(pathname) && (userError || !userData.user)) {
-      return adminLoginRedirect(request, refreshedResponse);
+      // No (or an expired) session: secure email sign-in, then straight back to the page that was requested.
+      return secureSignInRedirect(request, refreshedResponse);
     }
 
     const { data: roles, error: roleError } = await supabase.rpc('current_staff_roles');

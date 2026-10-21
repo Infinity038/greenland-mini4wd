@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { MemberProfileModal } from '@/components/admin/MemberProfileModal';
+import { createSupabaseBrowserClient } from '@/lib/supabaseAuth/browserClient';
 
 const font = { fontFamily: "'DM Sans', sans-serif" } as const;
 const heading = { fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 } as const;
@@ -18,7 +19,7 @@ export default function AdminMembersPage() {
     try {
       const {data,error} = await new Promise<any>((resolve,reject)=>{
         const timer=setTimeout(()=>reject(new Error('Member request timed out')),7000);
-        Promise.resolve(supabase.from('members').select(MEMBER_FIELDS).order('created_at',{ascending:false})).then(
+        Promise.resolve(createSupabaseBrowserClient().from('members').select(MEMBER_FIELDS).order('created_at',{ascending:false})).then(
           result=>{clearTimeout(timer);resolve(result);},
           err=>{clearTimeout(timer);reject(err);}
         );

@@ -2,7 +2,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { awardForPayment, clawbackForPayment } from '@/lib/loyalty';
+import { adminWrite } from '@/lib/admin/adminWrite';
+import { loyaltyAward, loyaltyClawback } from '@/lib/admin/adminApi';
+import { createSupabaseBrowserClient } from '@/lib/supabaseAuth/browserClient';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 // Never render an email address as the member's "name" line — falls back to
 // showing the email alone (no duplicate) if no real name is on file.
@@ -72,13 +74,13 @@ export default function AdminTicketsPage() {
         if (status === 'payment_confirmed' && ticket?.payment_status !== 'payment_confirmed') {
             const col = ticket?.ticket_type === 'season' ? 'season_loyalty_progress' : 'weekly_loyalty_progress';
             const qty = ticket?.quantity || 1;
-            const { data: member } = await supabase.from('members').select(col).eq('email', ticket.member_email).single();
+            const { data: member } = await createSupabaseBrowserClient().from('members').select(col).eq('email', ticket.member_email).single();
             if (member) {
                 const m = member as any;
                 const current = m[col] || 0;
                 const newVal = (current + qty) % 10;
                 const grantFree = (current + qty) >= 10;
-                await supabase.from('members').update({ [col]: newVal }).eq('email', ticket.member_email);
+                await adminWrite({ table: 'members', op: 'update', values: { [col]: newVal }, match: { email: ticket.member_email } });
                 if (grantFree)
                     setMsg(`✅ Updated · 🎁 ${hasRealName(ticket.member_name) ? ticket.member_name : ticket.member_email} earned a FREE ticket!`);
                 else
@@ -87,45 +89,27 @@ export default function AdminTicketsPage() {
             else {
                 setMsg('✅ Updated');
             }
-            if (!ticket?.rewards_applied) {
-                const spend = Number(ticket?.total_price) || 0;
-                if (spend > 0 && ticket?.member_email) {
-                    try {
-                        const result = await awardForPayment(ticket.member_email, spend);
-                        if (result) {
-                            ticketUpdates.points_awarded = result.points;
-                            ticketUpdates.membership_days_awarded = result.days;
-                            ticketUpdates.rewards_applied = true;
-                        }
-                    }
-                    catch (e: any) {
-                        setMsg('⚠️ Updated, but rewards sync failed: ' + e.message);
-                    }
-                }
-            }
-        }
-        else if (status === 'cancelled' && ticket?.rewards_applied) {
-            try {
-                await clawbackForPayment(ticket.member_email, Number(ticket.points_awarded) || 0, Number(ticket.membership_days_awarded) || 0);
-                ticketUpdates.rewards_applied = false;
-            }
-            catch (e: any) {
-                setMsg('⚠️ Cancelled, but clawback failed: ' + e.message);
-            }
-            setMsg('✅ Updated');
         }
         else {
             setMsg('✅ Updated');
         }
-        const {error:updateError}=await supabase.from('race_tickets').update(ticketUpdates).eq('id', id);
-        if(updateError) setMsg('Ticket status could not be saved. Any previously attempted reward/loyalty changes need reconciliation before retrying: '+updateError.message);
+        const {error:updateError}=await adminWrite({ table: 'race_tickets', op: 'update', values: ticketUpdates, match: { id } });
+        if(updateError) setMsg('Ticket status could not be saved: '+updateError.message);
+        else {
+            try {
+                // Rewards are computed on the server from the stored ticket; the browser sends no amounts.
+                if (status === 'payment_confirmed' && ticket?.payment_status !== 'payment_confirmed' && !ticket?.rewards_applied) await loyaltyAward('ticket', id);
+                if (status === 'cancelled' && ticket?.rewards_applied) await loyaltyClawback('ticket', id);
+            }
+            catch (e: any) { setMsg('⚠️ Status saved, but rewards sync failed: ' + e.message); }
+        }
         loadData();
         setSaving(null);
         setTimeout(() => setMsg(''), 4000);
     }
     async function saveEarlyBirdSlots() {
         setSavingConfig(true);
-        const {error}=await supabase.from('admin_config').upsert({ key: 'earlybird_slots', value: String(earlyBirdSlots) }, { onConflict: 'key' });
+        const {error}=await adminWrite({ table: 'admin_config', op: 'upsert', values: { key: 'earlybird_slots', value: String(earlyBirdSlots) }, onConflict: 'key' });
         setSavingConfig(false);
         setMsg(error ? 'Early Bird slot update failed: '+error.message : '✅ Early bird slots saved');
         setTimeout(() => setMsg(''), 2000);
@@ -138,7 +122,7 @@ export default function AdminTicketsPage() {
         }
         if (!confirm('Delete this unpaid ticket draft?'))
             return;
-        const { error } = await supabase.from('race_tickets').delete().eq('id', id);
+        const { error } = await adminWrite({ table: 'race_tickets', op: 'delete', match: { id } });
         if (error) {
             setMsg('❌ Delete failed: ' + error.message);
             setTimeout(() => setMsg(''), 7000);

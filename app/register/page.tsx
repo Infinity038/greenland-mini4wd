@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { saveMemberData } from "@/lib/member";
+import TurnstileWidget, { turnstileConfigured } from "@/components/public/TurnstileWidget";
 
 function getPasswordStrength(val: string) {
   let score = 0;
@@ -32,6 +32,11 @@ export default function RegisterPage() {
   });
   const [pwScore, setPwScore] = useState(0);
   const [login, setLogin] = useState({ email: "", password: "" });
+  const [captcha, setCaptcha] = useState<string | null>(null);     // Turnstile token; verified by the SERVER route
+  const [captchaTry, setCaptchaTry] = useState(0);
+  const [notice, setNotice] = useState("");
+  const [loginCaptcha, setLoginCaptcha] = useState<string | null>(null);
+  const [loginCaptchaTry, setLoginCaptchaTry] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -53,40 +58,26 @@ export default function RegisterPage() {
     if (reg.password.length < 8) { setError("Password must be at least 8 characters."); return; }
     setLoading(true);
     try {
-      const bcrypt = await import("bcryptjs");
-      const password_hash = await bcrypt.hash(reg.password, 10);
-
-      const { data: existing } = await supabase
-        .from("members")
-        .select("id, email")
-        .eq("email", reg.email.trim().toLowerCase())
-        .single();
-
-      if (existing) {
-        setError("An account with that email already exists. Please log in or contact the club administrator.");
-        setTab("login");
-        return;
-      }
-
-      const insertPayload: any = {
-        name: reg.name.trim(),
-        email: reg.email.trim().toLowerCase(),
-        phone: reg.phone.trim() || null,
-        nationality: reg.nationality || null,
-        city: reg.city.trim() || null,
-        password_hash,
-      };
-
-      if (refCode) insertPayload.referred_by = refCode;
-
-      const { data, error: insertError } = await supabase
-        .from("members")
-        .insert([insertPayload])
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-      setSession(data);
+      // Server route: validates, rate-limits, hashes the password on the server and never returns the hash.
+      const res = await fetch("/api/public/register", {
+        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: reg.name, email: reg.email, phone: reg.phone || undefined, nationality: reg.nationality || undefined,
+          city: reg.city || undefined, password: reg.password, refCode: refCode || undefined, website: "",
+          turnstileToken: captcha || undefined,
+        }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (res.status === 429) { setError("Too many attempts. Please wait a while and try again."); return; }
+      if (res.status === 400 && out?.error === "verification failed") { setError("Please complete the human check and try again."); setCaptcha(null); setCaptchaTry(n => n + 1); return; }
+      if (!res.ok || out.ok !== true) throw new Error("Registration failed. Try again.");
+      // The answer is identical for a new and an already-registered address, so nothing here reveals whether the email was known.
+      // The member signs in explicitly (password checked inside the database) with the address they just used.
+      setLogin({ email: reg.email.trim().toLowerCase(), password: "" });
+      setReg(r => ({ ...r, password: "" }));
+      setNotice("Thanks! If this email address was not already registered, your account is ready. Please log in with your email and password.");
+      setCaptcha(null); setCaptchaTry(n => n + 1);
+      setTab("login");
     } catch (err: any) {
       setError(err.message || "Registration failed. Try again.");
     } finally {
@@ -99,24 +90,18 @@ export default function RegisterPage() {
     setError("");
     setLoading(true);
     try {
-      const { data, error: fetchError } = await supabase
-        .from("members")
-        .select("*")
-        .eq("email", login.email.trim().toLowerCase())
-        .single();
-
-      if (fetchError || !data) { setError("No account found with that email."); return; }
-
-      if (!data.password_hash) {
-        setError("This account requires a secure password setup. Contact the club administrator.");
-        return;
-      }
-
-      const bcrypt = await import("bcryptjs");
-      const match = await bcrypt.compare(login.password, data.password_hash);
-      if (!match) { setError("Incorrect password."); return; }
-
-      setSession(data);
+      // Server route -> public.club_member_login: the password is compared inside the database and no hash ever reaches the browser.
+      const res = await fetch("/api/public/member-login", {
+        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: login.email.trim().toLowerCase(), password: login.password, turnstileToken: loginCaptcha || undefined }),
+      });
+      const out = await res.json().catch(() => ({}));
+      setLoginCaptcha(null); setLoginCaptchaTry(n => n + 1);                 // a Turnstile token is single-use
+      if (res.status === 429) { setError("Too many attempts. Please wait a while and try again."); return; }
+      if (res.status === 400 && out?.error === "verification failed") { setError("Please complete the human check and try again."); return; }
+      if (res.status === 401) { setError("The email or password is not correct."); return; }   // same text whether or not the email is registered
+      if (!res.ok || out.ok !== true || !out.member) throw new Error("Login is temporarily unavailable. Please try again.");
+      setSession(out.member);
     } catch (err: any) {
       setError(err.message || "Login failed. Try again.");
     } finally {
@@ -186,6 +171,11 @@ export default function RegisterPage() {
             ))}
           </div>
 
+          {notice && !error && (
+            <div role="status" style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.35)", borderRadius: 6, padding: "10px 14px", fontSize: 13, color: "#86efac", marginBottom: 20 }}>
+              {notice}
+            </div>
+          )}
           {error && (
             <div style={{ background: "rgba(232,25,44,0.1)", border: "1px solid rgba(232,25,44,0.3)", borderRadius: 6, padding: "10px 14px", fontSize: 13, color: "#E8192C", marginBottom: 20 }}>
               {error}
@@ -237,7 +227,8 @@ export default function RegisterPage() {
                   </div>
                 </div>
               </div>
-              <button type="submit" disabled={loading}
+              <TurnstileWidget onToken={setCaptcha} resetKey={captchaTry} />
+              <button type="submit" disabled={loading || (turnstileConfigured() && !captcha)}
                 style={{ width: "100%", marginTop: 24, padding: "15px", background: "#E8192C", color: "#fff", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", border: "none", borderRadius: 6, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}>
                 {loading ? "JOINING..." : "JOIN THE CLUB — FREE"}
               </button>
@@ -259,7 +250,8 @@ export default function RegisterPage() {
                   <input style={inp} type="password" placeholder="Your password" value={login.password} onChange={e => setLogin({ ...login, password: e.target.value })} required />
                 </div>
               </div>
-              <button type="submit" disabled={loading}
+              <TurnstileWidget onToken={setLoginCaptcha} resetKey={loginCaptchaTry} />
+              <button type="submit" disabled={loading || (turnstileConfigured() && !loginCaptcha)}
                 style={{ width: "100%", marginTop: 24, padding: "15px", background: "#E8192C", color: "#fff", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", border: "none", borderRadius: 6, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}>
                 {loading ? "LOGGING IN..." : "LOGIN TO DASHBOARD"}
               </button>

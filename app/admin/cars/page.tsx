@@ -2,6 +2,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { adminWrite } from '@/lib/admin/adminWrite';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
@@ -27,7 +28,7 @@ export default function AdminCarsPage() {
     }
     async function updateStatus(id: string, status: string, notes?: string) {
         setSaving(id);
-        await supabase.from('cars').update({ status, ...(notes ? { notes } : {}) }).eq('id', id);
+        await adminWrite({ table: 'cars', op: 'update', values: { status, ...(notes ? { notes } : {}) }, match: { id } });
         setMsg(status === 'approved' ? '✅ Car approved!' : '❌ Car rejected');
         loadData();
         setSaving(null);
@@ -36,7 +37,7 @@ export default function AdminCarsPage() {
     async function deleteCar(id: string) {
         if (!confirm('Delete this car registration?'))
             return;
-        await supabase.from('cars').delete().eq('id', id);
+        await adminWrite({ table: 'cars', op: 'delete', match: { id } });
         loadData();
     }
     const filtered = filter === 'all' ? cars : cars.filter(c => c.status === filter);

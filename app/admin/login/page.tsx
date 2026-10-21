@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabaseAuth/browserClient';
+import TurnstileWidget, { turnstileConfigured } from '@/components/public/TurnstileWidget';
 import { resolveStaffSession } from '@/lib/supabaseAuth/resolveStaffSession';
 import { resolveSafeNextPath } from '@/lib/supabaseAuth/safeNextPath';
 
@@ -23,6 +24,8 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaTry, setCaptchaTry] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,7 +61,9 @@ export default function AdminLoginPage() {
     const { error: signInError } = await client.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
+      options: { captchaToken: captcha || undefined },
     });
+    setCaptcha(null); setCaptchaTry(n => n + 1);   // a token is single-use
 
     if (signInError) {
       setError('Invalid email or password.');
@@ -108,7 +113,9 @@ export default function AdminLoginPage() {
               </div>
 
               {error && <div role="alert" style={{ ...FB, fontSize: 12, color: '#DC2626', marginBottom: 16 }}>⚠ {error}</div>}
-              <button onClick={handleLogin} disabled={busy} style={{ width: '100%', background: busy ? 'rgba(220,38,38,0.5)' : '#DC2626', color: '#fff', border: 'none', borderRadius: 10, padding: '14px 24px', ...F, fontWeight: 900, fontSize: 18, letterSpacing: 3, cursor: busy ? 'not-allowed' : 'pointer' }}>
+              <TurnstileWidget onToken={setCaptcha} resetKey={captchaTry} />
+              <p style={{ ...FB, fontSize: 12, color: '#B8C1CC', textAlign: 'center', margin: '14px 0 0' }}>Signed in to the Prediction Pit with an emailed code? <a href="/secure-member-signin?next=%2Fadmin" style={{ color: '#facc15' }}>Use the secure email sign-in</a>.</p>
+              <button onClick={handleLogin} disabled={busy || (turnstileConfigured() && !captcha)} style={{ width: '100%', background: busy ? 'rgba(220,38,38,0.5)' : '#DC2626', color: '#fff', border: 'none', borderRadius: 10, padding: '14px 24px', ...F, fontWeight: 900, fontSize: 18, letterSpacing: 3, cursor: busy ? 'not-allowed' : 'pointer' }}>
                 {phase === 'signing_in' ? 'SIGNING IN…' : 'SIGN IN →'}
               </button>
             </>

@@ -51,7 +51,7 @@ export default function EventsPage() {
     for (const t of list) {
       const computed = autoStatus(t);
       if (computed !== t.status && t.status !== 'cancelled') {
-        await supabase.from('tournaments').update({ status: computed }).eq('id', t.id);
+        // Display-only: a public visitor's browser must never write tournament rows. Stored status is changed by staff.
         t.status = computed;
       }
     }

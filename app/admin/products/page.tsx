@@ -2,6 +2,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminWrite, pick } from '@/lib/admin/adminWrite';
+import { EDITABLE } from '@/lib/admin/writePolicy';
 import { parseImages } from '@/lib/images';
 import CatalogImportPanel from '@/components/admin/CatalogImportPanel';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
@@ -90,14 +92,14 @@ export default function AdminProductsPage() {
         setSaving(true);
         setSaveError('');
         try {
-            const payload = { ...editing, image_url: fixImageUrl(editing.image_url), price_dkk: cheapestPrice(editing) || editing.price_dkk || 0 };
+            const payload = pick({ ...editing, image_url: fixImageUrl(editing.image_url), price_dkk: cheapestPrice(editing) || editing.price_dkk || 0 }, EDITABLE.products);
             if (editing.id) {
-                const { error } = await supabase.from('products').update(payload).eq('id', editing.id);
+                const { error } = await adminWrite({ table: 'products', op: 'update', values: payload, match: { id: editing.id } });
                 if (error)
                     throw error;
             }
             else {
-                const { error } = await supabase.from('products').insert({ ...payload, created_at: new Date().toISOString() });
+                const { error } = await adminWrite({ table: 'products', op: 'insert', values: { ...payload, created_at: new Date().toISOString() } });
                 if (error)
                     throw error;
             }
@@ -112,7 +114,7 @@ export default function AdminProductsPage() {
     const del = async (id: string) => {
         if (!confirm('Delete?'))
             return;
-        const { error } = await supabase.from('products').delete().eq('id', id);
+        const { error } = await adminWrite({ table: 'products', op: 'delete', match: { id } });
         if (error) {
             flash('❌ Delete failed: ' + error.message);
             return;
@@ -121,7 +123,7 @@ export default function AdminProductsPage() {
         await fetchProducts();
     };
     const quickStatus = async (p: any, status: string) => {
-        const { error } = await supabase.from('products').update({ status }).eq('id', p.id);
+        const { error } = await adminWrite({ table: 'products', op: 'update', values: { status }, match: { id: p.id } });
         if (error) {
             flash('❌ Status update failed: ' + error.message);
             return;
@@ -130,13 +132,13 @@ export default function AdminProductsPage() {
     };
     const saveInventory = async () => {
         setCaseSaving(true);
-        const { error } = await supabase.from('shop_inventory').update({ case_stock: caseStock }).eq('id', 1);
+        const { error } = await adminWrite({ table: 'shop_inventory', op: 'update', values: { case_stock: caseStock }, match: { id: 1 } });
         if (error)
             flash('❌ Case inventory save failed: ' + error.message);
         setCaseSaving(false);
     };
     const markPreorderDone = async (id: string) => {
-        const { error } = await supabase.from('preorders').update({ status: 'fulfilled' }).eq('id', id);
+        const { error } = await adminWrite({ table: 'preorders', op: 'update', values: { status: 'fulfilled' }, match: { id } });
         if (error) {
             flash('❌ Update failed: ' + error.message);
             return;
@@ -146,7 +148,7 @@ export default function AdminProductsPage() {
     const delPreorder = async (id: string) => {
         if (!confirm('Delete this preorder request?'))
             return;
-        const { error } = await supabase.from('preorders').delete().eq('id', id);
+        const { error } = await adminWrite({ table: 'preorders', op: 'delete', match: { id } });
         if (error) {
             flash('❌ Delete failed: ' + error.message);
             return;

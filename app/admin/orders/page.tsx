@@ -2,7 +2,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { awardForPayment, clawbackForPayment } from '@/lib/loyalty';
+import { adminWrite } from '@/lib/admin/adminWrite';
+import { loyaltyAward, loyaltyClawback } from '@/lib/admin/adminApi';
+import { createSupabaseBrowserClient } from '@/lib/supabaseAuth/browserClient';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 // Never render an email address as the member's "name" — shows the email
 // alone (no duplicate "email · email") if no real name is on file.
@@ -63,7 +65,7 @@ export default function AdminOrders() {
     async function loadData() {
         const [{ data: o }, { data: m }, { data: p }] = await Promise.all([
             supabase.from('orders').select('*').order('created_at', { ascending: false }),
-            supabase.from('members').select('id, name, first_name, last_name, email, member_status, created_at').order('created_at', { ascending: false }),
+            createSupabaseBrowserClient().from('members').select('id, name, first_name, last_name, email, member_status, created_at').order('created_at', { ascending: false }),
             supabase.from('products').select('id, name, image_url'),
         ]);
         const ordersData = o || [];
@@ -110,39 +112,29 @@ export default function AdminOrders() {
     async function updateStatus(id: string, status: string) {
         setSaving(id);
         const order = orders.find((o: any) => o.id === id);
-        const updates: any = { payment_status: status };
-        try {
-            if (PAID_STATUSES.includes(status) && order && !order.rewards_applied) {
-                const spend = Number(order.spend_amount_dkk) || extractSpendFromNotes(order.notes);
-                if (spend > 0 && (order.member_email || order.email)) {
-                    const result = await awardForPayment(order.member_email || order.email, spend);
-                    if (result) {
-                        updates.points_awarded = result.points;
-                        updates.membership_days_awarded = result.days;
-                        updates.rewards_applied = true;
-                        updates.spend_amount_dkk = spend; // backfill so it's correct going forward too
-                    }
-                }
-            }
-            // Cancelling a previously-confirmed order claws back exactly what it gave.
-            if (status === 'cancelled' && order?.rewards_applied) {
-                await clawbackForPayment(order.member_email || order.email, Number(order.points_awarded) || 0, Number(order.membership_days_awarded) || 0);
-                updates.rewards_applied = false;
-            }
-        }
-        catch (e: any) {
-            setMsg('⚠️ Status saved, but rewards sync failed: ' + e.message);
-        }
-        const { error } = await supabase.from('orders').update(updates).eq('id', id);
+        const { error } = await adminWrite({ table: 'orders', op: 'update', values: { payment_status: status }, match: { id } });
         if (error) {
             setMsg('❌ Error: ' + error.message);
         }
-        else if (!msg) {
+        else {
             setMsg('✅ Updated');
+            try {
+                // Rewards are computed on the server from the stored order; the browser sends no amounts.
+                if (PAID_STATUSES.includes(status) && order && !order.rewards_applied) await loyaltyAward('order', id);
+                if (status === 'cancelled' && order?.rewards_applied) await loyaltyClawback('order', id);
+            }
+            catch (e: any) {
+                setMsg('⚠️ Status saved, but rewards sync failed: ' + e.message);
+            }
         }
         loadData();
         setSaving(null);
         setTimeout(() => setMsg(''), 3000);
+    }
+    async function unlockMembership(memberId: string) {
+        const { error } = await adminWrite({ table: 'members', op: 'update', values: { member_status: 'official' }, match: { id: memberId } });
+        if (error) setMsg('❌ Error: ' + error.message);
+        loadData();
     }
     async function deleteOrder(id: string) {
         const order=orders.find((item:any)=>item.id===id);
@@ -152,7 +144,7 @@ export default function AdminOrders() {
             return;
         }
         if(!confirm('Delete only this unpaid order draft? This cannot be undone.'))return;
-        const {error}=await supabase.from('orders').delete().eq('id',id);
+        const {error}=await adminWrite({ table: 'orders', op: 'delete', match: { id } });
         if(error){setMsg('Delete failed: '+error.message);return;}
         loadData();
     }
@@ -265,6 +257,7 @@ export default function AdminOrders() {
                   <div style={s.memberEmail}>{m.email} · Joined {new Date(m.created_at).toLocaleDateString('en-GB')}</div>
                 </div>
                 <span style={s.memberBadge(m.member_status || 'registered')}>{m.member_status || 'registered'}</span>
+                {m.member_status !== 'official' && m.member_status !== 'suspended' && (<button onClick={() => unlockMembership(m.id)} style={s.saveBtn}>Unlock membership</button>)}
               </div>);
             })}
           </div>)}

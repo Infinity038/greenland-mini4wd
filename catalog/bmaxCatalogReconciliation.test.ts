@@ -301,7 +301,13 @@ describe('storefront never renders a 0 kr/0 DKK price and gates checkout behind 
   it('/shop implements a non-order inquiry flow (openInquiry/sendInquiry) that writes only to product_inquiries', () => {
     expect(shopSrc).toMatch(/const openInquiry = /);
     expect(shopSrc).toMatch(/const sendInquiry = /);
-    expect(shopSrc).toMatch(/supabase\.from\('product_inquiries'\)\.insert/);
+    // The browser no longer writes: it posts to the server route, whose handler writes only to product_inquiries.
+    expect(shopSrc).toMatch(/fetch\('\/api\/public\/inquiry'/);
+    expect(shopSrc).not.toMatch(/supabase\.from\('product_inquiries'\)/);
+    const handler = readFileSync(join(process.cwd(), 'lib', 'public', 'publicHandlers.ts'), 'utf8');
+    const inquiryHandler = handler.slice(handler.indexOf('export async function handleInquiry'), handler.indexOf('// ---------------------------------------------------------------- member registration'));
+    expect(inquiryHandler).toMatch(/from\('product_inquiries'\)\.insert/);
+    expect(inquiryHandler).not.toMatch(/from\('orders'\)|from\('preorders'\)/);
     // The inquiry writer must never touch orders/preorders/stock.
     const sendInquiryBody = shopSrc.slice(shopSrc.indexOf('const sendInquiry ='), shopSrc.indexOf('const sendInquiry =') + 800);
     expect(sendInquiryBody).not.toMatch(/from\('orders'\)/);

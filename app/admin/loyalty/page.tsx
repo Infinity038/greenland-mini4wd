@@ -3,6 +3,8 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { loyaltyAdjust } from '@/lib/admin/adminApi';
+import { createSupabaseBrowserClient } from '@/lib/supabaseAuth/browserClient';
 import {
   REWARD_MILESTONES,
   highestUnlockedReward,
@@ -34,7 +36,7 @@ export default function AdminLoyaltyPage() {
   async function loadData() {
     setLoading(true);
     const [{ data: memberRows }, { data: accountRows }, { data: transactionRows }] = await Promise.all([
-      supabase
+      createSupabaseBrowserClient()
         .from('members')
         .select('id, name, first_name, last_name, email, member_status, membership_expires_at')
         .order('first_name'),
@@ -97,51 +99,15 @@ export default function AdminLoyaltyPage() {
     setSaving(true);
     setMessage('');
 
-    const currentEarned = normalizeRewardPoints(selectedAccount?.total_earned);
-    const currentRedeemed = normalizeRewardPoints(selectedAccount?.total_redeemed);
-    const nextBalance = isRedeem ? balance - amount : balance + amount;
-    const nextEarned = isRedeem ? currentEarned : currentEarned + amount;
-    const nextRedeemed = isRedeem ? currentRedeemed + amount : currentRedeemed;
-    const memberLabel = displayName(selectedMember);
-
-    const { error: accountError } = await supabase.from('loyalty_points').upsert({
-      member_id: selectedMember.id,
-      member_name: memberLabel,
-      points_balance: nextBalance,
-      total_earned: nextEarned,
-      total_redeemed: nextRedeemed,
-      points_rate: 1,
-      tier: 'fixed_rewards',
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'member_id' });
-
-    if (accountError) {
-      setMessage(`Error: ${accountError.message}`);
-      setSaving(false);
-      return;
-    }
-
-    const description = form.description.trim()
-      || (isRedeem
-        ? `Fixed reward redemption: ${amount} points for ${selectedMilestone?.discountDkk} DKK`
-        : `Manual fixed reward adjustment: +${amount} points`);
-
-    const { error: transactionError } = await supabase.from('points_transactions').insert({
-      member_id: selectedMember.id,
-      member_name: memberLabel,
-      type: isRedeem ? 'redeem' : form.type,
-      amount,
-      rate_applied: 1,
-      purchase_amount: null,
-      description,
-    });
-
-    if (transactionError) {
-      setMessage(`Balance updated, but activity log failed: ${transactionError.message}`);
-    } else {
+    try {
+      await loyaltyAdjust({ memberId: selectedMember.id, kind: isRedeem ? 'redeem' : (form.type as 'bonus' | 'adjust'), amount, description: form.description.trim() || undefined });
       setMessage(isRedeem
         ? `✅ Redeemed ${amount} points for ${selectedMilestone?.discountDkk} DKK.`
         : `✅ Added ${amount} points.`);
+    } catch (e: any) {
+      setMessage(`Error: ${e.message}`);
+      setSaving(false);
+      return;
     }
 
     setForm({ type: 'bonus', amount: '', description: '' });

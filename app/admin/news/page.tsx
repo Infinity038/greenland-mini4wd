@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminWrite, pick } from '@/lib/admin/adminWrite';
+import { EDITABLE } from '@/lib/admin/writePolicy';
 const F = { fontFamily: "'Barlow Condensed', sans-serif" } as const;
 const FB = { fontFamily: "'DM Sans', sans-serif" } as const;
 // Must match the public /blog page's filter tabs exactly (minus "All", which is
@@ -35,10 +37,10 @@ export default function AdminNewsPage() {
       if (!editing || !useDb) return;
       setSaving(true); setDbError('');
       try {
-        const payload={...editing}; delete payload.id;
+        const payload=pick(editing,EDITABLE.news_posts);
         const result=editing.id
-          ? await supabase.from('news_posts').update(payload).eq('id',editing.id)
-          : await supabase.from('news_posts').insert({...payload,created_at:new Date().toISOString()});
+          ? await adminWrite({ table: 'news_posts', op: 'update', values: payload, match: { id: editing.id } })
+          : await adminWrite({ table: 'news_posts', op: 'insert', values: {...payload,created_at:new Date().toISOString()} });
         if(result.error) throw result.error;
         setEditing(null);
         await fetchPosts();
@@ -47,13 +49,13 @@ export default function AdminNewsPage() {
     };
     const del=async(id:string)=>{
       if(!useDb || !confirm('Delete this post?')) return;
-      const {error}=await supabase.from('news_posts').delete().eq('id',id);
+      const {error}=await adminWrite({ table: 'news_posts', op: 'delete', match: { id } });
       if(error){setDbError('Delete failed: '+error.message);return;}
       await fetchPosts();
     };
     const toggle=async(post:any)=>{
       if(!useDb)return;
-      const {error}=await supabase.from('news_posts').update({published:!post.published}).eq('id',post.id);
+      const {error}=await adminWrite({ table: 'news_posts', op: 'update', values: {published:!post.published}, match: { id: post.id } });
       if(error){setDbError('Publication update failed: '+error.message);return;}
       await fetchPosts();
     };

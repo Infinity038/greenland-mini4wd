@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-import { isRegistered, getMemberData } from '@/lib/member';
+import { isRegistered, getMemberData, fetchMemberView } from '@/lib/member';
 import { isMemberActive } from '@/lib/loyalty';
 import { supabase } from '@/lib/supabase';
 import { isFixedPrizePolicy, calculateFixedPrize, publicPrizeSummary } from '@/lib/prizePolicy';
@@ -117,7 +117,7 @@ export default function TournamentPage() {
         setMyTickets(tkData || []);
         const { data: meData } = await supabase.from('race_entries').select('*').eq('member_email',local.email);
         setMyEntries(meData || []);
-        const { data: memberRow } = await supabase.from('members').select('membership_expires_at').eq('email',local.email).single();
+        const memberRow = await fetchMemberView<{ membership_expires_at?: string | null }>('membership');
         setMemberActive(isMemberActive(memberRow));
       }
       setLoading(false);

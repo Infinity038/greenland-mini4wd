@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import TurnstileWidget, { turnstileConfigured } from '@/components/public/TurnstileWidget';
 import { createSupabaseBrowserClient } from '@/lib/supabaseAuth/browserClient';
 
 const OWNER_EMAIL = 'alltfarmer@gmail.com';
@@ -18,6 +19,8 @@ export default function AdminOwnerSetupPage() {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('checking');
   const [password, setPassword] = useState('');
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaTry, setCaptchaTry] = useState(0);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -76,10 +79,12 @@ export default function AdminOwnerSetupPage() {
       password,
       options: {
         emailRedirectTo: confirmationUrl(),
+        captchaToken: captcha || undefined,
         data: { bootstrap_owner: true },
       },
     });
 
+    setCaptcha(null); setCaptchaTry(n => n + 1);   // a token is single-use
     if (signupError) {
       setError(signupError.message || 'Account setup failed.');
       setPhase('form');
@@ -101,8 +106,9 @@ export default function AdminOwnerSetupPage() {
     const { error: resendError } = await client.auth.resend({
       type: 'signup',
       email: OWNER_EMAIL,
-      options: { emailRedirectTo: confirmationUrl() },
+      options: { emailRedirectTo: confirmationUrl(), captchaToken: captcha || undefined },
     });
+    setCaptcha(null); setCaptchaTry(n => n + 1);
 
     if (resendError) {
       setError(resendError.message || 'Confirmation email could not be resent.');
@@ -129,7 +135,8 @@ export default function AdminOwnerSetupPage() {
             <div style={{ fontSize: 34, marginBottom: 12 }}>✉️</div>
             A confirmation link was sent to <strong style={{ color: '#F5F5F5' }}>{OWNER_EMAIL}</strong>.
             Open the newest email on this device to finish setup and receive the administrator role.
-            <button onClick={resendConfirmation} style={{ width: '100%', marginTop: 18, background: 'transparent', color: '#F5F5F5', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '11px 18px', ...F, fontWeight: 800, letterSpacing: 1.5, fontSize: 14, cursor: 'pointer' }}>RESEND CONFIRMATION</button>
+            <TurnstileWidget onToken={setCaptcha} resetKey={captchaTry} />
+            <button onClick={resendConfirmation} disabled={turnstileConfigured() && !captcha} style={{ width: '100%', marginTop: 18, background: 'transparent', color: '#F5F5F5', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '11px 18px', ...F, fontWeight: 800, letterSpacing: 1.5, fontSize: 14, cursor: 'pointer' }}>RESEND CONFIRMATION</button>
           </div>
         ) : busy ? (
           <div role="status" style={{ ...FB, textAlign: 'center', color: '#B8C1CC', fontSize: 14 }}>
@@ -150,8 +157,9 @@ export default function AdminOwnerSetupPage() {
             <input type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} onKeyDown={event => event.key === 'Enter' && createOwnerAccount()} autoComplete="new-password" placeholder="Repeat password" style={{ width: '100%', boxSizing: 'border-box', background: '#050505', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 9, padding: '12px 14px', color: '#F5F5F5', ...FB, fontSize: 14, marginBottom: error ? 9 : 18 }} />
 
             {error && <div role="alert" style={{ ...FB, color: '#DC2626', fontSize: 12, lineHeight: 1.5, marginBottom: 15 }}>⚠ {error}</div>}
-            <button onClick={createOwnerAccount} style={{ width: '100%', background: '#DC2626', color: '#fff', border: 'none', borderRadius: 10, padding: '13px 20px', ...F, fontWeight: 900, letterSpacing: 2, fontSize: 16, cursor: 'pointer' }}>CREATE OWNER ACCOUNT →</button>
-            <button onClick={resendConfirmation} style={{ width: '100%', marginTop: 10, background: 'transparent', color: '#B8C1CC', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 18px', ...F, fontWeight: 800, letterSpacing: 1.2, fontSize: 13, cursor: 'pointer' }}>ALREADY CREATED? RESEND EMAIL</button>
+            <TurnstileWidget onToken={setCaptcha} resetKey={captchaTry} />
+            <button onClick={createOwnerAccount} disabled={turnstileConfigured() && !captcha} style={{ width: '100%', background: '#DC2626', color: '#fff', border: 'none', borderRadius: 10, padding: '13px 20px', ...F, fontWeight: 900, letterSpacing: 2, fontSize: 16, cursor: 'pointer' }}>CREATE OWNER ACCOUNT →</button>
+            <button onClick={resendConfirmation} disabled={turnstileConfigured() && !captcha} style={{ width: '100%', marginTop: 10, background: 'transparent', color: '#B8C1CC', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 18px', ...F, fontWeight: 800, letterSpacing: 1.2, fontSize: 13, cursor: 'pointer' }}>ALREADY CREATED? RESEND EMAIL</button>
           </>
         )}
       </div>

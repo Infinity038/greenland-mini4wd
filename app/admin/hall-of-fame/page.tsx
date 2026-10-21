@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { adminWrite } from '@/lib/admin/adminWrite';
+import { createSupabaseBrowserClient } from '@/lib/supabaseAuth/browserClient';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 const HOF_CATEGORIES = [
     { key: 'fastest_lap', label: '⚡ Fastest Lap', unit: 'seconds', lower_is_better: true },
@@ -21,7 +23,7 @@ export default function AdminHallOfFame() {
         const [r, h, m] = await Promise.all([
             supabase.from('hall_of_fame').select('*'),
             supabase.from('hall_of_fame_history').select('*').order('held_until', { ascending: false }).limit(20),
-            supabase.from('members').select('id, first_name, last_name').order('first_name'),
+            createSupabaseBrowserClient().from('members').select('id, first_name, last_name').order('first_name'),
         ]);
         setRecords(r.data || []);
         setHistory(h.data || []);
@@ -47,17 +49,17 @@ export default function AdminHallOfFame() {
         setSaving(true);
         // Archive previous record to history
         if (editing.member_name !== 'TBD') {
-            await supabase.from('hall_of_fame_history').insert({
+            await adminWrite({ table: 'hall_of_fame_history', op: 'insert', values: {
                 category: editing.category,
                 member_name: editing.member_name,
                 record_value: editing.record_value,
                 record_label: editing.record_label,
                 held_from: editing.achieved_at,
                 held_until: new Date().toISOString(),
-            });
+            } });
         }
         // Update current record
-        const { error } = await supabase.from('hall_of_fame').update({
+        const { error } = await adminWrite({ table: 'hall_of_fame', op: 'update', values: {
             member_id: form.member_id || null,
             member_name: form.member_name,
             record_value: parseFloat(form.record_value),
@@ -66,10 +68,10 @@ export default function AdminHallOfFame() {
             previous_record_value: editing.record_value,
             previous_holder_name: editing.member_name !== 'TBD' ? editing.member_name : null,
             previous_achieved_at: editing.achieved_at,
-        }).eq('id', editing.id);
+        }, match: { id: editing.id } });
         // Update member tier to hall_of_fame if member selected
         if (form.member_id) {
-            await supabase.from('members').update({ loyalty_tier: 'hall_of_fame' }).eq('id', form.member_id);
+            await adminWrite({ table: 'members', op: 'update', values: { loyalty_tier: 'hall_of_fame' }, match: { id: form.member_id } });
             // Hall of Fame is a prestige title, never a multiplier on fixed reward points.
             // Do not upsert a partial loyalty_points row; preserve the actual balance.
         }

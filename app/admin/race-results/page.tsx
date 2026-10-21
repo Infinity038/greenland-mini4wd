@@ -2,7 +2,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { checkAndUpdateHOF, getMemberLifetimeStat } from '@/lib/hallOfFame';
+import { adminWrite } from '@/lib/admin/adminWrite';
+import { hallOfFameCheck } from '@/lib/admin/adminApi';
+import { createSupabaseBrowserClient } from '@/lib/supabaseAuth/browserClient';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 const RACE_CATEGORIES = ['Box Stock', 'Open Box Stock', 'B-Max', 'Open Class'];
 // 1st = 5, 2nd = 3, 3rd = 2, everyone else who finished (4th+) = 1 participation point.
@@ -39,11 +41,11 @@ async function syncSeasonTiers(seasonId: string) {
         for (let i = 0; i < Math.min(3, eligible.length); i++) {
             const targetTier = RANK_TIER[i + 1];
             const memberId = eligible[i].member_id;
-            const { data: memberRow } = await supabase.from('members').select('loyalty_tier').eq('id', memberId).single();
+            const { data: memberRow } = await createSupabaseBrowserClient().from('members').select('loyalty_tier').eq('id', memberId).single();
             const currentOrder = TIER_ORDER[memberRow?.loyalty_tier || 'member'] ?? 1;
             const targetOrder = TIER_ORDER[targetTier];
             if (targetOrder > currentOrder) {
-                await supabase.from('members').update({ loyalty_tier: targetTier }).eq('id', memberId);
+                await adminWrite({ table: 'members', op: 'update', values: { loyalty_tier: targetTier }, match: { id: memberId } });
             }
         }
     }
@@ -65,7 +67,7 @@ export default function AdminRaceResults() {
     async function loadData() {
         const [s, m, t, r, cfg] = await Promise.all([
             supabase.from('seasons').select('*').order('created_at', { ascending: false }),
-            supabase.from('members').select('id, name').order('name'),
+            createSupabaseBrowserClient().from('members').select('id, name').order('name'),
             supabase.from('tournaments').select('id, name, date').order('date', { ascending: false }),
             supabase.from('race_results').select('*').order('created_at', { ascending: false }).limit(50),
             supabase.from('admin_config').select('value').eq('key', 'min_races_for_ranking').single(),
@@ -82,7 +84,7 @@ export default function AdminRaceResults() {
     }
     async function saveMinRaces() {
         setMinRacesSaving(true);
-        await supabase.from('admin_config').upsert({ key: 'min_races_for_ranking', value: String(minRaces) }, { onConflict: 'key' });
+        await adminWrite({ table: 'admin_config', op: 'upsert', values: { key: 'min_races_for_ranking', value: String(minRaces) }, onConflict: 'key' });
         setMinRacesSaving(false);
         setMsg('✅ Minimum races setting saved');
         setTimeout(() => setMsg(''), 2000);
@@ -118,7 +120,7 @@ export default function AdminRaceResults() {
         const q2 = form.qualifying_time_2 ? parseFloat(form.qualifying_time_2) : null;
         const bestQual = [q1, q2].filter((v): v is number => v != null).sort((a, b) => a - b)[0];
         const lapTime = form.lap_time_seconds ? parseFloat(form.lap_time_seconds) : (bestQual ?? null);
-        const { error } = await supabase.from('race_results').insert({
+        const { error } = await adminWrite({ table: 'race_results', op: 'insert', values: {
             season_id: form.season_id,
             race_category: form.race_category,
             member_id: form.member_id,
@@ -132,32 +134,20 @@ export default function AdminRaceResults() {
             wins: parseInt(form.wins) || 0,
             points_earned: parseInt(form.points_earned) || 0,
             notes: form.notes,
-        });
+        } });
         let hofMsg = '';
         if (!error) {
             try {
+                // The server recomputes every candidate value from race_results; the browser sends only the category and the member.
                 if (lapTime != null) {
-                    const r = await checkAndUpdateHOF('fastest_lap', form.member_id, form.member_name, lapTime, `${lapTime}s`, true);
+                    const r = await hallOfFameCheck('fastest_lap', form.member_id);
                     if (r.broke_record)
                         hofMsg += ' 🏆 New fastest lap record!';
                 }
-                const lifetimeWins = await getMemberLifetimeStat(form.member_id, 'wins');
-                if (lifetimeWins > 0) {
-                    const r = await checkAndUpdateHOF('most_wins', form.member_id, form.member_name, lifetimeWins, `${lifetimeWins} wins`, false);
+                for (const [cat, text] of [['most_wins', ' 🏆 New Most Wins record!'], ['most_points', ' 🏆 New Top Scorer record!'], ['most_races', ' 🏆 New Most Races record!']] as const) {
+                    const r = await hallOfFameCheck(cat, form.member_id);
                     if (r.broke_record)
-                        hofMsg += ' 🏆 New Most Wins record!';
-                }
-                const lifetimePoints = await getMemberLifetimeStat(form.member_id, 'points_earned');
-                if (lifetimePoints > 0) {
-                    const r = await checkAndUpdateHOF('most_points', form.member_id, form.member_name, lifetimePoints, `${lifetimePoints} pts`, false);
-                    if (r.broke_record)
-                        hofMsg += ' 🏆 New Top Scorer record!';
-                }
-                const lifetimeRaces = await getMemberLifetimeStat(form.member_id, 'race_count');
-                if (lifetimeRaces > 0) {
-                    const r = await checkAndUpdateHOF('most_races', form.member_id, form.member_name, lifetimeRaces, `${lifetimeRaces} races`, false);
-                    if (r.broke_record)
-                        hofMsg += ' 🏆 New Most Races record!';
+                        hofMsg += text;
                 }
             }
             catch (e: any) {
@@ -185,7 +175,7 @@ export default function AdminRaceResults() {
         if (!confirm('Delete this result?'))
             return;
         const row = results.find((r: any) => r.id === id);
-        await supabase.from('race_results').delete().eq('id', id);
+        await adminWrite({ table: 'race_results', op: 'delete', match: { id } });
         if (row?.season_id) {
             try {
                 await syncSeasonTiers(row.season_id);

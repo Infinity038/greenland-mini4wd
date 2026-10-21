@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { adminWrite } from '@/lib/admin/adminWrite';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 // Date-only strings (e.g. "2026-07-01" from a <input type="date">) get parsed
 // as UTC midnight by the JS Date constructor. Displaying that in a negative
@@ -28,7 +29,7 @@ export default function AdminSeasons() {
             return;
         }
         setSaving(true);
-        const { error } = await supabase.from('seasons').insert({ ...form, is_active: false });
+        const { error } = await adminWrite({ table: 'seasons', op: 'insert', values: { ...form, is_active: false } });
         if (error)
             setMsg('Error: ' + error.message);
         else {
@@ -40,8 +41,8 @@ export default function AdminSeasons() {
         setTimeout(() => setMsg(''), 3000);
     }
     async function setActive(id: string) {
-        await supabase.from('seasons').update({ is_active: false }).neq('id', id);
-        await supabase.from('seasons').update({ is_active: true }).eq('id', id);
+        await adminWrite({ table: 'seasons', op: 'update', values: { is_active: false }, neq: { id } });
+        await adminWrite({ table: 'seasons', op: 'update', values: { is_active: true }, match: { id } });
         // Update member tiers based on current season standings
         const { data: standings } = await supabase.from('season_standings').select('*').eq('season_id', id).order('season_rank');
         if (standings) {
@@ -57,7 +58,7 @@ export default function AdminSeasons() {
                     tier = 'season_3rd';
                 }
                 if (s.member_id) {
-                    await supabase.from('members').update({ loyalty_tier: tier }).eq('id', s.member_id);
+                    await adminWrite({ table: 'members', op: 'update', values: { loyalty_tier: tier }, match: { id: s.member_id } });
                     // Prestige is separate from fixed financial reward points. Do not overwrite
                     // loyalty_points here: an upsert on member_id could also reset existing balances.
                 }

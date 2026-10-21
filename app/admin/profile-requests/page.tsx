@@ -2,6 +2,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { adminWrite } from '@/lib/admin/adminWrite';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 export default function AdminProfileRequests() {
     const [requests, setRequests] = useState<any[]>([]);
@@ -26,14 +27,14 @@ export default function AdminProfileRequests() {
         if (req.requested_avatar_url)
             updates.avatar_url = req.requested_avatar_url;
         if (Object.keys(updates).length > 0) {
-            const { error } = await supabase.from('members').update(updates).eq('id', req.member_id);
+            const { error } = await adminWrite({ table: 'members', op: 'update', values: updates, match: { id: req.member_id } });
             if (error) {
                 setMsg('Error updating member: ' + error.message);
                 setBusyId(null);
                 return;
             }
         }
-        await supabase.from('profile_edit_requests').update({ status: 'approved', reviewed_at: new Date().toISOString() }).eq('id', req.id);
+        await adminWrite({ table: 'profile_edit_requests', op: 'update', values: { status: 'approved', reviewed_at: new Date().toISOString() }, match: { id: req.id } });
         setMsg('✅ Approved and applied.');
         setBusyId(null);
         loadData();
@@ -41,7 +42,7 @@ export default function AdminProfileRequests() {
     }
     async function handleReject(req: any) {
         setBusyId(req.id);
-        await supabase.from('profile_edit_requests').update({ status: 'rejected', reviewed_at: new Date().toISOString() }).eq('id', req.id);
+        await adminWrite({ table: 'profile_edit_requests', op: 'update', values: { status: 'rejected', reviewed_at: new Date().toISOString() }, match: { id: req.id } });
         setMsg('Rejected.');
         setBusyId(null);
         loadData();

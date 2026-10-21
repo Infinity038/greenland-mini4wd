@@ -2,13 +2,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { getMemberData, isRegistered, generatePaymentRef } from '@/lib/member';
+import { getMemberData, isRegistered, generatePaymentRef, fetchMemberView } from '@/lib/member';
 import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { resilientCatalogFetch } from '@/lib/resilientCatalogFetch';
 import { parseImages } from '@/lib/images';
 import { ProductImage as SharedProductImage } from '@/components/ProductImage';
+import TurnstileWidget, { turnstileConfigured } from '@/components/public/TurnstileWidget';
 import { isPriceOnRequest, PRICE_ON_REQUEST_LABEL, ASK_FOR_PRICE_LABEL } from '@/lib/pricing';
 
 // public.products is the runtime source of truth for every category (Cars,
@@ -258,6 +259,7 @@ export default function ShopPage() {
   const [inquiryContact, setInquiryContact] = useState('');
   const [inquiryMessage, setInquiryMessage] = useState('');
   const [inquirySending, setInquirySending] = useState(false);
+  const [inquiryCaptcha, setInquiryCaptcha] = useState<string | null>(null);
   const [inquiryDone, setInquiryDone] = useState(false);
   const [inquiryError, setInquiryError] = useState('');
 
@@ -329,7 +331,7 @@ export default function ShopPage() {
         setDiscountError('This code has reached its usage limit.'); setDiscountChecking(false); return;
       }
       if (code.min_tier) {
-        const { data: m } = await supabase.from('members').select('loyalty_tier').eq('email', member.email).single();
+        const m = await fetchMemberView<{ loyalty_tier?: string }>('tier');
         const memberTierRank = TIER_ORDER[m?.loyalty_tier || 'member'] ?? 1;
         const requiredRank = TIER_ORDER[code.min_tier] ?? 0;
         if (memberTierRank < requiredRank) { setDiscountError(`This code requires ${code.min_tier.replace('_', ' ')} tier or higher.`); setDiscountChecking(false); return; }
@@ -489,16 +491,12 @@ export default function ShopPage() {
     if (!inquiryName.trim() || !inquiryContact.trim()) { setInquiryError('Please enter your name and email or contact info.'); return; }
     setInquirySending(true); setInquiryError('');
     try {
-      const { error: err } = await supabase.from('product_inquiries').insert({
-        product_id: inquiryTarget.id,
-        item_no: inquiryTarget.item_no || null,
-        product_name: inquiryTarget.name,
-        customer_name: inquiryName.trim(),
-        customer_contact: inquiryContact.trim(),
-        message: inquiryMessage.trim() || null,
-        status: 'new',
+      // Server route: validates, rate-limits, and reads the product name from the catalogue (not from the browser).
+      const res = await fetch('/api/public/inquiry', {
+        method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ productId: String(inquiryTarget.id), customerName: inquiryName.trim(), customerContact: inquiryContact.trim(), message: inquiryMessage.trim() || undefined, website: '', turnstileToken: inquiryCaptcha || undefined }),
       });
-      if (err) throw err;
+      if (!res.ok) throw new Error(res.status === 429 ? 'rate' : 'failed');
       setInquiryDone(true);
     } catch { setInquiryError('Something went wrong. Please try again.'); }
     setInquirySending(false);
@@ -1068,8 +1066,9 @@ export default function ShopPage() {
                   <textarea value={inquiryMessage} onChange={e => setInquiryMessage(e.target.value)} placeholder="Optional message" rows={3}
                     style={{ background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#F5F5F5', ...FB, fontSize: 13, outline: 'none', resize: 'vertical' }} />
                 </div>
+                <TurnstileWidget onToken={setInquiryCaptcha} />
                 {inquiryError && <div style={{ ...FB, fontSize: 12, color: '#DC2626', marginBottom: 12 }}>{inquiryError}</div>}
-                <button onClick={sendInquiry} disabled={inquirySending} style={{ width: '100%', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 12, padding: 15, ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, cursor: 'pointer', opacity: inquirySending ? 0.5 : 1 }}>
+                <button onClick={sendInquiry} disabled={inquirySending || (turnstileConfigured() && !inquiryCaptcha)} style={{ width: '100%', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 12, padding: 15, ...F, fontWeight: 900, fontSize: 16, letterSpacing: 2, cursor: 'pointer', opacity: inquirySending ? 0.5 : 1 }}>
                   {inquirySending ? 'SENDING...' : 'SEND INQUIRY →'}
                 </button>
               </>

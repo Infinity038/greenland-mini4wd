@@ -65,18 +65,27 @@ export function logout(): void {
   if (typeof window === 'undefined') return;
   document.cookie = 'gm4wd_registered=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
   localStorage.removeItem('gm4wd_member');
-  window.location.href = '/register';
+  // end the database session and clear the HttpOnly cookie (best effort: the redirect happens either way)
+  fetch('/api/public/member-logout', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' })
+    .catch(() => undefined).finally(() => { window.location.href = '/register'; });
+}
+
+/** The signed-in club member's OWN data, one scope at a time. Identity is the HttpOnly session cookie checked on the server; this
+ *  function never sends an email or id. Returns null when nobody is signed in (or the session expired). */
+export type MemberViewScope = 'tier' | 'ticket_progress' | 'membership' | 'profile';
+export async function fetchMemberView<T = Record<string, any>>(scope: MemberViewScope): Promise<T | null> {
+  try {
+    const res = await fetch('/api/public/member-view', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ scope }) });
+    if (!res.ok) return null;
+    const out = await res.json();
+    return out?.ok === true && out.data ? (out.data as T) : null;
+  } catch { return null; }
 }
 
 // ─── Supabase fetches ────────────────────────────────────────
-export async function getMemberDataFromSupabase(email: string): Promise<Member | null> {
-  const { data, error } = await supabase
-    .from('members')
-    .select('*')
-    .eq('email', email)
-    .single();
-  if (error || !data) return null;
-  return data as Member;
+export async function getMemberDataFromSupabase(_email?: string): Promise<Member | null> {
+  // The email argument is ignored on purpose: the server decides who is asking from the session cookie.
+  return fetchMemberView<Member>('profile');
 }
 
 export async function getMemberOrdersFromSupabase(email: string) {

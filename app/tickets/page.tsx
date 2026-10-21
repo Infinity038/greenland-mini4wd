@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { getMemberData, isRegistered, generatePaymentRef } from '@/lib/member';
+import { getMemberData, isRegistered, generatePaymentRef, fetchMemberView } from '@/lib/member';
 import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
@@ -90,7 +90,7 @@ export default function TicketsPage() {
   }
 
   async function fetchLoyalty(email) {
-    const { data } = await supabase.from('members').select('weekly_loyalty_progress, season_loyalty_progress').eq('email', email).single();
+    const data = await fetchMemberView('ticket_progress');
     if (data) {
       setWeeklyProgress(data.weekly_loyalty_progress || 0);
       setSeasonProgress(data.season_loyalty_progress || 0);
