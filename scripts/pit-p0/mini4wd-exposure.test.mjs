@@ -90,3 +90,17 @@ test('invalid odds or stake cannot be interpreted as an accepted quote',()=>{
   assert.equal(evaluateWith({proposed:ticket('h1','a','p1',20,99)}).reason,'INVALID_QUOTE');
   assert.equal(evaluateWith({proposed:ticket('h1','a','p1',0,536)}).reason,'INVALID_QUOTE');
 });
+
+test('owner approval is a hard ceiling even when caller supplies larger limits',()=>{
+  for(const extra of [
+    {ticketMax:26},{playerEventMax:101},{eventNetMax:1001},{combinedNetMax:3001}
+  ]){
+    const result=evaluateWith({limits:{...limits,...extra}});
+    assert.equal(result.reason,'LIMITS_EXCEED_OWNER_APPROVAL');
+    assert.equal(result.accepted,false);
+  }
+});
+test('a smaller temporary limit may be imposed without owner-tier promotion',()=>{
+  const result=evaluateWith({limits:{...limits,ticketMax:15},proposed:ticket('h1','a','p1',16,200)});
+  assert.equal(result.reason,'TICKET_CAP');
+});
