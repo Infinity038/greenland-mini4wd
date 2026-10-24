@@ -40,6 +40,13 @@ BEGIN
   IF (SELECT count(*) FROM pp.mcl_marbles WHERE season_id=p_season) <> 24 THEN
     RAISE EXCEPTION 'P0 requires a 24-marble roster' USING errcode='22023';
   END IF;
+  IF (SELECT count(DISTINCT color) FROM pp.mcl_marbles WHERE season_id=p_season) <> 6
+     OR EXISTS (
+       SELECT 1 FROM pp.mcl_marbles WHERE season_id=p_season
+       GROUP BY color HAVING count(*) <> 4
+     ) THEN
+    RAISE EXCEPTION 'P0 requires exactly four marbles in each of six colors' USING errcode='22023';
+  END IF;
 
   SELECT count(*) FILTER(WHERE phase='regular'),
          count(*) FILTER(WHERE phase='playoff'),
@@ -66,6 +73,16 @@ BEGIN
           WHERE y.val=x.val)));
   IF n_invalid<>0 THEN
     RAISE EXCEPTION 'results must be a permutation of each six-marble lineup' USING errcode='22023';
+  END IF;
+
+  -- Regular six-marble heats must each have exactly one contender per color.
+  SELECT count(*) INTO n_invalid FROM pp.mcl_races r
+    WHERE r.season_id=p_season AND r.phase='regular'
+      AND (SELECT count(DISTINCT m.color)
+           FROM jsonb_array_elements_text(r.lineup) AS q(marble_id)
+           JOIN pp.mcl_marbles m ON m.season_id=p_season AND m.marble_id=q.marble_id) <> 6;
+  IF n_invalid <> 0 THEN
+    RAISE EXCEPTION 'each regular race must have one marble from each color' USING errcode='22023';
   END IF;
 
   SELECT * INTO final_race FROM pp.mcl_races WHERE season_id=p_season AND phase='final';
