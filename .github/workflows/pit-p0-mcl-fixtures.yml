@@ -1,0 +1,22 @@
+name: Prediction Pit P0 MCL fixture tests
+on:
+  pull_request:
+    paths:
+      - 'scripts/pit-p0/**'
+      - '.github/workflows/pit-p0-mcl-fixtures.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mcl-p0-fixtures:
+    name: Node fixture checks (no database access)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run immutable P0 MCL scenario checks
+        run: node --test scripts/pit-p0/mcl-champion-readiness.test.mjs
