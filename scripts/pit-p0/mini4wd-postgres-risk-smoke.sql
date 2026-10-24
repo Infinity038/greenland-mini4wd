@@ -44,12 +44,12 @@ INSERT INTO pp.m4_heats(id,mode,status)
  SELECT ('00000000-0000-0000-0000-'||lpad(h::text,12,'0'))::uuid,
  CASE WHEN h=4 THEN 'podium' ELSE 'win' END,
  'open'
- FROM generate_series(1,6) h;
+ FROM generate_series(1,7) h;
 INSERT INTO pp.m4_entries(id,heat_id,position)
  SELECT ('10000000-0000-0000-'||lpad(h::text,4,'0')||'-'||lpad(n::text,12,'0'))::uuid,
  ('00000000-0000-0000-0000-'||lpad(h::text,12,'0'))::uuid,
  n
- FROM generate_series(1,6) h CROSS JOIN generate_series(1,6) n;
+ FROM generate_series(1,7) h CROSS JOIN generate_series(1,6) n;
 
 -- No real funding record is seeded by the release-candidate migration.
 DO $x$ DECLARE before_n int;
@@ -147,17 +147,23 @@ BEGIN
  END IF;
 END $x$;
 
--- Gross coverage and earmarks bind even if per-event/net checks pass.
+-- Gross coverage binds independently of net limits (3,100 vs 3,000).
+-- Heat 7 uses normal 2x quote, creating only 25 net downside, so the
+-- combined downside remains under 3,000 while gross coverage fails.
 UPDATE pp.p0_operator_reserve SET settled_free_reserve=3000;
-DO $x$ DECLARE before_n int;
+DO $x$ DECLARE before_n int; reason text;
 BEGIN
  SELECT count(*) INTO before_n FROM pp.ledger;
  BEGIN
   PERFORM pp.m4_place_bet(
-   '00000000-0000-0000-0000-000000000001',
-   '10000000-0000-0000-0001-000000000005',1,2,'reserve-low-00007');
+   '00000000-0000-0000-0000-000000000007',
+   '10000000-0000-0000-0007-000000000001',25,2,'reserve-low-00007');
   RAISE EXCEPTION 'Gross reserve condition bypassed';
- EXCEPTION WHEN check_violation THEN NULL;
+ EXCEPTION WHEN check_violation THEN
+  GET STACKED DIAGNOSTICS reason=MESSAGE_TEXT;
+  IF reason <> 'P0 Mini4WD gross reserve capacity exceeded' THEN
+    RAISE EXCEPTION 'Wrong gross risk failure: %',reason;
+  END IF;
  END;
  IF (SELECT count(*) FROM pp.ledger)<>before_n THEN
   RAISE EXCEPTION 'Rejected gross-risk ticket debited wallet';
