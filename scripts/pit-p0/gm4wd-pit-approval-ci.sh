@@ -37,14 +37,14 @@ expect_denial 'anonymous user cannot read approval inventory' \
  "SET ROLE anon; SELECT * FROM public.prediction_pit_access;"
 expect 'owner 18+ verified approval succeeds' \
  "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='$owner';
- SELECT public.pit_owner_set_member_access('$member',true,true); ROLLBACK;" 'true'
+ SELECT public.pit_owner_set_member_access('$member',true,true); ROLLBACK;" 't'
 # Previous transaction rolled back, and must not have provisioned anything.
 expect 'rolled-back owner approval did not persist' \
  "SET ROLE anon; SELECT public.pit_member_handoff_authorized(repeat('b',64))->>'allowed'; RESET ROLE;" 'false'
 # Commit real synthetic owner action. This is CI memory only, not a real member.
 expect 'owner persists approved and verified 18+ access' \
  "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='$owner';
- SELECT public.pit_owner_set_member_access('$member',true,true); COMMIT;" 'true'
+ SELECT public.pit_owner_set_member_access('$member',true,true); COMMIT;" 't'
 expect 'active approved club cookie permits issuing a short-lived token' \
  "SET ROLE anon; SELECT public.pit_member_handoff_authorized(repeat('b',64))->>'member_id'; RESET ROLE;" "$member"
 expect 'expired club session fails closed' \
@@ -56,7 +56,7 @@ expect 'valid session without owner-approved membership denied' \
 # Revocation blocks existing sessions without touching logged-in user session rows.
 expect 'owner revokes instantly' \
  "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='$owner';
- SELECT public.pit_owner_set_member_access('$member',false,true); COMMIT;" 'true'
+ SELECT public.pit_owner_set_member_access('$member',false,true); COMMIT;" 't'
 expect 'revoked approval makes same cookie invalid for Pit' \
  "SET ROLE anon; SELECT public.pit_member_handoff_authorized(repeat('b',64))->>'allowed'; RESET ROLE;" 'false'
 expect 'revoking does not delete prior club sessions' \
