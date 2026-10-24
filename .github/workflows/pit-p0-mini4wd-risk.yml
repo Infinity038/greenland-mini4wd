@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'scripts/pit-p0/mini4wd-exposure*.mjs'
+      - 'scripts/pit-p0/mcl-stake-policy*.mjs'
+      - 'scripts/pit-p0/p0-policy.mjs'
       - '.github/workflows/pit-p0-mini4wd-risk.yml'
   workflow_dispatch:
 
@@ -18,5 +20,5 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - name: Verify independently funded Winner and Top-3 liabilities
-        run: node --test scripts/pit-p0/mini4wd-exposure.test.mjs
+      - name: Verify owner-approved P0 policy and funded-MCL / fixed-Mini4WD limits
+        run: node --test scripts/pit-p0/mcl-stake-policy.test.mjs scripts/pit-p0/mini4wd-exposure.test.mjs
