@@ -91,10 +91,6 @@ export default function AdminDashboardContent({ roles }: { roles: StaffRole[] })
     router.refresh();
   }
 
-  const adminModules = roles.includes('admin')
-    ? [...NAV, { href: '/admin/prediction-pit', icon: '🔒', label: 'Prediction Pit Access', desc: 'Invitation-only member approvals' }]
-    : NAV;
-
   const cards = [
     ['Total Members', stats.totalMembers, '👥', '#3B82F6', '/admin/members'],
     ['Official Members', stats.officialMembers, '✓', '#22C55E', '/admin/members'],
@@ -117,7 +113,7 @@ export default function AdminDashboardContent({ roles }: { roles: StaffRole[] })
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {roles.includes('admin') && <Link href="/prediction-pit/operator" style={{ ...FB, fontSize: 12, color: '#b6ff3b', textDecoration: 'none', border: '1px solid rgba(182,255,59,0.3)', borderRadius: 6, padding: '6px 12px' }}>Prediction Pit host →</Link>}
+          {roles.includes('admin') && <span role="status" aria-label="Prediction Pit host is pending secure integration" style={{ ...FB, fontSize: 12, color: '#B8C1CC', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '6px 12px' }}>Prediction Pit host · Pending</span>}
           <Link href="/" style={{ ...FB, fontSize: 12, color: '#B8C1CC', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '6px 12px' }}>← Site</Link>
           <button onClick={signOut} disabled={signingOut} style={{ ...FB, fontSize: 12, color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 6, padding: '6px 12px', cursor: signingOut ? 'not-allowed' : 'pointer' }}>{signingOut ? 'Signing out…' : 'Sign Out'}</button>
         </div>
@@ -151,7 +147,7 @@ export default function AdminDashboardContent({ roles }: { roles: StaffRole[] })
 
         <div style={{ ...F, fontSize: 11, letterSpacing: 4, color: '#B8C1CC', marginBottom: 12 }}>ALL MODULES</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-          {adminModules.map(module => (
+          {NAV.map(module => (
             <Link key={module.href} href={module.href} style={{ textDecoration: 'none' }}>
               <div style={{ background: '#071426', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px 14px' }}>
                 <div style={{ fontSize: 22, marginBottom: 8 }}>{module.icon}</div>
@@ -160,6 +156,13 @@ export default function AdminDashboardContent({ roles }: { roles: StaffRole[] })
               </div>
             </Link>
           ))}
+          {roles.includes('admin') && (
+            <div role="status" aria-label="Prediction Pit Access is pending secure integration" style={{ background: '#071426', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: 12, padding: '16px 14px' }}>
+              <div style={{ fontSize: 22, marginBottom: 8 }}>🔒</div>
+              <div style={{ ...F, fontWeight: 700, fontSize: 14, color: '#B8C1CC', letterSpacing: 1 }}>Prediction Pit Access</div>
+              <div style={{ ...FB, fontSize: 11, color: '#B8C1CC' }}>Pending secure integration. Not yet available.</div>
+            </div>
+          )}
         </div>
       </main>
     </div>
