@@ -13,10 +13,32 @@ jobs:
   mcl-p0-fixtures:
     name: Node fixture checks (no database access)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pit_ci
+          POSTGRES_USER: pit_test
+          POSTGRES_PASSWORD: pit_ci_disposable_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pit_test -d pit_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
       - name: Run immutable P0 MCL scenario checks
         run: node --test scripts/pit-p0/mcl-champion-readiness.test.mjs
+
+      - name: Compile and smoke-test candidate SQL in disposable Postgres
+        env:
+          PGPASSWORD: pit_ci_disposable_only
+        run: >-
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1
+          -U pit_test -d pit_ci
+          -f scripts/pit-p0/mcl-champion-postgres-smoke.sql
