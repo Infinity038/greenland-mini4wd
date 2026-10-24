@@ -5,13 +5,13 @@ CREATE ROLE anon; CREATE ROLE authenticated;
 CREATE SCHEMA auth; CREATE SCHEMA pp;
 CREATE TABLE pp.m4_heats (
  id uuid PRIMARY KEY, mode text NOT NULL, status text NOT NULL,
- result jsonb,opened_at timestamptz,locked_at timestamptz);
+ result jsonb,opened_at timestamptz,locked_at timestamptz,settled_at timestamptz);
 CREATE TABLE pp.m4_entries (
  id uuid PRIMARY KEY, heat_id uuid NOT NULL,position integer NOT NULL);
 CREATE TABLE pp.ledger(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,balance_after bigint);
 CREATE TABLE pp.m4_bets (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),heat_id uuid,entry_id uuid,
- player_id uuid,stake bigint,odds numeric,status text DEFAULT 'pending',
+ player_id uuid,stake bigint,odds numeric,payout bigint DEFAULT 0,status text DEFAULT 'pending',
  idem text,stake_ledger_id bigint);
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS
  $$SELECT '00000000-0000-0000-0000-000000000007'::uuid$$;
