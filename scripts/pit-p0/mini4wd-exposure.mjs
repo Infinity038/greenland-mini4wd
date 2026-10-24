@@ -1,3 +1,5 @@
+import { P0_POLICY } from './p0-policy.mjs';
+
 /**
  * Prediction Pit Mini4WD - isolated deterministic risk model for P0 review.
  * No database, wallet, server clock or authorization integration.
@@ -65,6 +67,14 @@ export function evaluateMini4WDAdmission({events,tickets,proposed,limits}){
     const fields=['ticketMax','playerEventMax','eventNetMax','combinedNetMax','settledFreeReserve','earmarkedLiabilities'];
     if(fields.some(k=>!int(limits[k])))return fail('POLICY_NOT_CONFIGURED');
     if(fields.slice(0,4).some(k=>!positive(limits[k]))||limits.settledFreeReserve<=0)return fail('POLICY_NOT_CONFIGURED');
+    // The operator's signed Tier 1 ceilings bound any lower per-session
+    // settings. Live code must bind these to an authenticated DB transaction.
+    const ceiling=P0_POLICY;
+    if(limits.ticketMax>Math.min(ceiling.mini4wd.winnerTicketMax,ceiling.mini4wd.podiumTicketMax)||
+      limits.playerEventMax>ceiling.mini4wd.playerHeatCombinedMax||
+      limits.eventNetMax>ceiling.risk.eventNetDownsideMax||
+      limits.combinedNetMax>ceiling.risk.combinedUnsettledNetDownsideMax)
+      return fail('LIMITS_EXCEED_OWNER_APPROVAL');
     const e=events?.find(x=>x.id===proposed.heatId);
     if(!e||e.status!=='open'||!e.entryIds?.includes(proposed.entryId))return fail('HEAT_OR_ENTRY_NOT_OPEN');
     if(!positive(proposed.stake)||!int(proposed.oddsCents)||proposed.oddsCents<101||typeof proposed.playerId!=='string'||!proposed.playerId)return fail('INVALID_QUOTE');
