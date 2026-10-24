@@ -13,12 +13,12 @@ CREATE TABLE pp.mcl_tickets(
  status text DEFAULT 'active',idem text,stake_ledger_id bigint);
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS
  $$SELECT '00000000-0000-0000-0000-000000000007'::uuid$$;
-CREATE FUNCTION pp._require_allowed() RETURNS void LANGUAGE sql AS $$SELECT$$;
-CREATE FUNCTION pp._require_game(text) RETURNS void LANGUAGE sql AS $$SELECT$$;
+CREATE FUNCTION pp._require_allowed() RETURNS void LANGUAGE plpgsql AS $BEGIN NULL; END$;
+CREATE FUNCTION pp._require_game(text) RETURNS void LANGUAGE plpgsql AS $BEGIN NULL; END$;
 CREATE FUNCTION pp._player_of(uuid) RETURNS uuid LANGUAGE sql AS
  $$SELECT '00000000-0000-0000-0000-000000000008'::uuid$$;
 CREATE FUNCTION pp._mcl_market_open(uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
-CREATE FUNCTION pp._mcl_check_outcome(uuid,text) RETURNS void LANGUAGE sql AS $$SELECT$$;
+CREATE FUNCTION pp._mcl_check_outcome(uuid,text) RETURNS void LANGUAGE plpgsql AS $BEGIN NULL; END$;
 CREATE FUNCTION pp._mcl_weight(timestamptz) RETURNS integer LANGUAGE sql AS $$SELECT 1$$;
 CREATE FUNCTION pp._mcl_estimate(uuid,text,bigint,integer,integer)
  RETURNS numeric LANGUAGE sql AS $$SELECT 0.4::numeric$$;
