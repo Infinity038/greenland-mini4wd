@@ -1,0 +1,36 @@
+name: GM4WD member P4 RLS isolation rehearsal
+on:
+  pull_request:
+    paths:
+      - 'scripts/security/pit-p0-p4-*'
+      - 'supabase/release/P4_02_r4_r5_lockdown.sql'
+      - '.github/workflows/pp-p0-gm4wd-p4-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-members-rls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: pit_test
+          POSTGRES_PASSWORD: synthetic_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pit_test -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Rehearse exact GM4WD P4_02 lockdown against synthetic identities
+        env:
+          PGPASSWORD: synthetic_ci_only
+        run: bash scripts/security/pit-p0-p4-postgres-smoke.sh
