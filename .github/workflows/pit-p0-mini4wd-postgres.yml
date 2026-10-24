@@ -1,0 +1,39 @@
+name: Prediction Pit P0 Mini4WD transactional exposure
+on:
+  pull_request:
+    paths:
+      - 'scripts/pit-p0/mini4wd-postgres-risk-smoke.sql'
+      - 'supabase/release-candidate/PIT_P0_MINI4WD_ADMISSION_GUARD_STAGING_ONLY.sql'
+      - '.github/workflows/pit-p0-mini4wd-postgres.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mini4wd-reserve-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: pit_disposable
+          POSTGRES_USER: pit_test
+          POSTGRES_PASSWORD: disposable_only_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pit_test -d pit_disposable"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Compile and test Mini4WD reserve/limit guard in disposable PostgreSQL
+        env:
+          PGPASSWORD: disposable_only_ci
+        run: >-
+          psql -X -v ON_ERROR_STOP=1
+          -h 127.0.0.1 -U pit_test -d pit_disposable
+          -f scripts/pit-p0/mini4wd-postgres-risk-smoke.sql
