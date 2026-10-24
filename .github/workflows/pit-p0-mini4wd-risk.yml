@@ -4,6 +4,7 @@ on:
     paths:
       - 'scripts/pit-p0/mini4wd-exposure*.mjs'
       - 'scripts/pit-p0/mcl-stake-policy*.mjs'
+      - 'scripts/pit-p0/mcl-funding-audit*.mjs'
       - 'scripts/pit-p0/p0-policy.mjs'
       - '.github/workflows/pit-p0-mini4wd-risk.yml'
   workflow_dispatch:
@@ -21,4 +22,4 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify owner-approved P0 policy and funded-MCL / fixed-Mini4WD limits
-        run: node --test scripts/pit-p0/mcl-stake-policy.test.mjs scripts/pit-p0/mini4wd-exposure.test.mjs
+        run: node --test scripts/pit-p0/mcl-stake-policy.test.mjs scripts/pit-p0/mcl-funding-audit.test.mjs scripts/pit-p0/mini4wd-exposure.test.mjs
