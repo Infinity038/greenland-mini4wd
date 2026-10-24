@@ -1,7 +1,9 @@
 -- Disposable PostgreSQL 17-only test of owner approvals and session scope.
 \set ON_ERROR_STOP on
-CREATE ROLE anon NOLOGIN;
-CREATE ROLE authenticated NOLOGIN;
+DO $roles$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+END $roles$;
 CREATE SCHEMA auth;
 CREATE SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
