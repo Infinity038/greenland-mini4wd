@@ -37,7 +37,24 @@ CREATE FUNCTION pp.game_stake(text,text,bigint,text)
  BEGIN INSERT INTO pp.ledger(balance_after) VALUES (1000) RETURNING * INTO l;
  RETURN l; END $mock$;
 
+CREATE FUNCTION pp._require_admin() RETURNS void
+ LANGUAGE plpgsql AS $v$ BEGIN NULL; END $v$;
+CREATE TABLE pp.audit(actor uuid,action text,detail jsonb);
+CREATE TABLE pp.mock_game_settlements (
+ id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, ref_type text,ref_id text,total bigint
+);
+CREATE FUNCTION pp.game_settle(p_ref_type text,p_ref_id text,p_result_version integer,p_payouts jsonb,p_max_total bigint)
+ RETURNS jsonb LANGUAGE plpgsql AS $mock_settle$
+DECLARE total bigint;
+BEGIN
+ SELECT COALESCE(sum((e->>'amount')::bigint),0) INTO total
+ FROM jsonb_array_elements(p_payouts) AS e;
+ IF total>p_max_total THEN RAISE EXCEPTION 'invalid funded settlement'; END IF;
+ INSERT INTO pp.mock_game_settlements(ref_type,ref_id,total) VALUES(p_ref_type,p_ref_id,total);
+ RETURN jsonb_build_object('total_paid',total);
+END $mock_settle$;
 \i supabase/release-candidate/PIT_P0_MINI4WD_ADMISSION_GUARD_STAGING_ONLY.sql
+\i supabase/release-candidate/PIT_P0_MINI4WD_SETTLEMENT_RESERVE_STAGING_ONLY.sql
 
 -- Six entrants per heat, all synthetic, no historic bettor identities.
 INSERT INTO pp.m4_heats(id,mode,status)
@@ -190,5 +207,55 @@ BEGIN
  IF (SELECT count(*) FROM pp.ledger)<>7 OR (SELECT count(*) FROM pp.m4_bets)<>7 THEN
    RAISE EXCEPTION 'Synthetic accepted bets mismatch';
  END IF;
+END $x$;
+
+-- Test official result and organizer void with synthetic operator capacity.
+UPDATE pp.p0_operator_reserve SET enabled=true,settled_free_reserve=30000;
+UPDATE pp.m4_heats SET status='locked'
+ WHERE id IN ('00000000-0000-0000-0000-000000000002',
+              '00000000-0000-0000-0000-000000000004');
+SELECT pp.m4_settle(
+ '00000000-0000-0000-0000-000000000002',
+ ARRAY['10000000-0000-0000-0002-000000000001'::uuid]);
+DO $x$ BEGIN
+ IF (SELECT settled_free_reserve FROM pp.p0_operator_reserve WHERE scope='mini4wd')<>29025
+ THEN RAISE EXCEPTION 'Winner payout must debit reserve by 975'; END IF;
+END $x$;
+-- Replay should leave one settlement and one reserve audit row.
+SELECT pp.m4_settle(
+ '00000000-0000-0000-0000-000000000002',
+ ARRAY['10000000-0000-0000-0002-000000000001'::uuid]);
+DO $x$ BEGIN
+ IF (SELECT count(*) FROM pp.p0_reserve_movements)<>1 OR
+    (SELECT count(*) FROM pp.mock_game_settlements)<>1
+ THEN RAISE EXCEPTION 'Winner replay double-counted'; END IF;
+END $x$;
+
+-- Organizer void fully refunds 4 x 25 = 100; no reserve profit/loss.
+SELECT pp.m4_void('00000000-0000-0000-0000-000000000001');
+SELECT pp.m4_void('00000000-0000-0000-0000-000000000001');
+DO $x$ BEGIN
+ IF (SELECT settled_free_reserve FROM pp.p0_operator_reserve WHERE scope='mini4wd')<>29025
+ THEN RAISE EXCEPTION 'Void changed available operator reserve'; END IF;
+ IF (SELECT actual_payouts_or_refunds FROM pp.p0_reserve_movements WHERE action='void')<>100
+ THEN RAISE EXCEPTION 'Void did not audit full original stakes'; END IF;
+ IF (SELECT count(*) FROM pp.p0_reserve_movements)<>2 OR
+    (SELECT count(*) FROM pp.mock_game_settlements)<>2
+ THEN RAISE EXCEPTION 'Void double-issued refund or movement'; END IF;
+END $x$;
+
+-- Top-3 physical race: one winning 40x ticket, two unmatched positions.
+SELECT pp.m4_settle(
+ '00000000-0000-0000-0000-000000000004',
+ ARRAY[
+ '10000000-0000-0000-0004-000000000001'::uuid,
+ '10000000-0000-0000-0004-000000000002'::uuid,
+ '10000000-0000-0000-0004-000000000003'::uuid]);
+DO $x$ BEGIN
+ IF (SELECT settled_free_reserve FROM pp.p0_operator_reserve WHERE scope='mini4wd')<>28050
+ THEN RAISE EXCEPTION 'Top-3 payout did not reduce reserve by 975'; END IF;
+ IF (SELECT count(*) FROM pp.p0_reserve_movements)<>3 OR
+    (SELECT count(*) FROM pp.mock_game_settlements)<>3
+ THEN RAISE EXCEPTION 'Top-3 official settlement missing audit'; END IF;
 END $x$;
 ROLLBACK;
