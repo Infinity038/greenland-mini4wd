@@ -1,9 +1,18 @@
 /** Pure P0 championship gate model for review-only fixtures; no DB/wallet writes.
  *  Do not confuse this fixture model with authenticated Postgres rehearsal. */
-export function assessChampionReadiness({season,marbles,races,markets,declaredChampion}) {
+export function assessChampionReadiness({season,marbles,colorsByMarble,races,markets,declaredChampion}) {
   if(season?.status!=='live') return {ok:false,code:'SEASON_NOT_LIVE'};
   if(!Array.isArray(marbles)||marbles.length!==24||new Set(marbles).size!==24)
     return {ok:false,code:'ROSTER_NOT_24_UNIQUE'};
+  // P0 requires exactly six colors with four unique marbles each.
+  const colorCounts=new Map();
+  for(const id of marbles){
+    const color=colorsByMarble?.[id];
+    if(typeof color!=='string'||!color) return {ok:false,code:'ROSTER_COLOR_DISTRIBUTION_INVALID'};
+    colorCounts.set(color,(colorCounts.get(color)||0)+1);
+  }
+  if(colorCounts.size!==6||[...colorCounts.values()].some(count=>count!==4))
+    return {ok:false,code:'ROSTER_COLOR_DISTRIBUTION_INVALID'};
   if(!Array.isArray(races)) return {ok:false,code:'RACES_MISSING'};
   const counts={regular:0,playoff:0,final:0};
   for(const r of races) {
@@ -21,6 +30,8 @@ export function assessChampionReadiness({season,marbles,races,markets,declaredCh
        r.result.some(x=>!r.lineup.includes(x))||r.lineup.some(x=>!roster.has(x)))
       return {ok:false,code:'RESULT_NOT_PERMUTATION_OF_LINEUP'};
   }
+  if(races.filter(r=>r.phase==='regular').some(r=>new Set(r.lineup.map(id=>colorsByMarble[id])).size!==6))
+    return {ok:false,code:'REGULAR_COLOR_LINEUP_INVALID'};
   const qualified=races.filter(r=>r.phase==='playoff').flatMap(r=>r.result.slice(0,3));
   const final=races.find(r=>r.phase==='final');
   if(new Set(qualified).size!==6||[...qualified].sort().join('|')!==[...final.lineup].sort().join('|'))
