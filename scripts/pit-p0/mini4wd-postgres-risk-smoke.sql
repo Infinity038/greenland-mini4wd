@@ -1,0 +1,188 @@
+-- Mini4WD disposable PostgreSQL 17 admission smoke. NO real user or wallet data.
+\set ON_ERROR_STOP on
+BEGIN;
+CREATE ROLE anon; CREATE ROLE authenticated;
+CREATE SCHEMA auth; CREATE SCHEMA pp;
+CREATE TABLE pp.m4_heats (
+ id uuid PRIMARY KEY, mode text NOT NULL, status text NOT NULL,
+ result jsonb,opened_at timestamptz,locked_at timestamptz);
+CREATE TABLE pp.m4_entries (
+ id uuid PRIMARY KEY, heat_id uuid NOT NULL,position integer NOT NULL);
+CREATE TABLE pp.ledger(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,balance_after bigint);
+CREATE TABLE pp.m4_bets (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),heat_id uuid,entry_id uuid,
+ player_id uuid,stake bigint,odds numeric,status text DEFAULT 'pending',
+ idem text,stake_ledger_id bigint);
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS
+ $$SELECT '00000000-0000-0000-0000-000000000007'::uuid$$;
+CREATE FUNCTION pp._require_allowed() RETURNS void LANGUAGE plpgsql AS $v$ BEGIN NULL; END $v$;
+CREATE FUNCTION pp._require_game(text) RETURNS void LANGUAGE plpgsql AS $v$ BEGIN NULL; END $v$;
+CREATE FUNCTION pp._player_of(uuid) RETURNS uuid LANGUAGE sql AS
+ $$SELECT '00000000-0000-0000-0000-000000000008'::uuid$$;
+CREATE FUNCTION pp._m4_quotes(p_heat uuid)
+ RETURNS TABLE(entry_id uuid,odds numeric) LANGUAGE sql STABLE AS $q$
+ SELECT id,CASE
+ WHEN p_heat='00000000-0000-0000-0000-000000000003'::uuid THEN 50
+ WHEN p_heat IN (
+  '00000000-0000-0000-0000-000000000002'::uuid,
+  '00000000-0000-0000-0000-000000000004'::uuid,
+  '00000000-0000-0000-0000-000000000005'::uuid,
+  '00000000-0000-0000-0000-000000000006'::uuid)
+ THEN 40 ELSE 2 END::numeric(8,2)
+ FROM pp.m4_entries WHERE heat_id=p_heat ORDER BY position;
+$q$;
+CREATE FUNCTION pp.game_stake(text,text,bigint,text)
+ RETURNS pp.ledger LANGUAGE plpgsql AS $mock$
+ DECLARE l pp.ledger;
+ BEGIN INSERT INTO pp.ledger(balance_after) VALUES (1000) RETURNING * INTO l;
+ RETURN l; END $mock$;
+
+\i supabase/release-candidate/PIT_P0_MINI4WD_ADMISSION_GUARD_STAGING_ONLY.sql
+
+-- Six entrants per heat, all synthetic, no historic bettor identities.
+INSERT INTO pp.m4_heats(id,mode,status)
+ SELECT ('00000000-0000-0000-0000-'||lpad(h::text,12,'0'))::uuid,
+ CASE WHEN h=4 THEN 'podium' ELSE 'win' END,
+ 'open'
+ FROM generate_series(1,6) h;
+INSERT INTO pp.m4_entries(id,heat_id,position)
+ SELECT ('10000000-0000-0000-'||lpad(h::text,4,'0')||'-'||lpad(n::text,12,'0'))::uuid,
+ ('00000000-0000-0000-0000-'||lpad(h::text,12,'0'))::uuid,
+ n
+ FROM generate_series(1,6) h CROSS JOIN generate_series(1,6) n;
+
+-- No real funding record is seeded by the release-candidate migration.
+DO $x$ DECLARE before_n int;
+BEGIN
+ SELECT count(*) INTO before_n FROM pp.ledger;
+ BEGIN
+   PERFORM pp.m4_place_bet(
+   '00000000-0000-0000-0000-000000000001',
+   '10000000-0000-0000-0001-000000000001',25,2,'no-reserve-0001');
+   RAISE EXCEPTION 'Missing reserve accepted a ticket';
+ EXCEPTION WHEN insufficient_privilege THEN NULL;
+ END;
+ IF (SELECT count(*) FROM pp.ledger)<>before_n THEN
+   RAISE EXCEPTION 'Failed closed reserve still debited a wallet';
+ END IF;
+END $x$;
+
+-- Synthetic test-only operator backing, NOT a migration and not actual funds.
+INSERT INTO pp.p0_operator_reserve(scope,tier,settled_free_reserve,earmarked_other_liabilities,verified_source_ref,verified_at,enabled)
+VALUES('mini4wd',1,30000,0,'SYNTHETIC_CI_ONLY',now(),true);
+
+-- Four tickets x25 for one player; 5th must reject. Quoted odds exactly 2x.
+SELECT pp.m4_place_bet(
+ '00000000-0000-0000-0000-000000000001',
+ '10000000-0000-0000-0001-000000000001',25,2,'h1-stake-first-0001');
+SELECT pp.m4_place_bet(
+ '00000000-0000-0000-0000-000000000001',
+ '10000000-0000-0000-0001-000000000002',25,2,'h1-stake-second0002');
+SELECT pp.m4_place_bet(
+ '00000000-0000-0000-0000-000000000001',
+ '10000000-0000-0000-0001-000000000003',25,2,'h1-stake-third-0003');
+SELECT pp.m4_place_bet(
+ '00000000-0000-0000-0000-000000000001',
+ '10000000-0000-0000-0001-000000000004',25,2,'h1-stake-fourth0004');
+DO $x$ DECLARE before_n int;
+BEGIN
+ SELECT count(*) INTO before_n FROM pp.ledger;
+ BEGIN
+   PERFORM pp.m4_place_bet(
+     '00000000-0000-0000-0000-000000000001',
+     '10000000-0000-0000-0001-000000000005',1,2,'h1-fifth-ticket0005');
+   RAISE EXCEPTION 'Player heat 100 limit bypassed';
+ EXCEPTION WHEN check_violation THEN NULL;
+ END;
+ BEGIN
+   PERFORM pp.m4_place_bet(
+     '00000000-0000-0000-0000-000000000001',
+     '10000000-0000-0000-0001-000000000005',26,2,'h1-over-ticket0006');
+   RAISE EXCEPTION '25 ticket limit bypassed';
+ EXCEPTION WHEN check_violation THEN NULL;
+ END;
+ IF (SELECT count(*) FROM pp.ledger)<>before_n THEN
+   RAISE EXCEPTION 'Rejected ticket debited wallet';
+ END IF;
+END $x$;
+
+-- Event-level worst-case loss of 25x50-25=1225 >1000.
+DO $x$ DECLARE before_n int;
+BEGIN
+ SELECT count(*) INTO before_n FROM pp.ledger;
+ BEGIN
+  PERFORM pp.m4_place_bet(
+  '00000000-0000-0000-0000-000000000003',
+  '10000000-0000-0000-0003-000000000001',25,50,'bad-event-risk0003');
+  RAISE EXCEPTION '1000 event limit bypassed';
+ EXCEPTION WHEN check_violation THEN NULL;
+ END;
+ IF (SELECT count(*) FROM pp.ledger)<>before_n THEN
+  RAISE EXCEPTION 'Rejected event-risk ticket debited wallet';
+ END IF;
+END $x$;
+
+-- Three independent high-risk heats 25x40=1000 gross each (975 net).
+SELECT pp.m4_place_bet(
+ '00000000-0000-0000-0000-000000000002',
+ '10000000-0000-0000-0002-000000000001',25,40,'combined-heat-0002');
+SELECT pp.m4_place_bet(
+ '00000000-0000-0000-0000-000000000004',
+ '10000000-0000-0000-0004-000000000001',25,40,'combined-heat-0004');
+SELECT pp.m4_place_bet(
+ '00000000-0000-0000-0000-000000000005',
+ '10000000-0000-0000-0005-000000000001',25,40,'combined-heat-0005');
+DO $x$ DECLARE before_n int;
+BEGIN
+ SELECT count(*) INTO before_n FROM pp.ledger;
+ BEGIN
+  PERFORM pp.m4_place_bet(
+  '00000000-0000-0000-0000-000000000006',
+  '10000000-0000-0000-0006-000000000001',25,40,'combined-over-0006');
+  RAISE EXCEPTION '3000 combined downside exceeded';
+ EXCEPTION WHEN check_violation THEN NULL;
+ END;
+ IF (SELECT count(*) FROM pp.ledger)<>before_n THEN
+  RAISE EXCEPTION 'Rejected combined-risk ticket debited wallet';
+ END IF;
+END $x$;
+
+-- Gross coverage and earmarks bind even if per-event/net checks pass.
+UPDATE pp.p0_operator_reserve SET settled_free_reserve=3000;
+DO $x$ DECLARE before_n int;
+BEGIN
+ SELECT count(*) INTO before_n FROM pp.ledger;
+ BEGIN
+  PERFORM pp.m4_place_bet(
+   '00000000-0000-0000-0000-000000000001',
+   '10000000-0000-0000-0001-000000000005',1,2,'reserve-low-00007');
+  RAISE EXCEPTION 'Gross reserve condition bypassed';
+ EXCEPTION WHEN check_violation THEN NULL;
+ END;
+ IF (SELECT count(*) FROM pp.ledger)<>before_n THEN
+  RAISE EXCEPTION 'Rejected gross-risk ticket debited wallet';
+ END IF;
+END $x$;
+UPDATE pp.p0_operator_reserve SET enabled=false;
+DO $x$ DECLARE before_n int;
+BEGIN
+ SELECT count(*) INTO before_n FROM pp.ledger;
+ BEGIN
+  PERFORM pp.m4_place_bet(
+   '00000000-0000-0000-0000-000000000001',
+   '10000000-0000-0000-0001-000000000005',1,2,'reserve-off-00008');
+  RAISE EXCEPTION 'Disabled reserve bypassed';
+ EXCEPTION WHEN insufficient_privilege THEN NULL;
+ END;
+ IF (SELECT count(*) FROM pp.ledger)<>before_n THEN
+  RAISE EXCEPTION 'Disabled reserve caused a wallet debit';
+ END IF;
+END $x$;
+
+DO $x$
+BEGIN
+ IF (SELECT count(*) FROM pp.ledger)<>7 OR (SELECT count(*) FROM pp.m4_bets)<>7 THEN
+   RAISE EXCEPTION 'Synthetic accepted bets mismatch';
+ END IF;
+END $x$;
+ROLLBACK;
