@@ -30,7 +30,7 @@ else
  grep -q "Handoff already redeemed" "$tmp/a"
 fi
 state="$(psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U pit_test -d pit_sso_disposable -tAc "
- SELECT count(*)::text || ':' || min(player_id)::text FROM pp.p0_handoff_redemptions;")"
+ SELECT count(*)::text || ':' || (array_agg(player_id))[1]::text FROM pp.p0_handoff_redemptions;")"
 [[ "$state" == "1:22222222-2222-4222-8222-222222222222" ]] || {
  echo "One-time handoff mislinked player: $state"; exit 1;
 }
