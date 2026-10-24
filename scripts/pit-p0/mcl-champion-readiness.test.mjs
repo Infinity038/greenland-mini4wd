@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {assessChampionReadiness as assess} from './mcl-champion-readiness.mjs';
 const marbles=Array.from({length:24},(_,i)=>`M${i+1}`);
+const colorsByMarble=Object.fromEntries(marbles.map((id,i)=>[id,`C${Math.floor(i/4)+1}`]));
 function fixture(){
   const races=[];
   for(let i=0;i<40;i++){
-    const lineup=marbles.slice((i%4)*6,(i%4)*6+6);
+    const lineup=Array.from({length:6},(_,color)=>marbles[color*4+(i%4)]);
     races.push({phase:'regular',status:'settled',lineup,result:[...lineup]});
   }
   const p1=marbles.slice(0,6),p2=marbles.slice(6,12);
@@ -15,7 +16,7 @@ function fixture(){
   races.push({phase:'final',status:'settled',lineup:finalists,result:[...finalists]});
   const markets=[{kind:'champion',status:'locked'},
     ...Array.from({length:86},()=>({kind:'race',status:'settled'}))];
-  return {season:{status:'live'},marbles,races,markets,declaredChampion:finalists[0]};
+  return {season:{status:'live'},marbles,colorsByMarble:{...colorsByMarble},races,markets,declaredChampion:finalists[0]};
 }
 test('valid 43-race season passes fixture check',()=>assert.equal(assess(fixture()).ok,true));
 test('a prematurely completed season must not re-settle',()=>{
@@ -54,4 +55,14 @@ test('unlocked champion market fails',()=>{
 test('missing market fails',()=>{
   const x=fixture();x.markets.pop();
   assert.equal(assess(x).code,'MARKET_COUNTS_INVALID');
+});
+
+test('rejects a 24-marble roster without six groups of four',()=>{
+  const x=fixture();x.colorsByMarble.M24='C1';
+  assert.equal(assess(x).code,'ROSTER_COLOR_DISTRIBUTION_INVALID');
+});
+test('rejects six-distinct-marble regular heat containing repeated color',()=>{
+  const x=fixture();x.races[0].lineup=['M1','M2','M5','M9','M13','M17'];
+  x.races[0].result=[...x.races[0].lineup];
+  assert.equal(assess(x).code,'REGULAR_COLOR_LINEUP_INVALID');
 });
