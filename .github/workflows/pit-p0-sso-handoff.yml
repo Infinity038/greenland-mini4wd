@@ -1,0 +1,38 @@
+name: Prediction Pit P0 signed one-use SSO contract
+on:
+  pull_request:
+    paths:
+      - 'scripts/pit-p0/sso-handoff-*'
+      - 'supabase/release-candidate/PIT_P0_SSO_ONE_USE_REDEMPTION_STAGING_ONLY.sql'
+      - '.github/workflows/pit-p0-sso-handoff.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signed-one-use-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: pit_ci
+          POSTGRES_USER: pit_test
+          POSTGRES_PASSWORD: ci_synthetic_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pit_test -d pit_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Signed handoff issuer/verifier and approval-denial fixtures
+        run: node --test scripts/pit-p0/sso-handoff-contract.test.mjs
+      - name: Postgres one-time redemption and historical wallet isolation
+        env:
+          PGPASSWORD: ci_synthetic_only
+        run: bash scripts/pit-p0/sso-handoff-postgres-race.sh
