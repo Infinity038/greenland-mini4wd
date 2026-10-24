@@ -98,7 +98,7 @@ begin
   update pp.m4_heats set status = 'settled', result = res, settled_at = now() where id = p_heat;
   insert into pp.audit(actor, action, detail) values (auth.uid(), 'm4_settle', jsonb_build_object('heat', p_heat, 'result', res, 'total_paid', total));
   return jsonb_build_object('status', 'settled', 'total_paid', total);
-end $function$
+end $function$;
 
 
 CREATE OR REPLACE FUNCTION pp.m4_void(p_heat uuid)
@@ -124,5 +124,5 @@ begin
   update pp.m4_heats set status = 'void', settled_at = now() where id = p_heat;
   insert into pp.audit(actor, action, detail) values (auth.uid(), 'm4_void', jsonb_build_object('heat', p_heat, 'refunded', total));
   return jsonb_build_object('status', 'void', 'refunded', total);
-end $function$
+end $function$;
 
