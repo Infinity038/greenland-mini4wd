@@ -52,7 +52,7 @@ expect_equal 'member can only see own ID' \
  SELECT count(*)::text||':'||max(name) FROM public.members; ROLLBACK;" '1:One'
 expect_equal 'member cannot see other member for UPDATE' \
  "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
- SELECT count(*) FROM public.members WHERE id='22222222-2222-4222-8222-222222222222';
+ WITH modified AS (UPDATE public.members SET name='EXPLOIT' WHERE id='22222222-2222-4222-8222-222222222222' RETURNING id) SELECT count(*) FROM modified;
  ROLLBACK;" '0'
 expect_equal 'synthetic staff can SELECT both members' \
  "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
