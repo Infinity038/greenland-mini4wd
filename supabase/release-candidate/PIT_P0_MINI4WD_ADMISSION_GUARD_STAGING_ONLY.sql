@@ -160,5 +160,5 @@ begin
   l := pp.game_stake('m4_heat', p_heat::text, p_stake, p_idem);
   insert into pp.m4_bets(heat_id, entry_id, player_id, stake, odds, idem, stake_ledger_id) values (p_heat, p_entry, pid, p_stake, q, p_idem, l.id) returning * into b;
   return jsonb_build_object('bet_id', b.id, 'odds', q, 'stake', p_stake, 'balance_after', l.balance_after, 'replay', false);
-end $function$
+end $function$;
 
