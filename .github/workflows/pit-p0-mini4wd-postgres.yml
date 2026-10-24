@@ -4,6 +4,7 @@ on:
     paths:
       - 'scripts/pit-p0/mini4wd-postgres-risk-smoke.sql'
       - 'supabase/release-candidate/PIT_P0_MINI4WD_ADMISSION_GUARD_STAGING_ONLY.sql'
+      - 'supabase/release-candidate/PIT_P0_MINI4WD_SETTLEMENT_RESERVE_STAGING_ONLY.sql'
       - '.github/workflows/pit-p0-mini4wd-postgres.yml'
   workflow_dispatch:
 permissions:
