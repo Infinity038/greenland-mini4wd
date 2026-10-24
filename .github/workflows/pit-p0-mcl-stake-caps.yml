@@ -1,0 +1,45 @@
+name: Prediction Pit P0 MCL database stake caps
+on:
+  pull_request:
+    paths:
+      - 'scripts/pit-p0/mcl-tier1-postgres-smoke.sql'
+      - 'scripts/pit-p0/mcl-tier1-concurrency*'
+      - 'supabase/release-candidate/PIT_P0_MCL_STAKE_CAPS_STAGING_ONLY.sql'
+      - '.github/workflows/pit-p0-mcl-stake-caps.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  p0-mcl-database-guards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      pg:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pit_test
+          POSTGRES_DB: pit_disposable
+          POSTGRES_PASSWORD: disposable_only_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pit_test -d pit_disposable"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Compile hosted-function adaptation and test P0 wallet pre-debit gates
+        env:
+          PGPASSWORD: disposable_only_ci
+        run: >-
+          psql -X -v ON_ERROR_STOP=1
+          -h 127.0.0.1 -U pit_test -d pit_disposable
+          -f scripts/pit-p0/mcl-tier1-postgres-smoke.sql
+
+      - name: Verify two overlapping Winner/Exact submissions obey one participant/race cap
+        env:
+          PGPASSWORD: disposable_only_ci
+        run: bash scripts/pit-p0/mcl-tier1-concurrency.sh
