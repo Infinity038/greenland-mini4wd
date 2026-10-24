@@ -4,6 +4,7 @@ on:
     paths:
       - 'scripts/pit-p0/sso-handoff-*'
       - 'scripts/pit-p0/gm4wd-pit-approval*'
+      - 'app/api/pit/handoff/route.ts'
       - 'supabase/release-candidate/GM4WD_PIT_P0_APPROVAL_GATE_STAGING_ONLY.sql'
       - 'supabase/release-candidate/PIT_P0_SSO_ONE_USE_REDEMPTION_STAGING_ONLY.sql'
       - '.github/workflows/pit-p0-sso-handoff.yml'
@@ -43,3 +44,8 @@ jobs:
         env:
           PGPASSWORD: ci_synthetic_only
         run: bash scripts/pit-p0/gm4wd-pit-approval-ci.sh
+
+      - name: Validate Next.js TypeScript handoff route against current GM4WD source
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx tsc --noEmit
