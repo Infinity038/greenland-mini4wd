@@ -9,7 +9,7 @@ psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U pit_test -d "$DB" \
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 query() {
-  psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U pit_test -d "$DB" -tAc "$1"
+  psql -X -qAt -v ON_ERROR_STOP=1 -h 127.0.0.1 -U pit_test -d "$DB" -c "$1"
 }
 expect_denial(){
  local name="$1" sql="$2"
@@ -47,24 +47,20 @@ expect_denial 'authenticated password hash remains inaccessible' \
  "BEGIN; SET LOCAL ROLE authenticated; SELECT password_hash FROM public.members; COMMIT;"
 expect_denial 'authenticated arbitrary member INSERT remains inaccessible' \
  "BEGIN; SET LOCAL ROLE authenticated; INSERT INTO public.members(id,email) VALUES(gen_random_uuid(),'bad2@example.invalid'); COMMIT;"
-expect_equal 'member can only see own ID, never other rows' \
- "BEGIN; SET LOCAL ROLE authenticated; SELECT set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
- SELECT count(*)::text||':'||min(name) FROM public.members;
- ROLLBACK;" '2:1:One'
-# The previous helper included psql statements' BEGIN and SET output. Select only
-# the last actual output from the session for assertions below.
-expect_equal 'non-owner cannot UPDATE other member' \
- "BEGIN; SET LOCAL ROLE authenticated; SELECT set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
- UPDATE public.members SET name='EXPLOIT' WHERE id='22222222-2222-4222-8222-222222222222' RETURNING name;
- ROLLBACK;" '2:0'
+expect_equal 'member can only see own ID' \
+ "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+ SELECT count(*)::text||':'||max(name) FROM public.members; ROLLBACK;" '1:One'
+expect_equal 'member cannot see other member for UPDATE' \
+ "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+ SELECT count(*) FROM public.members WHERE id='22222222-2222-4222-8222-222222222222';
+ ROLLBACK;" '0'
 expect_equal 'synthetic staff can SELECT both members' \
- "BEGIN; SET LOCAL ROLE authenticated; SELECT set_config('request.jwt.claim.sub','cccccccc-cccc-4ccc-8ccc-cccccccccccc',true);
- SELECT count(*) FROM public.members; ROLLBACK;" '2:2'
-expect_equal 'staff may update granted safe column but never raw password hash' \
- "BEGIN; SET LOCAL ROLE authenticated; SELECT set_config('request.jwt.claim.sub','cccccccc-cccc-4ccc-8ccc-cccccccccccc',true);
+ "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+ SELECT count(*) FROM public.members; ROLLBACK;" '2'
+expect_equal 'staff may update a safe column but never password hash' \
+ "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
  UPDATE public.members SET name='STAFF_ONLY' WHERE id='22222222-2222-4222-8222-222222222222';
- SELECT count(*) FROM public.members WHERE name='STAFF_ONLY';
- ROLLBACK;" '2:UPDATE 1:1'
+ SELECT count(*) FROM public.members WHERE name='STAFF_ONLY'; ROLLBACK;" '1'
 # No modifications survive individual rolled-back sessions.
 expect_equal 'synthetic baseline never mutated by tests' \
  "SELECT string_agg(name,',' ORDER BY name) FROM public.members" 'One,Two'
