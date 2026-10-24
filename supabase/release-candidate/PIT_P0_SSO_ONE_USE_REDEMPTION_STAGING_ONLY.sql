@@ -36,7 +36,7 @@ BEGIN
 
  -- The existing member->Pit linkage must be explicitly verified beforehand.
  -- No creation, no silent relink, no email lookup, no resetting wallets.
- SELECT count(*)::integer,min(id) INTO match_count,player
+ SELECT count(*)::integer,(array_agg(id))[1] INTO match_count,player
    FROM pp.players WHERE member_id=p_member;
  IF match_count<>1 THEN
    RAISE EXCEPTION 'Verified Pit identity link missing or ambiguous'
