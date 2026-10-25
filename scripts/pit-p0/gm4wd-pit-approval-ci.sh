@@ -35,6 +35,15 @@ expect_denial 'anonymous user cannot create owner approval' \
  "SET ROLE anon; SELECT public.pit_owner_set_member_access('$member',true,true);"
 expect_denial 'anonymous user cannot read approval inventory' \
  "SET ROLE anon; SELECT * FROM public.prediction_pit_access;"
+# Owner-admin role alone is NEVER sufficient: must be pinned by a
+# separate privileged, verified owner identity before approval can work.
+expect_denial 'even an admin cannot approve before owner identity is pinned' \
+ "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='$owner';
+ SELECT public.pit_owner_set_member_access('$member',true,true); COMMIT;"
+# CI-only controlled bootstrap (NEVER inserts a real owner ID on production).
+call "INSERT INTO public.prediction_pit_owner_authority
+ (singleton,owner_auth_user_id,verified_at,verification_ref)
+ VALUES(true,'$owner',now(),'SYNTHETIC_QA_ONLY');"
 expect 'owner 18+ verified approval succeeds' \
  "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='$owner';
  SELECT public.pit_owner_set_member_access('$member',true,true); ROLLBACK;" 't'
