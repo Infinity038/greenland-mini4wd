@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import PredictionPitEntry from './PredictionPitEntry';
 import {
   ORDER_STATUS_COLORS,
   ORDER_STATUS_LABELS,
@@ -411,7 +412,10 @@ export default function RacerProfile() {
                 {pendingRequest && <div style={{ ...FB, marginTop: 10, color: '#FACC15', fontSize: 12 }}>⏳ Profile change awaiting admin approval</div>}
               </div>
 
-              <button onClick={logout} style={{ ...FB, fontSize: 12, color: '#B8C1CC', background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 14px', cursor: 'pointer' }}>Logout</button>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:8}}>
+                <button onClick={logout} style={{ ...FB, fontSize: 12, color: '#B8C1CC', background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 14px', cursor: 'pointer' }}>Logout</button>
+                {profileDataReady && <PredictionPitEntry />}
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
