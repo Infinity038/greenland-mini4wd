@@ -3,6 +3,21 @@
 -- A valid GM4WD 64-hex HttpOnly cookie is necessary but not sufficient.
 -- Production SSO endpoint must throttle, check same-origin + CSRF, sign
 -- server-side only, and the Pit side must verify nonce consumption and approval.
+-- OWNER-ONLY authority is deliberately NOT pre-seeded by migration.
+-- A separate verified and audited privileged operation must pin exactly
+-- one already-existing owner Supabase Auth UUID after the production P3
+-- owner sign-in. Admin role ALONE must not approve any Pit account.
+CREATE TABLE IF NOT EXISTS public.prediction_pit_owner_authority (
+ singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton=true),
+ owner_auth_user_id uuid NOT NULL,
+ verified_at timestamptz NOT NULL,
+ verification_ref text NOT NULL CHECK(length(verification_ref)>=8)
+);
+ALTER TABLE public.prediction_pit_owner_authority ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.prediction_pit_owner_authority
+ FROM PUBLIC,anon,authenticated;
+-- No SQL seed, no user-provided email inference, no automatic admin promotion.
+
 CREATE TABLE IF NOT EXISTS public.prediction_pit_access (
  member_id uuid PRIMARY KEY REFERENCES public.members(id) ON DELETE RESTRICT,
  approved boolean NOT NULL DEFAULT false,
@@ -57,7 +72,11 @@ CREATE OR REPLACE FUNCTION public.pit_owner_set_member_access(
 SET search_path TO 'pg_catalog','pg_temp'
 AS $owner_access$
 BEGIN
- IF auth.uid() IS NULL OR NOT public.has_staff_role(ARRAY['admin']::public.staff_role[]) THEN
+ IF auth.uid() IS NULL OR
+    auth.uid() IS DISTINCT FROM (
+      SELECT owner_auth_user_id FROM public.prediction_pit_owner_authority
+      WHERE singleton=true
+    ) OR NOT public.has_staff_role(ARRAY['admin']::public.staff_role[]) THEN
    RAISE EXCEPTION 'Owner approval required' USING errcode='42501';
  END IF;
  IF p_member IS NULL OR p_approved IS NULL OR p_age_verified IS NULL
