@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'scripts/pit-p0/pit-handoff-receiver*'
+      - 'scripts/pit-p0/pit-existing-auth-session-broker*'
       - 'scripts/pit-p0/sso-handoff-contract.mjs'
       - '.github/workflows/pit-p0-receiver.yml'
   workflow_dispatch:
@@ -17,4 +18,4 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate live-shaped browser POST to verified-existing-Auth-user session exchange
-        run: node --test scripts/pit-p0/pit-handoff-receiver.test.mjs
+        run: node --test scripts/pit-p0/pit-handoff-receiver.test.mjs scripts/pit-p0/pit-existing-auth-session-broker.test.mjs
