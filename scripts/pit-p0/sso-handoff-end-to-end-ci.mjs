@@ -32,6 +32,13 @@ const linked=pg(pit,"UPDATE pp.players SET member_id='"+member+"'"+
  " WHERE id='"+linkedPlayer+"' AND member_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';"+
  " SELECT count(*) FROM pp.players WHERE member_id='"+member+"';");
 assert.equal(linked,'1');
+ // Owner-reviewed synthetic evidence must follow the synthetic member ID,
+ // but not be inferred from email, wallet balance or an existing session.
+assert.equal(pg(pit,
+ "UPDATE pp.p0_verified_player_links SET member_id='"+member+"'"+
+ " WHERE player_id='"+linkedPlayer+"' AND status='verified';"+
+ " SELECT count(*) FROM pp.p0_verified_player_links"+
+ " WHERE member_id='"+member+"' AND status='verified';"),'1');
 assert.equal(pg(gm4wd,"SET ROLE anon; SELECT "+
  "public.pit_member_handoff_authorized(repeat('b',64))->>'member_id'; RESET ROLE;"),member);
 
