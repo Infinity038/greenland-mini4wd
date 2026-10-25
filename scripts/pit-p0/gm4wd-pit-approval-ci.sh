@@ -62,6 +62,19 @@ expect 'rolled-back owner approval did not persist' \
 expect 'owner persists approved and verified 18+ access' \
  "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='$owner';
  SELECT public.pit_owner_set_member_access('$member',true,true); COMMIT;" 't'
+# Owner consent is necessary, but not sufficient: anonymous member exposure
+# must first be closed. An accidentally enabled feature flag stays harmless.
+expect 'owner-approved member blocked while club members RLS remains off' \
+ "SET ROLE anon; SELECT public.pit_member_handoff_authorized(repeat('b',64))->>'allowed'; RESET ROLE;" 'false'
+expect 'security interlock false before P4 member lockdown' \
+ "SELECT public.pit_p0_security_ready()::text" 'false'
+# Synthetic imitation of the SEPARATELY TESTED exact P4 privileges + RLS
+# transition. This runs only in the disposable CI database.
+call "ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
+ ALTER TABLE public.members FORCE ROW LEVEL SECURITY;
+ REVOKE SELECT,INSERT,UPDATE ON public.members FROM anon;"
+expect 'security interlock true only after RLS/grants and owner pin' \
+ "SELECT public.pit_p0_security_ready()::text" 'true'
 expect 'active approved club cookie permits issuing a short-lived token' \
  "SET ROLE anon; SELECT public.pit_member_handoff_authorized(repeat('b',64))->>'member_id'; RESET ROLE;" "$member"
 expect 'expired club session fails closed' \
