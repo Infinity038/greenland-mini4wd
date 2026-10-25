@@ -75,6 +75,17 @@ call "ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
  REVOKE SELECT,INSERT,UPDATE ON public.members FROM anon;"
 expect 'security interlock true only after RLS/grants and owner pin' \
  "SELECT public.pit_p0_security_ready()::text" 'true'
+expect 'server-side approval bridge callable only from privileged role' \
+ "SELECT has_function_privilege('anon',
+ 'public.pit_p0_current_member_approved(uuid)'::regprocedure,'EXECUTE')::text" 'false'
+expect 'owner-approved member is currently eligible from trusted server' \
+ "SET ROLE service_role;
+ SELECT public.pit_p0_current_member_approved('$member')::text;
+ RESET ROLE;" 'true'
+expect 'unapproved member fails current server eligibility' \
+ "SET ROLE service_role;
+ SELECT public.pit_p0_current_member_approved('22222222-2222-4222-8222-222222222222')::text;
+ RESET ROLE;" 'false'
 expect 'active approved club cookie permits issuing a short-lived token' \
  "SET ROLE anon; SELECT public.pit_member_handoff_authorized(repeat('b',64))->>'member_id'; RESET ROLE;" "$member"
 expect 'expired club session fails closed' \
@@ -89,6 +100,10 @@ expect 'owner revokes instantly' \
  SELECT public.pit_owner_set_member_access('$member',false,true); COMMIT;" 't'
 expect 'revoked approval makes same cookie invalid for Pit' \
  "SET ROLE anon; SELECT public.pit_member_handoff_authorized(repeat('b',64))->>'allowed'; RESET ROLE;" 'false'
+expect 'owner revocation immediately blocks server-to-server approval' \
+ "SET ROLE service_role;
+ SELECT public.pit_p0_current_member_approved('$member')::text;
+ RESET ROLE;" 'false'
 expect 'revoking does not delete prior club sessions' \
  "SELECT count(*) FROM public.club_member_sessions" '3'
 expect 'club member rows unchanged by owner approvals' \
