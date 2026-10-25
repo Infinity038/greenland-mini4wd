@@ -5,6 +5,7 @@ on:
       - 'scripts/pit-p0/pit-handoff-receiver*'
       - 'scripts/pit-p0/pit-existing-auth-session-broker*'
       - 'scripts/pit-p0/production-readiness-gates*'
+      - 'scripts/pit-p0/pit-next-http-receiver-adapter*'
       - 'scripts/security/*P0_RELEASE_INVENTORY_READ_ONLY.sql'
       - 'scripts/pit-p0/sso-handoff-contract.mjs'
       - '.github/workflows/pit-p0-receiver.yml'
@@ -20,4 +21,4 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate live-shaped browser POST to verified-existing-Auth-user session exchange
-        run: node --test scripts/pit-p0/pit-handoff-receiver.test.mjs scripts/pit-p0/pit-existing-auth-session-broker.test.mjs scripts/pit-p0/production-readiness-gates.test.mjs
+        run: node --test scripts/pit-p0/pit-handoff-receiver.test.mjs scripts/pit-p0/pit-existing-auth-session-broker.test.mjs scripts/pit-p0/production-readiness-gates.test.mjs scripts/pit-p0/pit-next-http-receiver-adapter.test.mjs
