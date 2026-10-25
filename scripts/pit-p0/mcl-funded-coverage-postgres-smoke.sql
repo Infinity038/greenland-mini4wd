@@ -93,10 +93,58 @@ BEGIN
     RAISE EXCEPTION 'No-winner prize disposition invalid: %',summary;
  END IF;
 END $q$;
+
+-- Ticket-level independent 4x/1x weighting: 1000 contributed gives
+-- 400 funded, early stake=100*4 receives 320, late stake=100*1 gets 80.
+INSERT INTO pp.mcl_markets(id,kind,status,cap) VALUES
+ ('00000000-0000-0000-0000-000000000004','champion','locked',8),
+ ('00000000-0000-0000-0000-000000000005','champion','locked',8),
+ ('00000000-0000-0000-0000-000000000006','winner','locked',2);
+INSERT INTO pp.mcl_tickets(id,market_id,player_id,outcome,stake,weight,cap) VALUES
+ ('10000000-0000-0000-0000-000000000041','00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000041','RED',100,4,8),
+ ('10000000-0000-0000-0000-000000000042','00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000042','RED',100,1,8),
+ ('10000000-0000-0000-0000-000000000043','00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000043','BLUE',800,1,8),
+ ('10000000-0000-0000-0000-000000000051','00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000051','RED',100,4,8),
+ ('10000000-0000-0000-0000-000000000052','00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000052','BLUE',4900,1,8),
+ ('10000000-0000-0000-0000-000000000061','00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000061','RED',1,1,2),
+ ('10000000-0000-0000-0000-000000000062','00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000062','RED',1,1,2),
+ ('10000000-0000-0000-0000-000000000063','00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000063','RED',1,1,2),
+ ('10000000-0000-0000-0000-000000000064','00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000064','BLUE',8,1,2);
+-- A malicious operator cannot submit 319/81 even when the total is 400.
 DO $q$ BEGIN
- IF (SELECT count(*) FROM pp.mock_settlements)<>3 OR
+ BEGIN
+  PERFORM pp._mcl_settle_market('00000000-0000-0000-0000-000000000004',ARRAY['RED'],
+   '[{"ticket_id":"10000000-0000-0000-0000-000000000041","amount":319},{"ticket_id":"10000000-0000-0000-0000-000000000042","amount":81}]'::jsonb);
+  RAISE EXCEPTION 'Wrong weighted split incorrectly accepted';
+ EXCEPTION WHEN check_violation THEN NULL;
+ END;
+ IF (SELECT status FROM pp.mcl_markets WHERE id='00000000-0000-0000-0000-000000000004')<>'locked'
+ THEN RAISE EXCEPTION 'Wrong weighted split closed market'; END IF;
+END $q$;
+DO $q$ DECLARE summary jsonb;
+BEGIN
+ summary:=pp._mcl_settle_market('00000000-0000-0000-0000-000000000004',ARRAY['RED'],
+  '[{"ticket_id":"10000000-0000-0000-0000-000000000041","amount":320},{"ticket_id":"10000000-0000-0000-0000-000000000042","amount":80}]'::jsonb);
+ IF summary->>'paid'<>'400' THEN RAISE EXCEPTION 'P0 weighted official settlement incorrect'; END IF;
+END $q$;
+-- Individual cap exhausted: 2000 funded; only one winner with 800 cap.
+DO $q$ DECLARE summary jsonb;
+BEGIN
+ summary:=pp._mcl_settle_market('00000000-0000-0000-0000-000000000005',ARRAY['RED'],
+  '[{"ticket_id":"10000000-0000-0000-0000-000000000051","amount":800}]'::jsonb);
+ IF summary->>'unclaimed'<>'1200' THEN RAISE EXCEPTION 'Cap surplus must remain unclaimed'; END IF;
+END $q$;
+-- Equal fractions deterministic UUID tie-break => 2,1,1.
+DO $q$ DECLARE summary jsonb;
+BEGIN
+ summary:=pp._mcl_settle_market('00000000-0000-0000-0000-000000000006',ARRAY['RED'],
+  '[{"ticket_id":"10000000-0000-0000-0000-000000000061","amount":2},{"ticket_id":"10000000-0000-0000-0000-000000000062","amount":1},{"ticket_id":"10000000-0000-0000-0000-000000000063","amount":1}]'::jsonb);
+ IF summary->>'paid'<>'4' THEN RAISE EXCEPTION 'Remainder tie distribution wrong'; END IF;
+END $q$;
+DO $q$ BEGIN
+ IF (SELECT count(*) FROM pp.mock_settlements)<>6 OR
     (SELECT count(*) FROM pp.mcl_tickets WHERE status='active')<>0 OR
-    (SELECT count(*) FROM pp.mcl_markets WHERE status='settled')<>3 THEN
+    (SELECT count(*) FROM pp.mcl_markets WHERE status='settled')<>6 THEN
    RAISE EXCEPTION 'Funded settlement count/status mismatch';
  END IF;
 END $q$;
