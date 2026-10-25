@@ -71,7 +71,7 @@ BEGIN
   IF public.pit_p0_security_ready() IS DISTINCT FROM true THEN
     RETURN jsonb_build_object('allowed',false);
   END IF;
-  IF p_token IS NULL OR p_token !~ '^[0-9a-f]{64}
+  IF p_token IS NULL OR p_token !~ '^[0-9a-f]{64}$' THEN
     RETURN jsonb_build_object('allowed',false);
   END IF;
   SELECT s.member_id INTO approved_member
