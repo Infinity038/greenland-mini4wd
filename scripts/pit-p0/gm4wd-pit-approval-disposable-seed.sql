@@ -11,7 +11,7 @@ CREATE TYPE public.staff_role AS ENUM('admin','registration_staff','checkin_staf
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
  SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid
 $$;
-CREATE TABLE public.members(id uuid PRIMARY KEY, name text);
+CREATE TABLE public.members(id uuid PRIMARY KEY, name text, password_hash text);
 CREATE TABLE public.staff_roles(user_id uuid,role public.staff_role);
 CREATE TABLE public.club_member_sessions(
  token_hash text PRIMARY KEY, member_id uuid NOT NULL, expires_at timestamptz NOT NULL
