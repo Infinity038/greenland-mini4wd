@@ -1,0 +1,39 @@
+name: Prediction Pit P0 MCL funded payout coverage
+on:
+  pull_request:
+    paths:
+      - 'scripts/pit-p0/mcl-funded-coverage-postgres-smoke.sql'
+      - 'supabase/release-candidate/PIT_P0_MCL_FUNDED_PAYOUT_COVERAGE_STAGING_ONLY.sql'
+      - '.github/workflows/pit-p0-mcl-funded-coverage.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  funded-mcl-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: pit_ci
+          POSTGRES_USER: pit_test
+          POSTGRES_PASSWORD: disposable_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pit_test -d pit_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify complete funded winning-ticket payouts before game settlement
+        env:
+          PGPASSWORD: disposable_ci_only
+        run: >-
+          psql -X -v ON_ERROR_STOP=1
+          -h 127.0.0.1 -U pit_test -d pit_ci
+          -f scripts/pit-p0/mcl-funded-coverage-postgres-smoke.sql
