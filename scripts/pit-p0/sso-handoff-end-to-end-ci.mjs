@@ -7,6 +7,10 @@ import {execFileSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {issueHandoffTicket,redeemHandoffTicket,verifyHandoffTicket}
   from './sso-handoff-contract.mjs';
+import {completePitHandoff} from './pit-handoff-receiver.mjs';
+import {
+  prepareExistingPitAuthSession,commitVerifiedPitSession,
+} from './pit-existing-auth-session-broker.mjs';
 const member='11111111-1111-4111-8111-111111111111';
 const linkedPlayer='22222222-2222-4222-8222-222222222222';
 const legacyPlayer='11111111-1111-4111-8111-111111111111';
@@ -71,6 +75,76 @@ assert.equal(accepted.accepted,true);
 assert.equal(accepted.playerId,linkedPlayer);
 assert.equal((await redeemHandoffTicket({token:signed,...deps})).code,'REPLAY_OR_EXPIRED');
 
+// Full synthetic cross-database issuance -> verified historical Pit link ->
+// atomic redemption -> exact pre-existing Supabase Auth identity -> cookie
+// session. Auth clients are FAKE and never touch a real user or API.
+const lookupVerified = async mid=>{
+  const row=pg(pit,"SELECT p.id::text||':'||p.member_id::text||':'||p.auth_user_id::text"+
+    " FROM pp.players p JOIN pp.p0_verified_player_links l"+
+    " ON l.player_id=p.id AND l.member_id=p.member_id"+
+    " AND l.auth_user_id=p.auth_user_id"+
+    " WHERE l.status='verified' AND l.revoked_at IS NULL"+
+    " AND p.member_id='"+esc(mid)+"';");
+  const v=row.split(':');
+  return v.length===3?{id:v[0],memberId:v[1],authUserId:v[2],verified:true}:null;
+};
+let authCalls=0, cookiesCommitted=0, currentAuthUser=null;
+const obtainUncommittedSession=async ({existingAuthUserId})=>{
+  authCalls++;
+  const candidate=await prepareExistingPitAuthSession({
+    existingAuthUserId,
+    adminClient:{auth:{admin:{
+      getUserById:async id=>({data:{user:{
+        id,email:'existing-only@example.invalid',email_confirmed_at:'2026-01-01'
+      }},error:null}),
+      generateLink:async()=>({data:{properties:{
+        hashed_token:'synthetic-server-only-token-hash'
+      }},error:null}),
+    }}},
+    isolatedAuthClient:{auth:{
+      verifyOtp:async()=>({data:{session:{
+       user:{id:existingAuthUserId},
+       access_token:'synthetic_access_token',
+       refresh_token:'synthetic_refresh_token',
+      }},error:null}),
+      getUser:async()=>({data:{user:{id:existingAuthUserId}},error:null}),
+    }},
+  });
+  if(!candidate.ok)throw Error('Synthetic Auth broker failed');
+  return candidate;
+};
+const commitSession=async ({expectedAuthUserId,accessToken,refreshToken})=>{
+  const fakeSsrClient={auth:{
+    setSession:async()=>{currentAuthUser=expectedAuthUserId;
+      return{data:{user:{id:expectedAuthUserId}},error:null}},
+    getUser:async()=>({data:{user:{id:currentAuthUser}},error:null}),
+    signOut:async()=>{currentAuthUser=null},
+  }};
+  const ok=await commitVerifiedPitSession({
+    existingAuthUserId:expectedAuthUserId,accessToken,refreshToken,
+    ssrClient:fakeSsrClient,
+  });
+  if(ok)cookiesCommitted++;
+  return ok;
+};
+const secondSigned=ticket();
+const complete=await completePitHandoff({
+  ticket:secondSigned,secret,nowSeconds:t+1,isCurrentlyApproved,
+  lookupLinkedPlayer:lookupVerified,atomicConsume,obtainUncommittedSession,
+  commitSession,
+});
+assert.equal(complete.code,'AUTHENTICATED');
+assert.equal(complete.redirectTo,'/');
+assert.equal(currentAuthUser,'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+assert.equal(authCalls,1);assert.equal(cookiesCommitted,1);
+assert.equal((await completePitHandoff({
+  ticket:secondSigned,secret,nowSeconds:t+1,isCurrentlyApproved,
+  lookupLinkedPlayer:lookupVerified,atomicConsume,obtainUncommittedSession,
+  commitSession,
+})).code,'REPLAY_OR_EXPIRED');
+assert.equal(authCalls,1);assert.equal(cookiesCommitted,1);
+
+
 // Revoke permission between issuance and exchange: signed ticket remains
 // cryptographically valid, but authorization must fail before nonce is spent.
 const prior=ticket();
@@ -84,6 +158,6 @@ const baseline=pg(pit,
  "(SELECT count(*) FROM pp.players WHERE id='"+legacyPlayer+"'"+
  " AND member_id IS NULL)::text||':'||"+
  "(SELECT count(*) FROM pp.p0_handoff_redemptions)::text;");
-assert.equal(baseline,'2:2:8100:1:2'); // one prior fixture and one redeemed
+assert.equal(baseline,'2:2:8100:1:3'); // fixture+one-use+Auth-backed redemption
 assert.equal(pg(gm4wd,'SELECT count(*) FROM public.club_member_sessions'),'3');
 console.log('PASS: synthetic two-project signed SSO, one-use replay and owner revocation; historical wallet untouched.');
