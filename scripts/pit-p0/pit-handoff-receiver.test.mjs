@@ -60,8 +60,9 @@ test('verified link then nonce then auth then SSR cookie commit ordering',async(
  assert.equal(result.authUserId,undefined);
 });
 test('replay fails before creating any second auth session',async()=>{
- tokens.clear();const first=deps();await completePitHandoff(first.args);
- const second=deps();const r=await completePitHandoff(second.args);
+ tokens.clear();const issued=token();const first=deps({ticket:issued});
+ await completePitHandoff(first.args);
+ const second=deps({ticket:issued});const r=await completePitHandoff(second.args);
  assert.equal(r.code,'REPLAY_OR_EXPIRED');
  assert.deepEqual(second.calls,['approval','link','consume']);
 });
