@@ -40,10 +40,18 @@ expect_denial 'anonymous user cannot read approval inventory' \
 expect_denial 'even an admin cannot approve before owner identity is pinned' \
  "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='$owner';
  SELECT public.pit_owner_set_member_access('$member',true,true); COMMIT;"
+# CI fixture has a second independently privileged staff identity: that role
+# must not impersonate the single owner for private game access.
+call "INSERT INTO public.staff_roles(user_id,role)
+ VALUES('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','admin');"
 # CI-only controlled bootstrap (NEVER inserts a real owner ID on production).
 call "INSERT INTO public.prediction_pit_owner_authority
  (singleton,owner_auth_user_id,verified_at,verification_ref)
  VALUES(true,'$owner',now(),'SYNTHETIC_QA_ONLY');"
+expect_denial 'second admin cannot approve private Pit members' \
+ "BEGIN; SET LOCAL ROLE authenticated;
+ SET LOCAL request.jwt.claim.sub='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+ SELECT public.pit_owner_set_member_access('$member',true,true); COMMIT;"
 expect 'owner 18+ verified approval succeeds' \
  "BEGIN; SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claim.sub='$owner';
  SELECT public.pit_owner_set_member_access('$member',true,true); ROLLBACK;" 't'
