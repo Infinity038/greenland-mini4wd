@@ -1,0 +1,26 @@
+name: Prediction Pit P0 unified source integration
+on:
+  pull_request:
+    paths:
+      - 'scripts/pit-p0/**'
+      - 'app/api/pit/**'
+      - 'app/profile/**'
+      - 'supabase/release-candidate/**'
+      - '.github/workflows/pit-p0-unified-source.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integrated-unit-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run all P0 Node fixtures together
+        run: node --test scripts/pit-p0/*.test.mjs
+      - name: Verify current Next.js GM4WD integration is type-correct
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx tsc --noEmit

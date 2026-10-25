@@ -36,3 +36,4 @@ INSERT INTO public.club_member_sessions(token_hash,member_id,expires_at) VALUES
  (encode(extensions.digest(repeat('d',64),'sha256'),'hex'),
   '11111111-1111-4111-8111-111111111111',now()-interval '1 hour');
 \i supabase/release-candidate/GM4WD_PIT_P0_APPROVAL_GATE_STAGING_ONLY.sql
+\i supabase/release-candidate/GM4WD_P0_CURRENT_OWNER_APPROVAL_READ_STAGING_ONLY.sql
