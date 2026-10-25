@@ -1,0 +1,24 @@
+name: Prediction Pit P0 receiving session trust-boundary
+on:
+  pull_request:
+    paths:
+      - 'scripts/pit-p0/pit-handoff-receiver*'
+      - 'scripts/pit-p0/pit-existing-auth-session-broker*'
+      - 'scripts/pit-p0/production-readiness-gates*'
+      - 'scripts/pit-p0/pit-next-http-receiver-adapter*'
+      - 'scripts/security/*P0_RELEASE_INVENTORY_READ_ONLY.sql'
+      - 'scripts/pit-p0/sso-handoff-contract.mjs'
+      - '.github/workflows/pit-p0-receiver.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  trusted-pit-receiver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Validate live-shaped browser POST to verified-existing-Auth-user session exchange
+        run: node --test scripts/pit-p0/pit-handoff-receiver.test.mjs scripts/pit-p0/pit-existing-auth-session-broker.test.mjs scripts/pit-p0/production-readiness-gates.test.mjs scripts/pit-p0/pit-next-http-receiver-adapter.test.mjs

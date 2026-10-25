@@ -20,7 +20,35 @@ INSERT INTO pp.wallet_accounts VALUES
 ('11111111-1111-4111-8111-111111111111','available',8000),
 ('22222222-2222-4222-8222-222222222222','available',100);
 GRANT SELECT ON pp.players TO service_role;
+-- Synthetic verified existing Auth user, never created from a member email.
+UPDATE pp.players
+  SET auth_user_id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+  WHERE id='22222222-2222-4222-8222-222222222222';
 \i supabase/release-candidate/PIT_P0_SSO_ONE_USE_REDEMPTION_STAGING_ONLY.sql
+\i supabase/release-candidate/PIT_P0_VERIFIED_PLAYER_LINK_STAGING_ONLY.sql
+
+-- A member_id on a Pit player does NOT by itself prove wallet ownership.
+DO $link_missing$ BEGIN
+ BEGIN
+  PERFORM pp.p0_redeem_verified_handoff(
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    repeat('a',64),clock_timestamp()+interval '30 seconds');
+  RAISE EXCEPTION 'Missing explicit owner identity verification was bypassed';
+ EXCEPTION WHEN insufficient_privilege THEN NULL;
+ END;
+ IF (SELECT count(*) FROM pp.p0_handoff_redemptions)<>0 THEN
+   RAISE EXCEPTION 'Unverified member issued a session claim';
+ END IF;
+END $link_missing$;
+-- Synthetic *manual* owner verified evidence; no such rows inserted
+-- by the staging migration or any hosted production change.
+INSERT INTO pp.p0_verified_player_links(
+ member_id,player_id,auth_user_id,status,verified_by,verified_at,evidence_ref)
+VALUES('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+ '22222222-2222-4222-8222-222222222222',
+ 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+ 'verified','ffffffff-ffff-4fff-8fff-ffffffffffff',
+ now(),'SYNTHETIC_OWNER_VERIFIED_CI_ONLY');
 
 DO $test$
 DECLARE n int;
@@ -70,6 +98,24 @@ BEGIN
    OR (SELECT count(*) FROM pp.players WHERE member_id IS NULL)<>1
  THEN RAISE EXCEPTION 'Denial mutated wallet, legacy owner identity or claim inventory'; END IF;
 END $test$;
+
+-- Even a previously verified link is revoked immediately without
+-- altering existing wallet balance or its original owner.
+UPDATE pp.p0_verified_player_links SET status='revoked',revoked_at=now();
+DO $link_revoked$ BEGIN
+ BEGIN
+  PERFORM pp.p0_redeem_verified_handoff(
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  repeat('e',64),clock_timestamp()+interval '30 seconds');
+  RAISE EXCEPTION 'Revoked identity link bypassed';
+ EXCEPTION WHEN insufficient_privilege THEN NULL;
+ END;
+ IF (SELECT count(*) FROM pp.p0_handoff_redemptions)<>0 THEN
+   RAISE EXCEPTION 'Revocation changed nonce inventory';
+ END IF;
+END $link_revoked$;
+UPDATE pp.p0_verified_player_links
+ SET status='verified',revoked_at=NULL;
 
 CREATE FUNCTION pp.test_slow_claim() RETURNS trigger LANGUAGE plpgsql AS $tr$
 BEGIN
